@@ -1,7 +1,7 @@
 /* E&C Time Clock – punch-in reminders that reach the phone even when the
    time clock app is closed.
 
-   Every minute, timeclockPunchReminders looks for active employees whose
+   Every 5 minutes, timeclockPunchReminders looks for active employees whose
    scheduled start (admin panel → Employees) plus the reminder delay (admin
    panel → Settings) has passed today and who haven't punched in. Each of them
    gets one web push notification per day on every phone that turned on
@@ -62,7 +62,7 @@ async function sendTo(ek, { title, body, tag }) {
 }
 
 exports.timeclockPunchReminders = onSchedule(
-  { schedule: 'every 1 minutes', timeZone: R.TZ, region: REGION, retryCount: 0, maxInstances: 1, memory: '256MiB' },
+  { schedule: '*/5 * * * *', timeZone: R.TZ, region: REGION, retryCount: 0, maxInstances: 1, memory: '256MiB' },
   async () => {
     const db = admin.database();
     const now = Date.now();
@@ -96,9 +96,9 @@ exports.timeclockPunchReminders = onSchedule(
       }
     }
 
-    // Once a day, drop the per-day "already reminded" records older than KEEP_SENT_DAYS
+    // Once a day (the 3:00 AM run), drop the per-day "already reminded" records older than KEEP_SENT_DAYS
     const z = R.zoned(now);
-    if (z.hh === 3 && z.mm === 0) {
+    if (z.hh === 3 && z.mm < 5) {
       const cutoff = R.addDaysKey(today, -KEEP_SENT_DAYS);
       const old = (await db.ref('timeclock/reminders_sent').orderByKey().endAt(cutoff).once('value')).val() || {};
       await Promise.all(Object.keys(old).map((k) => db.ref(`timeclock/reminders_sent/${k}`).remove()));

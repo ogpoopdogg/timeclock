@@ -67,8 +67,9 @@ the home-screen icon. iOS only allows web notifications for home-screen web apps
 ## Reminders when the app is closed
 
 `functions/` holds a Firebase Cloud Function, `timeclockPunchReminders`. It runs every
-minute and sends a web push notification to any active employee who is scheduled
-today and hasn't punched in by their start time plus the reminder delay. Each person
+5 minutes (at :00, :05, :10 …) and sends a web push notification to any active employee
+who is scheduled today and hasn't punched in by their start time plus the reminder
+delay, so the notification arrives 0–5 minutes after that time. Each person
 gets at most one per day. It stops trying at their scheduled end time, or 2 hours after
 the reminder was due if no end time is set. A second function, `timeclockTestPush`,
 powers the **Send test** button.
@@ -113,23 +114,23 @@ the command above deploys only that codebase. The dispatch app's functions
 other functions, answer **No**.
 
 The first deploy may ask to turn on the Cloud Scheduler API. Say yes, because the
-every-minute schedule runs on it.
+5-minute schedule runs on it.
 
 #### Running cost (estimate from Google's published prices, October 2026, USD)
 
-Running every minute is 43,200 runs a month (60 × 24 × 30). Each function has 1 vCPU
+Running every 5 minutes is 8,640 runs a month (12 × 24 × 30). Each function has 1 vCPU
 and 256 MiB of memory.
 
 | Piece | Free allowance | Price after that | This feature |
 | --- | --- | --- | --- |
-| Function runs ([Cloud Run](https://cloud.google.com/run/pricing)) | 180,000 vCPU-s, 360,000 GiB-s, 2M requests a month, per billing account | $0.000024/vCPU-s, $0.0000025/GiB-s, $0.40/million requests | 21,600–129,600 vCPU-s (0.5–3 s per run): $0.55–$3.21 if no free allowance is left |
+| Function runs ([Cloud Run](https://cloud.google.com/run/pricing)) | 180,000 vCPU-s, 360,000 GiB-s, 2M requests a month, per billing account | $0.000024/vCPU-s, $0.0000025/GiB-s, $0.40/million requests | 4,320–25,920 vCPU-s (0.5–3 s per run): $0.11–$0.64 if no free allowance is left |
 | Scheduler ([Cloud Scheduler](https://cloud.google.com/scheduler/pricing)) | 3 jobs per billing account | $0.10 per job per 31 days | 1 job: $0, or $0.10 if the account already has 3+ jobs |
-| Database reads ([Firebase](https://firebase.google.com/pricing)) | ~10 GB/month (360 MB/day) | $1/GB | roughly 0.2–0.5 GB a month |
+| Database reads ([Firebase](https://firebase.google.com/pricing)) | ~10 GB/month (360 MB/day) | $1/GB | roughly 0.04–0.1 GB a month |
 | Push notifications (FCM) | No-cost product | — | $0 |
 
 On its own, this feature fits inside the free allowances. It only costs money if
 the other apps on the same billing account have already used them up. In that case
-the worst case is about **$0.90–$3.85 USD a month**. To see the real numbers, check
+the worst case is about **$0.25–$0.90 USD a month**. To see the real numbers, check
 Google Cloud console → **Billing → Reports**, filtered by service.
 
 ### 4. Turn it on for each phone
