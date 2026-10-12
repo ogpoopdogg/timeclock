@@ -64,10 +64,69 @@ the home-screen icon. iOS only allows web notifications for home-screen web apps
 - **Admin edits** are marked "Edited by admin" on the employee's own screen, and each
   one is saved to the change log (`timeclock/audit`) with the reason.
 
-## Known limitation: reminders when the app is closed
+## Reminders when the app is closed
 
-The reminder comes from the time clock page, so it only fires while the page is open,
-including in the background or as a home-screen app the phone hasn't closed. If the
-phone has fully closed the page, no reminder is sent. Reminders with the app closed
-need a server to send a push notification at the right time, such as a scheduled Cloud
-Function using Firebase Cloud Messaging like the one in the `dispatch` repo.
+`functions/` holds a Firebase Cloud Function, `timeclockPunchReminders`. It runs every
+minute and sends a web push notification to any active employee who is scheduled
+today and hasn't punched in by their start time plus the reminder delay. Each person
+gets at most one per day. It stops trying at their scheduled end time, or 2 hours after
+the reminder was due if no end time is set. A second function, `timeclockTestPush`,
+powers the **Send test** button.
+
+Until the steps below are done, phones only get the reminder while the time clock is
+open. Nothing else changes.
+
+### 1. Get the two keys from Firebase
+
+Firebase console → project **eandccourier-36fcc** → ⚙ **Project settings**:
+
+1. **General** → *Your apps*. If there's no **Web** app (`</>`), click *Add app* → Web,
+   name it `E&C Time Clock`, and leave Hosting unticked. Copy its `appId`
+   (it looks like `1:1067680083511:web:…`).
+2. **Cloud Messaging** → *Web configuration* → *Web Push certificates* →
+   **Generate key pair**. Copy the key.
+
+Paste both into `push-config.js` and commit the change.
+
+### 2. Add the database rules
+
+`database.rules.json` now also has `timeclock/push_tokens` and
+`timeclock/push_tests`. Merge them in the same way as the rest (see step 1 above).
+
+### 3. Deploy the functions (once, and again whenever `functions/` changes)
+
+The easiest way, with nothing to install, is **Google Cloud Shell**
+(<https://shell.cloud.google.com>), signed in with the Google account that owns the
+Firebase project:
+
+```sh
+git clone https://github.com/ogpoopdogg/timeclock.git
+cd timeclock/functions && npm install && cd ..
+npx firebase-tools login --no-localhost
+npx firebase-tools deploy --only functions:timeclock --project eandccourier-36fcc
+```
+
+`firebase.json` puts these functions in their own *codebase* called `timeclock`, and
+the command above deploys only that codebase. The dispatch app's functions
+(`notifyStaffOnRequest`, `sendTestPush`) and `fleetHuntHistory`, `pajApi` and
+`pollNow` in the same project are left alone. If the CLI ever asks whether to delete
+other functions, answer **No**.
+
+The first deploy may ask to turn on the Cloud Scheduler API. Say yes, because the
+every-minute schedule runs on it. Running every minute is about 43,200 runs a month
+(60 × 24 × 30). Check current prices at <https://firebase.google.com/pricing> and
+<https://cloud.google.com/scheduler/pricing>.
+
+### 4. Turn it on for each phone
+
+Each employee opens the time clock and taps **Turn on** under Reminders. Phones that
+already allowed notifications register by themselves the next time the clock opens.
+The card then says *"This phone gets it even when the time clock is closed"*, and
+**Send test** sends a notification through the server.
+
+**Admin → Employees** shows *1 phone* (or more) next to everyone who will get
+closed-app reminders, and *No phone alerts* for everyone who won't.
+
+On iPhone, the clock must be added to the Home Screen and opened from there (iOS 16.4
+or later). The page checks whether the browser supports this kind of push, and falls
+back to the open-app reminder if it doesn't.

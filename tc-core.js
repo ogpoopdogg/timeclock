@@ -6,6 +6,9 @@
 //   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, src, edited }
 //   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at }
 //   timeclock/audit/{id}               admin edit history
+//   timeclock/push_tokens/{ek}/{key}   { token, at, device }  phones that get closed-app reminders
+//   timeclock/push_tests/{ek}          written to ask the server for a test notification
+//   timeclock/reminders_sent/{day}/{ek} written by the server (functions/) once a reminder is handled
 // {ek} is the employee's email in lower case with "." replaced by "," (keys can't contain ".").
 //
 // GPS units and their nicknames are the ones RouteWatcher uses:
@@ -30,6 +33,8 @@ export const P = {
     shifts: "timeclock/shifts",
     claims: "timeclock/vehicle_claims",
     audit: "timeclock/audit",
+    pushTokens: "timeclock/push_tokens",
+    pushTests: "timeclock/push_tests",
     gps: "developer/dispatch_dashboard/drivers",
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };

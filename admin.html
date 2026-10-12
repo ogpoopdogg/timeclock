@@ -251,6 +251,7 @@
         }
         .emp-row.inactive { opacity: 0.55; }
         .emp-row .avatar { background: var(--yellow); width: 40px; height: 40px; font-size: 1rem; }
+        .emp-status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
         .sched-chips { display: flex; gap: 4px; flex-wrap: wrap; }
         .sched-chip {
             display: inline-flex; flex-direction: column; align-items: center; min-width: 50px; padding: 4px 6px; border-radius: 8px;
@@ -624,7 +625,7 @@
 
         // ---------- State ----------
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
-        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, audit = [];
+        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, audit = [], pushTokens = {};
         let viewWeek = null, rangeStart = null;
         let unsubs = [], shiftUnsubs = {};
         let activeTab = "live";
@@ -677,7 +678,7 @@
         onAuthStateChanged(auth, u => {
             stopAll();
             user = u;
-            employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = [];
+            employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = []; pushTokens = {};
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
                 $("gateSub").textContent = "Only the time clock administrator can open this panel.";
@@ -705,6 +706,7 @@
             });
             sub(ref(db, P.employees), s => { employees = s.val() || {}; syncShiftListeners(); renderAll(); });
             sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
+            sub(ref(db, P.pushTokens), s => { pushTokens = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(query(ref(db, P.audit), limitToLast(30)), s => {
                 audit = Object.values(s.val() || {}).sort((a, b) => (b.at || 0) - (a.at || 0));
@@ -1198,6 +1200,13 @@
             }).join("") + "</div>";
         }
 
+        // How many phones get this person's punch-in reminders while the time clock is closed
+        function phoneTag(k) {
+            const n = Object.keys(pushTokens[k] || {}).length;
+            return n ? ' <span class="tag gps" title="Gets punch-in reminders even with the time clock closed">' + n + (n === 1 ? " phone" : " phones") + "</span>"
+                : ' <span class="tag off" title="Only reminded while the time clock is open on their phone">No phone alerts</span>';
+        }
+
         function renderPeople() {
             const list = empList();
             $("empList").innerHTML = list.length ? list.map((e, i) => {
@@ -1207,7 +1216,8 @@
                     '<div class="avatar">' + esc(initials(name)) + "</div>" +
                     '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
                     schedSummary(e) +
-                    '<div class="emp-status">' + (e.active === false ? '<span class="tag off">Inactive</span>' : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') + "</div>" +
+                    '<div class="emp-status">' + (e.active === false ? '<span class="tag off">Inactive</span>' : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
+                    phoneTag(e.ek) + "</div>" +
                     '<button type="button" class="btn sm" data-emp="' + esc(e.ek) + '">Edit</button></div>';
             }).join("") : '<div class="empty-state"><strong>No employees yet</strong>Click “Add employee” to put your first driver on the time clock.</div>';
         }

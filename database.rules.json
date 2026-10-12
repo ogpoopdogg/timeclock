@@ -36,6 +36,22 @@
         }
       },
 
+      "push_tokens": {
+        "$ek": {
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
+          "$key": {
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && root.child('timeclock/employees').child($ek).exists()",
+            ".validate": "newData.child('token').isString() && newData.child('token').val().length < 4096"
+          }
+        }
+      },
+
+      "push_tests": {
+        "$ek": {
+          ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && root.child('timeclock/employees').child($ek).child('active').val() !== false && root.child('timeclock/employees').child($ek).exists()"
+        }
+      },
+
       "vehicle_claims": {
         ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
         "$gpsId": {

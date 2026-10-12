@@ -1,0 +1,14 @@
+{
+  "name": "ec-timeclock-functions",
+  "private": true,
+  "description": "Sends E&C time clock punch-in reminders to phones, even when the app is closed",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.10.0",
+    "firebase-functions": "^7.4.0"
+  }
+}
