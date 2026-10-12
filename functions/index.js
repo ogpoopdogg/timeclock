@@ -25,6 +25,8 @@ const REGION = 'us-central1';
 const CLOCK_URL = 'https://app.eandccourier.ca/timeclock/';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KEEP_SENT_DAYS = 30;
+// Memory is set explicitly (with the default 1 vCPU) so running costs are predictable; see README "Running cost"
+
 
 // Tokens FCM reports as gone for good (site data cleared, notifications turned off, token rotated)
 const DEAD_TOKEN_CODES = new Set([
@@ -60,7 +62,7 @@ async function sendTo(ek, { title, body, tag }) {
 }
 
 exports.timeclockPunchReminders = onSchedule(
-  { schedule: 'every 1 minutes', timeZone: R.TZ, region: REGION, retryCount: 0, maxInstances: 1 },
+  { schedule: 'every 1 minutes', timeZone: R.TZ, region: REGION, retryCount: 0, maxInstances: 1, memory: '256MiB' },
   async () => {
     const db = admin.database();
     const now = Date.now();
@@ -105,7 +107,7 @@ exports.timeclockPunchReminders = onSchedule(
 );
 
 // "Send a test" in the time clock's Reminders card writes timeclock/push_tests/<ek>
-exports.timeclockTestPush = onValueWritten({ ref: '/timeclock/push_tests/{ek}', region: REGION }, async (event) => {
+exports.timeclockTestPush = onValueWritten({ ref: '/timeclock/push_tests/{ek}', region: REGION, memory: '256MiB' }, async (event) => {
   if (!event.data.after.exists()) return;
   const ek = event.params.ek;
   const result = await sendTo(ek, {
