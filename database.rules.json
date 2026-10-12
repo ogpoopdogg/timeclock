@@ -1,0 +1,61 @@
+{
+  "rules": {
+    "timeclock": {
+      ".read": "auth != null && auth.token.email.toLowerCase() === 'justin@ec.com'",
+      ".write": "auth != null && auth.token.email.toLowerCase() === 'justin@ec.com'",
+
+      "settings": {
+        ".read": "auth != null"
+      },
+
+      "employees": {
+        "$ek": {
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek"
+        }
+      },
+
+      "shifts": {
+        "$ek": {
+          ".indexOn": ["in"],
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
+          "$shiftId": {
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && newData.child('in').val() <= now && newData.child('in').val() > now - 60000 && !newData.child('out').exists() && !newData.child('edited').exists() && !newData.child('vehicleId').exists()",
+            "out": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.exists() && newData.val() <= now && newData.val() > now - 60000"
+            },
+            "vehicleId": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.parent().child('out').exists()"
+            },
+            "vehicleName": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.parent().child('out').exists()"
+            },
+            "nickname": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.parent().child('out').exists()"
+            }
+          }
+        }
+      },
+
+      "vehicle_claims": {
+        ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+        "$gpsId": {
+          ".write": "auth != null && ((!data.exists() && newData.child('ek').val() === auth.token.email.toLowerCase().replace('.', ',')) || (data.child('ek').val() === auth.token.email.toLowerCase().replace('.', ',') && (!newData.exists() || newData.child('ek').val() === auth.token.email.toLowerCase().replace('.', ','))))"
+        }
+      }
+    },
+
+    "developer": {
+      "dispatch_dashboard": {
+        "drivers": {
+          ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+        },
+        "driver_nicknames": {
+          ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+          "$gpsId": {
+            ".write": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).child('active').val() !== false && (!newData.exists() || (newData.isString() && newData.val().length <= 24))"
+          }
+        }
+      }
+    }
+  }
+}

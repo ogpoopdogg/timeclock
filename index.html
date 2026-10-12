@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0c0e10">
+    <meta name="robots" content="noindex">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="E&amp;C Clock">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Time Clock &middot; E&amp;C Courier</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-512.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0c0e10;
+            --asphalt: #101214;
+            --asphalt-2: #171a1d;
+            --asphalt-3: #1f2327;
+            --asphalt-4: #2a2f34;
+            --line: rgba(255, 255, 255, 0.09);
+            --shoulder: rgba(255, 255, 255, 0.16);
+            --text: #eef0f2;
+            --muted: #9aa1a9;
+            --dim: #6b727a;
+            --yellow: #ffcc00;
+            --green: #35d07f;
+            --red: #ff6b5e;
+            --accent: var(--yellow);
+            --accent-rgb: 255, 204, 0;
+
+            --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+            --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --pad: clamp(16px, 5vw, 40px);
+        }
+
+        body.is-in { --accent: var(--red); --accent-rgb: 255, 107, 94; }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            font-family: var(--font-body);
+            font-size: 1rem;
+            line-height: 1.5;
+            color: var(--text);
+            background:
+                radial-gradient(900px 520px at 50% -8%, rgba(var(--accent-rgb), 0.10), transparent 62%),
+                radial-gradient(700px 500px at 100% 100%, rgba(255, 255, 255, 0.03), transparent 60%),
+                var(--bg);
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            transition: background 0.8s var(--ease-out);
+            padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+        }
+
+        button { font: inherit; color: inherit; }
+        [hidden] { display: none !important; }
+
+        .wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding-left: var(--pad); padding-right: var(--pad); }
+
+        /* ---------- Top bar ---------- */
+        .topbar {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding-top: 18px; padding-bottom: 18px;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .brand img {
+            width: 40px; height: 40px; border-radius: 10px; object-fit: contain; background: #000;
+            box-shadow: 0 0 0 1px rgba(255, 204, 0, 0.45);
+        }
+        .brand-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+        .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; white-space: nowrap; }
+        .brand-sub { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+        .chip-btn {
+            height: 38px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent;
+            font-family: var(--font-display); font-weight: 600; font-size: 1rem; letter-spacing: 0.02em;
+            color: var(--muted); box-shadow: inset 0 0 0 1px var(--shoulder); cursor: pointer; white-space: nowrap;
+            transition: color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out), transform 0.2s var(--ease-out);
+        }
+        .chip-btn:hover, .chip-btn:focus-visible { outline: none; color: var(--yellow); box-shadow: inset 0 0 0 1px var(--yellow); }
+        .chip-btn:active { transform: scale(0.97); }
+
+        /* ---------- Screens ---------- */
+        .screen { animation: screenIn 0.7s var(--ease-out) both; }
+        @keyframes screenIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+        .boot {
+            min-height: 70vh; display: grid; place-items: center; color: var(--muted);
+        }
+        .boot-spinner {
+            width: 46px; height: 46px; border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: var(--yellow);
+            animation: spin 0.9s linear infinite; margin: 0 auto 14px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---------- Sign in ---------- */
+        .signin { min-height: calc(100vh - 100px); display: grid; place-items: center; padding: 20px 0 60px; }
+        .signin-card {
+            width: 100%; max-width: 420px; position: relative; overflow: hidden;
+            background: linear-gradient(180deg, var(--asphalt-2), var(--asphalt));
+            border-radius: 22px; padding: clamp(26px, 6vw, 40px);
+            box-shadow: 0 0 0 1px var(--line), 0 30px 80px rgba(0, 0, 0, 0.5);
+        }
+        .signin-card::before {
+            content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+            background: linear-gradient(90deg, transparent, var(--yellow), transparent);
+            animation: sweep 3.2s ease-in-out infinite;
+        }
+        @keyframes sweep { 0%, 100% { transform: translateX(-60%); } 50% { transform: translateX(60%); } }
+        .signin-dial {
+            width: 92px; height: 92px; margin: 0 auto 18px; border-radius: 50%; position: relative;
+            box-shadow: inset 0 0 0 2px rgba(255, 204, 0, 0.35), 0 0 40px rgba(255, 204, 0, 0.12);
+        }
+        .signin-dial::before, .signin-dial::after {
+            content: ""; position: absolute; left: 50%; bottom: 50%; width: 3px; border-radius: 2px;
+            background: var(--yellow); transform-origin: 50% 100%;
+        }
+        .signin-dial::before { height: 26px; margin-left: -1.5px; animation: spin 12s linear infinite; }
+        .signin-dial::after { height: 36px; width: 2px; margin-left: -1px; background: var(--text); animation: spin 2s linear infinite; }
+        .signin h1 {
+            font-family: var(--font-display); font-weight: 800; font-size: clamp(2.3rem, 9vw, 3rem);
+            line-height: 0.95; text-align: center; margin-bottom: 6px;
+        }
+        .signin .sub { color: var(--muted); text-align: center; margin-bottom: 26px; }
+        .field-label {
+            display: block; font-family: var(--font-display); font-weight: 600; font-size: 0.95rem;
+            letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+        }
+        .input {
+            display: block; width: 100%; height: 50px; padding: 0 14px; margin-bottom: 16px;
+            border: 0; border-radius: 12px; font: inherit; font-size: 1.05rem; color: var(--text);
+            background: var(--asphalt-3); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+            transition: box-shadow 0.2s var(--ease-out);
+        }
+        .input:focus { outline: none; box-shadow: inset 0 0 0 2px var(--yellow); }
+        .primary-btn {
+            width: 100%; height: 52px; margin-top: 6px; border: 0; border-radius: 12px;
+            font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; letter-spacing: 0.03em;
+            color: #111; background: var(--yellow); cursor: pointer; position: relative; overflow: hidden;
+            transition: transform 0.2s var(--ease-out), opacity 0.2s, box-shadow 0.3s;
+            box-shadow: 0 10px 30px rgba(255, 204, 0, 0.18);
+        }
+        .primary-btn:hover { transform: translateY(-1px); box-shadow: 0 14px 34px rgba(255, 204, 0, 0.28); }
+        .primary-btn:active { transform: translateY(1px); }
+        .primary-btn:disabled { opacity: 0.55; cursor: progress; transform: none; }
+        .primary-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+        .form-msg { min-height: 1.5em; margin-top: 14px; font-size: 0.95rem; color: var(--red); text-align: center; }
+        .shake { animation: shake 0.45s var(--ease-out); }
+        @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+
+        /* ---------- Notice screen (not set up) ---------- */
+        .notice { max-width: 520px; margin: 10vh auto; text-align: center; }
+        .notice h1 { font-family: var(--font-display); font-weight: 800; font-size: 2.4rem; line-height: 1; margin: 18px 0 10px; }
+        .notice p { color: var(--muted); margin-bottom: 22px; }
+        .notice-icon {
+            width: 76px; height: 76px; border-radius: 50%; margin: 0 auto; display: grid; place-items: center;
+            color: var(--yellow); background: rgba(255, 204, 0, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.3);
+        }
+
+        /* ---------- Main clock layout ---------- */
+        .layout {
+            display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+            gap: clamp(20px, 4vw, 48px); align-items: start; padding-bottom: 48px;
+        }
+
+        .hero { text-align: center; padding-top: clamp(4px, 2vh, 24px); }
+        .greeting {
+            font-family: var(--font-display); font-weight: 800; line-height: 0.95;
+            font-size: clamp(2.2rem, 8vw, 3.4rem); letter-spacing: -0.005em;
+        }
+        .today { color: var(--muted); margin-top: 6px; font-size: 1.02rem; }
+
+        .status {
+            display: inline-flex; align-items: center; gap: 10px; margin-top: 16px;
+            padding: 8px 16px 8px 12px; border-radius: 999px;
+            font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase;
+            background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px var(--line);
+            transition: background 0.5s var(--ease-out), box-shadow 0.5s var(--ease-out), color 0.5s;
+        }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dim); position: relative; }
+        body.is-in .status { color: var(--green); background: rgba(53, 208, 127, 0.08); box-shadow: inset 0 0 0 1px rgba(53, 208, 127, 0.35); }
+        body.is-in .status-dot { background: var(--green); }
+        body.is-in .status-dot::after {
+            content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--green);
+            animation: ping 1.8s ease-out infinite;
+        }
+        @keyframes ping { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.8); opacity: 0; } }
+
+        .sched-line { margin-top: 10px; color: var(--muted); font-size: 0.95rem; min-height: 1.5em; }
+        .sched-line strong { color: var(--text); font-weight: 600; }
+        .sched-line.late strong { color: var(--red); }
+
+        /* ---------- The punch ring ---------- */
+        .punch {
+            --size: min(78vw, 360px);
+            position: relative; width: var(--size); height: var(--size); margin: clamp(18px, 3.5vh, 34px) auto 6px;
+        }
+        .punch-glow {
+            position: absolute; inset: 8%; border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--accent-rgb), 0.26), transparent 68%);
+            filter: blur(18px); opacity: 0.55; transform: scale(0.9);
+            transition: opacity 0.4s var(--ease-out), transform 0.6s var(--ease-out), background 0.6s;
+            animation: breathe 4s ease-in-out infinite;
+        }
+        @keyframes breathe { 50% { opacity: 0.8; transform: scale(1); } }
+        .punch.holding .punch-glow { opacity: 1; transform: scale(1.12); animation: none; }
+
+        .punch svg.ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+        .tick { stroke: rgba(255, 255, 255, 0.14); stroke-width: 2; stroke-linecap: round; transition: stroke 0.15s, stroke-width 0.15s; }
+        .tick.major { stroke: rgba(255, 255, 255, 0.28); stroke-width: 3; }
+        .tick.lit { stroke: rgb(var(--accent-rgb)); stroke-width: 3; filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.9)); }
+        .ring-track { fill: none; stroke: rgba(255, 255, 255, 0.07); stroke-width: 12; }
+        .ring-progress {
+            fill: none; stroke: rgb(var(--accent-rgb)); stroke-width: 12; stroke-linecap: round;
+            stroke-dasharray: 1; stroke-dashoffset: 1;
+            filter: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.75));
+            transition: stroke-dashoffset 0.45s var(--ease-out), stroke 0.5s;
+        }
+        .punch.holding .ring-progress { transition: none; }
+        .ring-orbit { fill: rgb(var(--accent-rgb)); filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 1)); opacity: 0; transition: opacity 0.2s; }
+        .punch.holding .ring-orbit { opacity: 1; }
+
+        .punch-btn {
+            position: absolute; inset: 15%; border-radius: 50%; border: 0; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+            background:
+                radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.10), transparent 58%),
+                linear-gradient(180deg, #23282d, #15181b);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.12),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+                0 24px 50px rgba(0, 0, 0, 0.55),
+                0 0 0 1px rgba(0, 0, 0, 0.6);
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.35s var(--ease-spring), box-shadow 0.35s var(--ease-out);
+        }
+        .punch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.9), 0 24px 50px rgba(0, 0, 0, 0.55); }
+        .punch.holding .punch-btn {
+            transform: scale(0.95);
+            box-shadow: inset 0 0 0 2px rgba(var(--accent-rgb), 0.5), inset 0 0 50px rgba(var(--accent-rgb), 0.18), 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+        .punch-btn:disabled { cursor: progress; }
+
+        .pb-time {
+            font-family: var(--font-display); font-weight: 700; font-variant-numeric: tabular-nums;
+            font-size: calc(var(--size) * 0.205); line-height: 0.9; letter-spacing: -0.01em; display: flex; align-items: baseline;
+        }
+        .pb-sec { font-size: 0.42em; color: var(--muted); margin-left: 2px; width: 1.25em; text-align: left; }
+        .pb-ampm { font-size: 0.3em; color: var(--muted); margin-left: 4px; font-weight: 600; }
+        .pb-action {
+            margin-top: calc(var(--size) * 0.03);
+            font-family: var(--font-display); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+            font-size: calc(var(--size) * 0.05); color: rgb(var(--accent-rgb));
+            transition: color 0.5s;
+        }
+        .pb-hint { font-size: calc(var(--size) * 0.036); color: var(--dim); letter-spacing: 0.04em; }
+        .pb-elapsed {
+            font-family: var(--font-display); font-weight: 600; font-variant-numeric: tabular-nums;
+            font-size: calc(var(--size) * 0.045); color: var(--green); margin-top: 2px;
+        }
+
+        .punch.busy .punch-btn { animation: busyPulse 1s ease-in-out infinite; }
+        @keyframes busyPulse { 50% { transform: scale(0.97); } }
+        .punch.busy .ring-progress { stroke-dashoffset: 0.75 !important; transform-box: fill-box; transform-origin: 50% 50%; animation: spin 0.9s linear infinite; transition: none; }
+
+        .shockwave {
+            position: absolute; inset: 15%; border-radius: 50%; pointer-events: none;
+            border: 3px solid rgb(var(--accent-rgb)); opacity: 0;
+        }
+        .shockwave.go { animation: shock 0.9s var(--ease-out) forwards; }
+        .shockwave.go.s2 { animation-delay: 0.12s; }
+        @keyframes shock { 0% { opacity: 0.95; transform: scale(1); } 100% { opacity: 0; transform: scale(1.75); } }
+
+        .spark {
+            position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+            background: rgb(var(--accent-rgb)); pointer-events: none; box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.9);
+            animation: spark 0.85s var(--ease-out) forwards;
+        }
+        @keyframes spark {
+            0% { transform: rotate(var(--a)) translateY(calc(var(--size) * -0.36)) scale(1); opacity: 1; }
+            100% { transform: rotate(var(--a)) translateY(calc(var(--size) * -0.62)) scale(0.2); opacity: 0; }
+        }
+
+        .punch-msg { text-align: center; min-height: 1.5em; color: var(--red); font-size: 0.95rem; margin-top: 8px; }
+
+        .vehicle-pill {
+            display: inline-flex; align-items: center; gap: 10px; margin-top: 12px;
+            padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+            animation: screenIn 0.5s var(--ease-out) both;
+        }
+        .vehicle-pill svg { width: 22px; height: 22px; color: var(--yellow); flex: none; }
+        .vehicle-pill .vp-label { color: var(--muted); font-size: 0.9rem; }
+        .vehicle-pill .vp-name { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; }
+        .vehicle-pill .chip-btn { height: 32px; padding: 0 12px; font-size: 0.95rem; }
+
+        /* ---------- Cards (right column) ---------- */
+        .side { display: flex; flex-direction: column; gap: 16px; padding-top: clamp(0px, 2vh, 18px); }
+        .card {
+            background: linear-gradient(180deg, var(--asphalt-2), rgba(23, 26, 29, 0.6));
+            border-radius: 18px; box-shadow: 0 0 0 1px var(--line); padding: 20px;
+            animation: screenIn 0.7s var(--ease-out) both;
+        }
+        .side .card:nth-child(2) { animation-delay: 0.08s; }
+        .side .card:nth-child(3) { animation-delay: 0.16s; }
+        .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+        .card-title {
+            font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+        }
+        .week-nav { display: flex; align-items: center; gap: 6px; }
+        .icon-btn {
+            width: 34px; height: 34px; border-radius: 10px; border: 0; background: var(--asphalt-3); color: var(--text);
+            display: grid; place-items: center; cursor: pointer; box-shadow: inset 0 0 0 1px var(--line);
+            transition: background 0.2s, transform 0.2s var(--ease-out), opacity 0.2s;
+        }
+        .icon-btn:hover { background: var(--asphalt-4); }
+        .icon-btn:active { transform: scale(0.94); }
+        .icon-btn:disabled { opacity: 0.3; cursor: default; }
+        .icon-btn svg { width: 18px; height: 18px; }
+        .week-label { font-size: 0.92rem; color: var(--muted); min-width: 0; text-align: center; white-space: nowrap; }
+
+        .total-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+        .total-big {
+            font-family: var(--font-display); font-weight: 800; font-size: 3.2rem; line-height: 0.9; font-variant-numeric: tabular-nums;
+        }
+        .total-big small { font-size: 0.42em; color: var(--muted); font-weight: 600; margin-left: 4px; }
+        .total-sub { color: var(--muted); font-size: 0.92rem; }
+
+        .days { display: flex; flex-direction: column; gap: 8px; }
+        .day {
+            display: grid; grid-template-columns: 54px minmax(0, 1fr) 62px; align-items: center; gap: 12px;
+            padding: 6px 8px; border-radius: 10px; transition: background 0.2s;
+        }
+        .day.is-today { background: rgba(255, 204, 0, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.2); }
+        .day-name { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; line-height: 1.05; }
+        .day-name small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 0.75rem; color: var(--dim); }
+        .day-bar { height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); overflow: hidden; position: relative; }
+        .day-bar i {
+            position: absolute; inset: 0 auto 0 0; border-radius: 6px; width: 0;
+            background: linear-gradient(90deg, rgba(255, 204, 0, 0.6), var(--yellow));
+            transition: width 0.9s var(--ease-out);
+        }
+        .day-bar i.live { background: linear-gradient(90deg, rgba(53, 208, 127, 0.55), var(--green)); }
+        .day-bar i.live::after {
+            content: ""; position: absolute; inset: 0; border-radius: 6px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+            animation: shimmer 1.8s linear infinite;
+        }
+        @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+        .day-hrs { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.95rem; }
+        .day-hrs.zero { color: var(--dim); font-weight: 400; }
+
+        .shifts { display: flex; flex-direction: column; }
+        .shift {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; gap: 4px 12px; padding: 12px 0;
+            border-top: 1px solid var(--line);
+        }
+        .shift:first-child { border-top: 0; padding-top: 2px; }
+        .shift-date { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
+        .shift-times { color: var(--muted); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+        .shift-dur { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .shift-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        .tag {
+            display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;
+            background: rgba(255, 255, 255, 0.06); color: var(--muted);
+        }
+        .tag.gps { color: var(--yellow); background: rgba(255, 204, 0, 0.08); }
+        .tag.edit { color: #8ab4ff; background: rgba(138, 180, 255, 0.1); }
+        .tag.live { color: var(--green); background: rgba(53, 208, 127, 0.1); }
+        .empty { color: var(--dim); font-size: 0.95rem; padding: 6px 0; }
+
+        .remind-row { display: flex; align-items: center; gap: 14px; }
+        .remind-icon {
+            width: 44px; height: 44px; border-radius: 12px; flex: none; display: grid; place-items: center;
+            color: var(--yellow); background: rgba(255, 204, 0, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.25);
+        }
+        .remind-icon svg { width: 22px; height: 22px; }
+        .remind-text { flex: 1; min-width: 0; font-size: 0.93rem; color: var(--muted); }
+        .remind-text strong { display: block; color: var(--text); font-weight: 600; font-size: 1rem; }
+        .remind-row .chip-btn { flex: none; }
+        .remind-row .chip-btn.on { color: var(--green); box-shadow: inset 0 0 0 1px rgba(53, 208, 127, 0.5); cursor: default; }
+
+        .lock-note { display: flex; gap: 10px; align-items: flex-start; color: var(--dim); font-size: 0.88rem; padding: 0 4px; }
+        .lock-note svg { width: 16px; height: 16px; flex: none; margin-top: 3px; }
+
+        /* ---------- Banner (late reminder inside the page) ---------- */
+        .banner {
+            position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 14px); z-index: 60;
+            width: min(560px, calc(100vw - 24px)); transform: translate(-50%, -140%);
+            display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 16px; border-radius: 16px;
+            background: rgba(40, 18, 16, 0.92); color: var(--text);
+            box-shadow: 0 0 0 1px rgba(255, 107, 94, 0.5), 0 20px 50px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            transition: transform 0.6s var(--ease-spring), visibility 0s linear 0.6s; visibility: hidden;
+        }
+        .banner.show { transform: translate(-50%, 0); visibility: visible; transition: transform 0.6s var(--ease-spring); }
+        .banner-icon { color: var(--red); flex: none; animation: wiggle 1.2s ease-in-out infinite; }
+        .banner-icon svg { width: 26px; height: 26px; display: block; }
+        @keyframes wiggle { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(-14deg); } 20%, 40% { transform: rotate(14deg); } }
+        .banner-text { flex: 1; font-size: 0.95rem; }
+        .banner-text strong { display: block; font-family: var(--font-display); font-size: 1.15rem; letter-spacing: 0.02em; }
+
+        /* ---------- Toast ---------- */
+        .toast {
+            position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); z-index: 70;
+            transform: translate(-50%, 160%); max-width: calc(100vw - 24px);
+            padding: 12px 18px; border-radius: 14px; background: rgba(31, 35, 39, 0.96); color: var(--text);
+            box-shadow: 0 0 0 1px var(--shoulder), 0 18px 40px rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            transition: transform 0.5s var(--ease-spring), visibility 0s linear 0.5s; font-size: 0.95rem; visibility: hidden;
+        }
+        .toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform 0.5s var(--ease-spring); }
+        .toast.warn { box-shadow: 0 0 0 1px rgba(255, 107, 94, 0.6), 0 18px 40px rgba(0, 0, 0, 0.55); }
+
+        /* ---------- Success overlay ---------- */
+        .success {
+            position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; text-align: center;
+            background: rgba(8, 9, 10, 0.72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            opacity: 0; pointer-events: none; transition: opacity 0.35s var(--ease-out);
+        }
+        .success.show { opacity: 1; pointer-events: auto; }
+        .success-inner { transform: scale(0.85); transition: transform 0.55s var(--ease-spring); }
+        .success.show .success-inner { transform: none; }
+        .success svg { width: 132px; height: 132px; display: block; margin: 0 auto 14px; overflow: visible; }
+        .success .sc-ring { fill: none; stroke: rgb(var(--sc-rgb, 53, 208, 127)); stroke-width: 6; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        .success .sc-check { fill: none; stroke: rgb(var(--sc-rgb, 53, 208, 127)); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        .success.show .sc-ring { animation: draw 0.6s var(--ease-out) 0.05s forwards; }
+        .success.show .sc-check { animation: draw 0.4s var(--ease-out) 0.45s forwards; }
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        .success .sc-fill { fill: rgba(var(--sc-rgb, 53, 208, 127), 0.12); transform-origin: 50% 50%; transform: scale(0); }
+        .success.show .sc-fill { animation: pop 0.6s var(--ease-spring) 0.3s forwards; }
+        @keyframes pop { to { transform: scale(1); } }
+        .sc-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(2.2rem, 9vw, 3rem); line-height: 1; }
+        .sc-time { font-family: var(--font-display); font-weight: 600; font-size: 1.5rem; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+        .sc-sub { color: var(--muted); margin-top: 6px; font-size: 0.95rem; }
+
+        /* ---------- Vehicle picker (bottom sheet) ---------- */
+        .sheet-backdrop {
+            position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            opacity: 0; pointer-events: none; transition: opacity 0.35s var(--ease-out);
+        }
+        .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+        .sheet {
+            position: fixed; left: 50%; bottom: 0; z-index: 91; width: min(720px, 100vw);
+            max-height: min(86vh, 760px); display: flex; flex-direction: column;
+            background: linear-gradient(180deg, #1b1f23, #121517); border-radius: 26px 26px 0 0;
+            box-shadow: 0 0 0 1px var(--shoulder), 0 -30px 80px rgba(0, 0, 0, 0.6);
+            transform: translate(-50%, 105%); visibility: hidden;
+            transition: transform 0.55s var(--ease-out), visibility 0s linear 0.55s;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .sheet.show { transform: translate(-50%, 0); visibility: visible; transition: transform 0.55s var(--ease-out); }
+        .sheet-grab { width: 44px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.2); margin: 10px auto 0; }
+        .sheet-head { padding: 16px 22px 8px; }
+        .sheet-head h2 { font-family: var(--font-display); font-weight: 800; font-size: 2rem; line-height: 1; }
+        .sheet-head p { color: var(--muted); margin-top: 6px; font-size: 0.95rem; }
+        .sheet-body { overflow-y: auto; padding: 10px 22px 8px; -webkit-overflow-scrolling: touch; }
+        .sheet-foot { display: flex; gap: 10px; padding: 12px 22px 18px; border-top: 1px solid var(--line); }
+        .sheet-foot .chip-btn { flex: 1; height: 46px; font-size: 1.05rem; }
+
+        .gps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+        .gps {
+            position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+            min-height: 108px; padding: 14px; border: 0; border-radius: 16px; text-align: left; cursor: pointer;
+            background: var(--asphalt-3); box-shadow: inset 0 0 0 1px var(--line);
+            transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out), background 0.25s, opacity 0.3s;
+            animation: tileIn 0.45s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 35ms);
+            overflow: hidden;
+        }
+        @keyframes tileIn { from { opacity: 0; transform: translateY(12px) scale(0.96); } to { opacity: 1; transform: none; } }
+        .gps:hover:not(:disabled) { transform: translateY(-2px); box-shadow: inset 0 0 0 2px var(--yellow), 0 12px 26px rgba(0, 0, 0, 0.4); }
+        .gps:active:not(:disabled) { transform: scale(0.97); }
+        .gps:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--yellow); }
+        .gps-icon {
+            width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #111;
+            background: var(--gps-color, var(--yellow));
+        }
+        .gps-icon svg { width: 20px; height: 20px; }
+        .gps-name { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; line-height: 1; word-break: break-word; }
+        .gps-state { font-size: 0.8rem; color: var(--green); }
+        .gps:disabled { cursor: not-allowed; opacity: 0.42; filter: grayscale(1); background: rgba(31, 35, 39, 0.6); }
+        .gps:disabled .gps-state { color: var(--muted); }
+        .gps.mine { box-shadow: inset 0 0 0 2px var(--green); opacity: 1; filter: none; }
+        .gps.mine .gps-state { color: var(--green); }
+        .gps.picking::after {
+            content: ""; position: absolute; inset: 0; border-radius: 16px;
+            background: linear-gradient(90deg, transparent, rgba(255, 204, 0, 0.25), transparent);
+            animation: shimmer 0.9s linear infinite;
+        }
+        .gps.flash-taken { animation: shake 0.45s var(--ease-out); }
+
+        .sheet-msg { min-height: 1.4em; color: var(--red); font-size: 0.92rem; margin-top: 12px; }
+
+        /* ---------- Responsive ---------- */
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            .side { padding-top: 0; }
+        }
+        @media (max-width: 420px) {
+            .brand-sub { display: none; }
+            .total-big { font-size: 2.7rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important; animation-delay: 0s !important;
+                animation-iteration-count: 1 !important; transition-duration: 0.001ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="wrap topbar">
+        <div class="brand">
+            <img src="icon-logo.png" alt="" width="40" height="40">
+            <div class="brand-text">
+                <span class="brand-name">E&amp;C Courier</span>
+                <span class="brand-sub">Time Clock</span>
+            </div>
+        </div>
+        <button type="button" class="chip-btn" id="signOutBtn" hidden>Sign out</button>
+    </header>
+
+    <!-- Loading -->
+    <main class="wrap" id="bootScreen">
+        <div class="boot"><div><div class="boot-spinner"></div>Loading time clock…</div></div>
+    </main>
+
+    <!-- Sign in -->
+    <main class="wrap signin screen" id="signinScreen" hidden>
+        <form class="signin-card" id="signinForm" novalidate>
+            <div class="signin-dial" aria-hidden="true"></div>
+            <h1>Time Clock</h1>
+            <p class="sub">Sign in with your E&amp;C email to punch in and out.</p>
+            <label class="field-label" for="email">Email</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" required>
+            <label class="field-label" for="password">Password</label>
+            <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="submit" class="primary-btn" id="signinBtn">Sign in</button>
+            <p class="form-msg" id="signinMsg" role="alert" aria-live="assertive"></p>
+        </form>
+    </main>
+
+    <!-- Not on the roster -->
+    <main class="wrap screen" id="noticeScreen" hidden>
+        <div class="notice">
+            <div class="notice-icon" aria-hidden="true">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <h1 id="noticeTitle">Not set up yet</h1>
+            <p id="noticeText"></p>
+            <button type="button" class="chip-btn" id="noticeSignOut">Use a different account</button>
+        </div>
+    </main>
+
+    <!-- Clock -->
+    <main class="wrap screen" id="clockScreen" hidden>
+        <div class="layout">
+            <section class="hero" aria-labelledby="greeting">
+                <h1 class="greeting" id="greeting">Hello</h1>
+                <p class="today" id="todayLine"></p>
+                <div class="status" id="statusChip" aria-live="polite"><span class="status-dot"></span><span id="statusText">Off the clock</span></div>
+                <p class="sched-line" id="schedLine"></p>
+
+                <div class="punch" id="punch">
+                    <div class="punch-glow"></div>
+                    <svg class="ring" viewBox="0 0 320 320" aria-hidden="true">
+                        <g id="ticks"></g>
+                        <circle class="ring-track" cx="160" cy="160" r="126"/>
+                        <circle class="ring-progress" id="ringProgress" cx="160" cy="160" r="126" pathLength="1"/>
+                        <circle class="ring-orbit" id="ringOrbit" cx="286" cy="160" r="9"/>
+                    </svg>
+                    <div class="shockwave" id="shock1"></div>
+                    <div class="shockwave s2" id="shock2"></div>
+                    <button type="button" class="punch-btn" id="punchBtn" aria-describedby="punchHint">
+                        <span class="pb-time"><span id="pbHM">--:--</span><span class="pb-sec" id="pbSec">00</span><span class="pb-ampm" id="pbAmPm"></span></span>
+                        <span class="pb-action" id="pbAction">Punch in</span>
+                        <span class="pb-hint" id="punchHint">Press and hold</span>
+                        <span class="pb-elapsed" id="pbElapsed" hidden></span>
+                    </button>
+                </div>
+                <p class="punch-msg" id="punchMsg" role="alert" aria-live="assertive"></p>
+
+                <div class="vehicle-pill" id="vehiclePill" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+                    <span><span class="vp-label" id="vpLabel">Vehicle</span> <span class="vp-name" id="vpName"></span></span>
+                    <button type="button" class="chip-btn" id="changeVehicleBtn">Change</button>
+                </div>
+            </section>
+
+            <aside class="side">
+                <section class="card" aria-labelledby="weekTitle">
+                    <div class="card-head">
+                        <h2 class="card-title" id="weekTitle">My week</h2>
+                        <div class="week-nav">
+                            <button type="button" class="icon-btn" id="weekPrev" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+                            <span class="week-label" id="weekLabel"></span>
+                            <button type="button" class="icon-btn" id="weekNext" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="total-row">
+                        <div class="total-big" id="weekTotal">0.00<small>hrs</small></div>
+                        <div class="total-sub" id="weekTotalSub"></div>
+                    </div>
+                    <div class="days" id="days"></div>
+                </section>
+
+                <section class="card" aria-labelledby="punchesTitle">
+                    <div class="card-head"><h2 class="card-title" id="punchesTitle">Punches this week</h2></div>
+                    <div class="shifts" id="shifts"></div>
+                </section>
+
+                <section class="card" aria-labelledby="remindTitle">
+                    <h2 class="card-title" id="remindTitle" style="margin-bottom:12px">Reminders</h2>
+                    <div class="remind-row">
+                        <div class="remind-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                        </div>
+                        <div class="remind-text" id="remindText"><strong>Punch-in reminder</strong></div>
+                        <button type="button" class="chip-btn" id="remindBtn" hidden>Turn on</button>
+                    </div>
+                </section>
+
+                <p class="lock-note">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    <span>Punch times are recorded by the server clock. Only your administrator can change a time — ask them if you missed a punch.</span>
+                </p>
+            </aside>
+        </div>
+    </main>
+
+    <!-- Overlays -->
+    <div class="banner" id="banner" role="alert">
+        <span class="banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
+        <span class="banner-text" id="bannerText"></span>
+        <button type="button" class="icon-btn" id="bannerClose" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <div class="success" id="success" aria-live="assertive">
+        <div class="success-inner">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="sc-fill" cx="60" cy="60" r="54"/>
+                <circle class="sc-ring" cx="60" cy="60" r="54" pathLength="1" transform="rotate(-90 60 60)"/>
+                <path class="sc-check" d="M36 62 L53 78 L86 44" pathLength="1"/>
+            </svg>
+            <div class="sc-title" id="scTitle">Punched in</div>
+            <div class="sc-time" id="scTime"></div>
+            <div class="sc-sub" id="scSub"></div>
+        </div>
+    </div>
+
+    <div class="sheet-backdrop" id="sheetBackdrop"></div>
+    <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-hidden="true">
+        <div class="sheet-grab" aria-hidden="true"></div>
+        <div class="sheet-head">
+            <h2 id="sheetTitle">Pick your vehicle</h2>
+            <p id="sheetSub">Choose the GPS unit in the vehicle you're driving today. Vehicles other drivers have taken are greyed out.</p>
+        </div>
+        <div class="sheet-body">
+            <div class="gps-grid" id="gpsGrid"></div>
+            <p class="sheet-msg" id="sheetMsg" role="alert"></p>
+        </div>
+        <div class="sheet-foot">
+            <button type="button" class="chip-btn" id="sheetSkip">Not driving today</button>
+        </div>
+    </section>
+
+    <script type="module">
+        let core;
+        try {
+            core = await import("./tc-core.js");
+        } catch (e) {
+            document.getElementById("bootScreen").innerHTML =
+                '<div class="boot"><div>Couldn\'t load the time clock. Check your connection and reload.</div></div>';
+            throw e;
+        }
+        const {
+            auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
+            zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
+            fmtClockDur, fmtHours, shiftList, shiftMs, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
+            AUTH_MESSAGES, DOW_SHORT
+        } = core;
+        const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
+            await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
+        const { ref, onValue, off, get, set, update, push, query, orderByChild, startAt, runTransaction, serverTimestamp } =
+            await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js");
+
+        const $ = id => document.getElementById(id);
+        const HOLD_MS = 1500;               // how long the button must be held
+        const HISTORY_DAYS = 120;           // how far back "My week" can go
+        const ICON = "icon-192.png";
+
+        // ---------- State ----------
+        let user = null, ek = null, emp = null, settings = settingsWithDefaults(null);
+        let shifts = [], claims = {}, serverOffset = 0;
+        let viewWeek = null;                // week start key shown in "My week"
+        let unsubs = [];
+        let empLoaded = false, shiftsLoaded = false;
+        let busy = false;
+        let afterPunchInPick = false;       // open the vehicle picker once the success overlay closes
+
+        const now = () => Date.now() + serverOffset;
+        const current = () => openShift(shifts);
+
+        function show(screen) {
+            ["bootScreen", "signinScreen", "noticeScreen", "clockScreen"].forEach(id => { $(id).hidden = id !== screen; });
+            $("signOutBtn").hidden = screen !== "clockScreen";
+        }
+
+        // ---------- Toast / banner ----------
+        let toastTimer = null;
+        function toast(text, warn) {
+            const el = $("toast");
+            el.textContent = text;
+            el.classList.toggle("warn", !!warn);
+            el.classList.add("show");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => el.classList.remove("show"), warn ? 6000 : 3600);
+        }
+
+        // ---------- Sign in ----------
+        $("signinForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const form = e.currentTarget, btn = $("signinBtn"), msg = $("signinMsg");
+            const email = form.email.value.trim(), password = form.password.value;
+            if (!email || !password) { msg.textContent = "Enter your email and password."; return; }
+            msg.textContent = "";
+            btn.disabled = true; btn.textContent = "Signing in…";
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (err) {
+                msg.textContent = AUTH_MESSAGES[err && err.code] || "Sign-in failed. Please try again.";
+                form.classList.remove("shake"); void form.offsetWidth; form.classList.add("shake");
+                form.password.value = ""; form.password.focus();
+            }
+            btn.disabled = false; btn.textContent = "Sign in";
+        });
+
+        async function doSignOut() {
+            if (current() && !confirm("You're still punched in. Sign out anyway? (You stay on the clock.)")) return;
+            await signOut(auth);
+        }
+        $("signOutBtn").addEventListener("click", doSignOut);
+        $("noticeSignOut").addEventListener("click", () => signOut(auth));
+
+        // ---------- Data ----------
+        function stopListening() { unsubs.forEach(fn => fn()); unsubs = []; }
+        function listen(r, cb, onErr) { unsubs.push(onValue(r, cb, onErr)); }
+
+        onAuthStateChanged(auth, u => {
+            stopListening();
+            user = u; emp = null; shifts = []; claims = {}; empLoaded = shiftsLoaded = false;
+            closeSheet(true);
+            if (!u) { ek = null; show("signinScreen"); return; }
+            ek = emailKey(u.email);
+            show("bootScreen");
+
+            listen(ref(db, ".info/serverTimeOffset"), s => { serverOffset = Number(s.val()) || 0; });
+            listen(ref(db, P.settings), s => { settings = settingsWithDefaults(s.val()); render(); }, () => {});
+            listen(ref(db, P.employees + "/" + ek), s => {
+                emp = s.val();
+                empLoaded = true;
+                route();
+            }, err => {
+                empLoaded = true; emp = null;
+                showNotice("Can't open the time clock", "Your account couldn't read the time clock (" + errText(err) + ") Ask your administrator to check the database rules.");
+            });
+            const since = Date.now() - HISTORY_DAYS * 86400000;
+            listen(query(ref(db, P.shifts + "/" + ek), orderByChild("in"), startAt(since)), s => {
+                shifts = shiftList(s.val());
+                shiftsLoaded = true;
+                route();
+                if (sheetOpen) renderSheet();
+            }, err => { shiftsLoaded = true; toast("Couldn't load your punches: " + errText(err), true); route(); });
+            listen(ref(db, P.claims), s => { claims = s.val() || {}; if (sheetOpen) renderSheet(); render(); }, () => {});
+        });
+
+        function showNotice(title, text) {
+            $("noticeTitle").textContent = title;
+            $("noticeText").textContent = text;
+            show("noticeScreen");
+        }
+
+        function route() {
+            if (!user || !empLoaded) return;
+            if (!emp || emp.active === false) {
+                showNotice(emp ? "Your time clock is turned off" : "Not set up yet",
+                    (emp ? "Your account is inactive on the time clock. " : (user.email + " isn't on the time clock yet. ")) +
+                    "Ask your administrator to add you, then reload this page.");
+                return;
+            }
+            if (!shiftsLoaded) return;
+            if ($("clockScreen").hidden) {
+                show("clockScreen");
+                viewWeek = weekStartKey(dayKey(now()), settings.weekStart);
+            }
+            render();
+            scheduleReminder();
+        }
+
+        // ---------- Rendering ----------
+        function greetingWord(h) { return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; }
+
+        function render() {
+            if (!user || !emp || $("clockScreen").hidden) return;
+            const t = now(), z = zoned(t), today = dayKey(t);
+            const open = current();
+            document.body.classList.toggle("is-in", !!open);
+
+            $("greeting").textContent = greetingWord(z.hh) + ", " + firstName(emp, user.email);
+            $("todayLine").textContent = fmtKey(today, true);
+            $("statusText").textContent = open ? "On the clock" : "Off the clock";
+
+            const sched = scheduleFor(emp, today);
+            const line = $("schedLine");
+            line.classList.remove("late");
+            if (open) {
+                line.innerHTML = "Punched in at <strong>" + esc(fmtTime(open.in)) + "</strong>" +
+                    (dayKey(open.in) !== today ? " on " + esc(fmtKey(dayKey(open.in))) : "");
+            } else if (sched) {
+                const startTs = keyToEpoch(today, sched.start);
+                const punchedToday = shifts.some(s => dayKey(s.in) === today);
+                const late = !punchedToday && t > startTs;
+                line.classList.toggle("late", late);
+                line.innerHTML = (late ? "You were scheduled to start at " : "Scheduled today ") + "<strong>" + esc(fmtHHMM(sched.start)) +
+                    (sched.end && !late ? " – " + esc(fmtHHMM(sched.end)) : "") + "</strong>";
+            } else {
+                line.textContent = "No shift scheduled today";
+            }
+
+            $("pbAction").textContent = open ? "Punch out" : "Punch in";
+            $("punchBtn").setAttribute("aria-label", (open ? "Punch out" : "Punch in") + ". Press and hold for " + (HOLD_MS / 1000) + " seconds.");
+
+            const pill = $("vehiclePill");
+            if (open) {
+                pill.hidden = false;
+                $("vpLabel").textContent = open.vehicleId ? "GPS" : "Vehicle";
+                $("vpName").textContent = open.vehicleId ? (open.vehicleName || "—") : "None selected";
+                $("changeVehicleBtn").textContent = open.vehicleId ? "Change" : "Pick";
+            } else {
+                pill.hidden = true;
+            }
+
+            tickClock();
+            renderWeek();
+            renderReminderCard();
+        }
+
+        function tickClock() {
+            const t = now(), z = zoned(t);
+            const h12 = z.hh % 12 || 12;
+            $("pbHM").textContent = h12 + ":" + String(z.mm).padStart(2, "0");
+            $("pbSec").textContent = String(z.ss).padStart(2, "0");
+            $("pbAmPm").textContent = z.hh < 12 ? "AM" : "PM";
+            const open = current();
+            const el = $("pbElapsed");
+            el.hidden = !open;
+            $("punchHint").hidden = !!open;
+            if (open) el.textContent = fmtClockDur(t - open.in) + " on the clock";
+        }
+
+        function renderWeek() {
+            if (!viewWeek) return;
+            const t = now(), today = dayKey(t);
+            const days = weekDays(viewWeek);
+            const { byDay, total } = weekTotals(shifts, days, t);
+            const thisWeek = weekStartKey(today, settings.weekStart);
+            $("weekLabel").textContent = viewWeek === thisWeek ? "This week" : fmtKey(days[0]) + " – " + fmtKey(days[6]);
+            $("weekNext").disabled = viewWeek >= thisWeek;
+            $("weekPrev").disabled = addDaysKey(viewWeek, -7) < dayKey(Date.now() - HISTORY_DAYS * 86400000);
+            $("weekTotal").innerHTML = esc(fmtHours(total)) + "<small>hrs</small>";
+            const count = days.reduce((n, k) => n + byDay[k].shifts.length, 0);
+            $("weekTotalSub").textContent = fmtDur(total) + " · " + count + (count === 1 ? " shift" : " shifts");
+
+            const maxMs = Math.max(8 * 3600000, ...days.map(k => byDay[k].ms));
+            const daysEl = $("days");
+            const rebuild = daysEl.dataset.week !== viewWeek;
+            if (rebuild) {
+                daysEl.dataset.week = viewWeek;
+                daysEl.innerHTML = days.map(k => '<div class="day" data-k="' + k + '"><div class="day-name"></div>' +
+                    '<div class="day-bar"><i></i></div><div class="day-hrs"></div></div>').join("");
+            }
+            days.forEach(k => {
+                const row = daysEl.querySelector('[data-k="' + k + '"]');
+                const d = byDay[k];
+                const sched = scheduleFor(emp, k);
+                row.classList.toggle("is-today", k === today);
+                row.querySelector(".day-name").innerHTML = esc(DOW_SHORT[new Date(k + "T12:00:00Z").getUTCDay()]) +
+                    "<small>" + esc(sched ? fmtHHMM(sched.start) : k.slice(5).replace("-", "/")) + "</small>";
+                const bar = row.querySelector(".day-bar i");
+                const live = d.shifts.some(s => typeof s.out !== "number");
+                bar.classList.toggle("live", live);
+                const width = (d.ms / maxMs * 100).toFixed(2) + "%";
+                if (rebuild) requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = width; }));
+                else bar.style.width = width;
+                const hrs = row.querySelector(".day-hrs");
+                hrs.textContent = d.ms ? fmtDur(d.ms) : "—";
+                hrs.classList.toggle("zero", !d.ms);
+            });
+
+            const list = days.flatMap(k => byDay[k].shifts).sort((a, b) => b.in - a.in);
+            $("punchesTitle").textContent = viewWeek === thisWeek ? "Punches this week" : "Punches that week";
+            const html = list.map(s => {
+                const live = typeof s.out !== "number";
+                const tags = [];
+                if (live) tags.push('<span class="tag live">On the clock</span>');
+                if (s.vehicleName) tags.push('<span class="tag gps">GPS ' + esc(s.vehicleName) + "</span>");
+                if (s.edited) tags.push('<span class="tag edit" title="' + esc(s.edited.note || "") + '">Edited by admin</span>');
+                return '<div class="shift"><div><div class="shift-date">' + esc(fmtKey(dayKey(s.in))) + '</div>' +
+                    '<div class="shift-times">' + esc(fmtTime(s.in)) + " → " + (live ? "now" : esc(fmtTime(s.out))) + "</div></div>" +
+                    '<div class="shift-dur">' + esc(fmtDur(shiftMs(s, t))) + "</div>" +
+                    (tags.length ? '<div class="shift-tags">' + tags.join("") + "</div>" : "") + "</div>";
+            }).join("");
+            const shiftsEl = $("shifts");
+            const next = html || '<p class="empty">No punches yet.</p>';
+            if (shiftsEl.dataset.html !== next) { shiftsEl.innerHTML = next; shiftsEl.dataset.html = next; }
+        }
+
+        $("weekPrev").addEventListener("click", () => { viewWeek = addDaysKey(viewWeek, -7); renderWeek(); });
+        $("weekNext").addEventListener("click", () => { viewWeek = addDaysKey(viewWeek, 7); renderWeek(); });
+
+        setInterval(() => {
+            if ($("clockScreen").hidden) return;
+            tickClock();
+            const z = zoned(now());
+            if (z.ss === 0) render(); // refresh bars, greeting and schedule line once a minute
+        }, 1000);
+
+        // ---------- The hold-to-punch ring ----------
+        const punchEl = $("punch"), punchBtn = $("punchBtn"), progressEl = $("ringProgress"), orbitEl = $("ringOrbit");
+        const TICKS = 60;
+        (function buildTicks() {
+            const g = $("ticks");
+            let html = "";
+            for (let i = 0; i < TICKS; i++) {
+                const a = (i / TICKS) * Math.PI * 2;
+                const major = i % 5 === 0;
+                const r1 = major ? 141 : 144, r2 = 152;
+                html += '<line class="tick' + (major ? " major" : "") + '" x1="' + (160 + r1 * Math.cos(a)).toFixed(2) + '" y1="' +
+                    (160 + r1 * Math.sin(a)).toFixed(2) + '" x2="' + (160 + r2 * Math.cos(a)).toFixed(2) + '" y2="' + (160 + r2 * Math.sin(a)).toFixed(2) + '"/>';
+            }
+            g.innerHTML = html;
+        })();
+        const tickEls = Array.from(document.querySelectorAll("#ticks .tick"));
+
+        let holdStart = 0, holdRaf = 0, holding = false, litCount = 0;
+
+        function setProgress(p) {
+            progressEl.style.strokeDashoffset = String(1 - p);
+            const a = p * Math.PI * 2;
+            orbitEl.setAttribute("cx", (160 + 126 * Math.cos(a)).toFixed(2));
+            orbitEl.setAttribute("cy", (160 + 126 * Math.sin(a)).toFixed(2));
+            const lit = Math.floor(p * TICKS);
+            if (lit !== litCount) {
+                tickEls.forEach((el, i) => el.classList.toggle("lit", i < lit));
+                if (lit > litCount && lit % 15 === 0 && navigator.vibrate) navigator.vibrate(8);
+                litCount = lit;
+            }
+        }
+
+        function startHold(e) {
+            if (busy || holding || !user || !emp) return;
+            if (e && e.button !== undefined && e.button !== 0) return;
+            holding = true;
+            holdStart = performance.now();
+            $("punchMsg").textContent = "";
+            punchEl.classList.add("holding");
+            if (navigator.vibrate) navigator.vibrate(12);
+            const step = () => {
+                if (!holding) return;
+                const p = Math.min(1, (performance.now() - holdStart) / HOLD_MS);
+                setProgress(p);
+                if (p >= 1) { holding = false; punchEl.classList.remove("holding"); completeHold(); return; }
+                holdRaf = requestAnimationFrame(step);
+            };
+            holdRaf = requestAnimationFrame(step);
+        }
+
+        function cancelHold() {
+            if (!holding) return;
+            holding = false;
+            cancelAnimationFrame(holdRaf);
+            punchEl.classList.remove("holding");
+            setProgress(0);
+            if (performance.now() - holdStart < 250) {
+                $("punchMsg").style.color = "var(--muted)";
+                $("punchMsg").textContent = "Keep holding until the ring fills.";
+                setTimeout(() => { $("punchMsg").style.color = ""; }, 2500);
+            }
+        }
+
+        punchBtn.addEventListener("pointerdown", e => {
+            e.preventDefault();
+            try { punchBtn.setPointerCapture(e.pointerId); } catch (err) {}
+            startHold(e);
+        });
+        punchBtn.addEventListener("pointerup", cancelHold);
+        punchBtn.addEventListener("pointercancel", cancelHold);
+        punchBtn.addEventListener("lostpointercapture", cancelHold);
+        punchBtn.addEventListener("contextmenu", e => e.preventDefault());
+        punchBtn.addEventListener("keydown", e => {
+            if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); startHold(); }
+        });
+        punchBtn.addEventListener("keyup", e => { if (e.key === " " || e.key === "Enter") cancelHold(); });
+        window.addEventListener("blur", cancelHold);
+
+        function burst() {
+            ["shock1", "shock2"].forEach(id => { const el = $(id); el.classList.remove("go"); void el.offsetWidth; el.classList.add("go"); });
+            for (let i = 0; i < 18; i++) {
+                const s = document.createElement("span");
+                s.className = "spark";
+                s.style.setProperty("--a", (i * 20 + Math.random() * 10) + "deg");
+                s.style.animationDuration = (0.65 + Math.random() * 0.35) + "s";
+                punchEl.appendChild(s);
+                setTimeout(() => s.remove(), 1100);
+            }
+        }
+
+        async function completeHold() {
+            if (busy) return;
+            busy = true;
+            punchBtn.disabled = true;
+            punchEl.classList.add("busy");
+            const open = current();
+            try {
+                if (open) await punchOut(open);
+                else await punchIn();
+                if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
+                burst();
+                const after = current();
+                showSuccess(!open, after ? after.in : now(), open);
+            } catch (err) {
+                $("punchMsg").textContent = (open ? "Punch out" : "Punch in") + " failed: " + errText(err);
+                punchEl.classList.remove("shake"); void punchEl.offsetWidth; punchEl.classList.add("shake");
+                if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+            } finally {
+                busy = false;
+                punchBtn.disabled = false;
+                punchEl.classList.remove("busy");
+                setProgress(0);
+            }
+        }
+
+        async function punchIn() {
+            if (current()) throw new Error("You're already punched in.");
+            const r = push(ref(db, P.shifts + "/" + ek));
+            await set(r, { in: serverTimestamp(), src: "clock" });
+            hideBanner();
+        }
+
+        async function punchOut(open) {
+            await set(ref(db, P.shifts + "/" + ek + "/" + open.id + "/out"), serverTimestamp());
+            if (open.vehicleId) await releaseVehicle(open.vehicleId, open.nickname).catch(err => console.warn("Vehicle release:", err));
+        }
+
+        function showSuccess(isIn, ts, prevShift) {
+            const el = $("success");
+            el.style.setProperty("--sc-rgb", isIn ? "53, 208, 127" : "255, 204, 0");
+            $("scTitle").textContent = isIn ? "Punched in" : "Punched out";
+            $("scTime").textContent = fmtTime(isIn ? ts : now());
+            $("scSub").textContent = isIn ? "Have a safe shift, " + firstName(emp, user.email) + "."
+                : "Shift length " + fmtDur(now() - prevShift.in) + " · see you next time.";
+            el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+            afterPunchInPick = isIn;
+            clearTimeout(showSuccess.t);
+            showSuccess.t = setTimeout(hideSuccess, isIn ? 1500 : 2200);
+        }
+        function hideSuccess() {
+            $("success").classList.remove("show");
+            if (afterPunchInPick) { afterPunchInPick = false; setTimeout(() => openSheet(), 250); }
+        }
+        $("success").addEventListener("click", () => { clearTimeout(showSuccess.t); hideSuccess(); });
+
+        // ---------- Vehicle picker ----------
+        let sheetOpen = false, gpsUnits = [], gpsError = "", picking = null;
+
+        async function loadGps() {
+            try {
+                const snap = await get(ref(db, P.gps));
+                gpsUnits = gpsList(snap.val());
+                gpsError = "";
+            } catch (err) {
+                gpsUnits = [];
+                gpsError = "Couldn't load the GPS list from RouteWatcher: " + errText(err);
+            }
+        }
+
+        async function openSheet() {
+            if (!current()) return;
+            sheetOpen = true;
+            $("sheetMsg").textContent = "";
+            $("gpsGrid").innerHTML = '<p class="empty">Loading vehicles…</p>';
+            $("sheetBackdrop").classList.add("show");
+            const sheet = $("sheet");
+            sheet.classList.add("show");
+            sheet.setAttribute("aria-hidden", "false");
+            await loadGps();
+            if (sheetOpen) renderSheet();
+        }
+
+        function closeSheet(instant) {
+            sheetOpen = false;
+            $("sheetBackdrop").classList.remove("show");
+            const sheet = $("sheet");
+            sheet.classList.remove("show");
+            sheet.setAttribute("aria-hidden", "true");
+            if (!instant) punchBtn.focus({ preventScroll: true });
+        }
+
+        function renderSheet() {
+            const open = current();
+            if (!open) { closeSheet(); return; }
+            const grid = $("gpsGrid");
+            $("sheetSkip").textContent = open.vehicleId ? "Keep GPS " + open.vehicleName : "Not driving today";
+            if (gpsError) { grid.innerHTML = ""; $("sheetMsg").textContent = gpsError; return; }
+            if (!gpsUnits.length) { grid.innerHTML = '<p class="empty">No GPS units are set up in RouteWatcher yet.</p>'; return; }
+            const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gps : null;
+            grid.innerHTML = gpsUnits.map((g, i) => {
+                const c = claims[g.id];
+                const mine = c && c.ek === ek;
+                const taken = c && !mine;
+                const state = mine ? "Your vehicle" : taken ? "In use · " + (c.nickname || c.name || "another driver") : "Available";
+                return '<button type="button" class="gps' + (mine ? " mine" : "") + (picking === g.id ? " picking" : "") + '" data-gps="' + esc(g.id) + '"' +
+                    (taken ? " disabled" : "") + ' style="--i:' + i + ';--gps-color:' + esc(g.color) + '" aria-label="GPS ' + esc(g.name) + ", " + esc(state) + '">' +
+                    '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></span>' +
+                    '<span class="gps-name">' + esc(g.name) + '</span><span class="gps-state">' + esc(state) + "</span></button>";
+            }).join("");
+            if (focused) { const el = grid.querySelector('[data-gps="' + CSS.escape(focused) + '"]'); if (el && !el.disabled) el.focus(); }
+        }
+
+        $("gpsGrid").addEventListener("click", e => {
+            const btn = e.target.closest(".gps");
+            if (!btn || btn.disabled || picking) return;
+            const g = gpsUnits.find(u => u.id === btn.dataset.gps);
+            if (g) pickVehicle(g, btn);
+        });
+
+        async function pickVehicle(g, btn) {
+            const open = current();
+            if (!open) return;
+            if (open.vehicleId === g.id) { closeSheet(); return; }
+            picking = g.id;
+            btn.classList.add("picking");
+            $("sheetMsg").textContent = "";
+            const nick = nicknameFor(emp, user.email);
+            try {
+                const res = await runTransaction(ref(db, P.claims + "/" + g.id), cur => {
+                    if (cur && cur.ek !== ek) return; // someone else has it
+                    return { ek: ek, email: normEmail(user.email), name: displayName(emp, user.email), nickname: nick,
+                        shiftId: open.id, vehicleName: g.name, at: now() };
+                });
+                if (!res.committed) {
+                    picking = null;
+                    renderSheet();
+                    const el = $("gpsGrid").querySelector('[data-gps="' + CSS.escape(g.id) + '"]');
+                    if (el) { el.classList.add("flash-taken"); }
+                    $("sheetMsg").textContent = "Someone just took GPS " + g.name + ". Pick another one.";
+                    return;
+                }
+                const prevId = open.vehicleId, prevNick = open.nickname;
+                await update(ref(db, P.shifts + "/" + ek + "/" + open.id), { vehicleId: g.id, vehicleName: g.name, nickname: nick });
+                if (prevId && prevId !== g.id) await releaseVehicle(prevId, prevNick).catch(err => console.warn("Vehicle release:", err));
+                let nickOk = true;
+                try { await set(ref(db, P.nicknames + "/" + g.id), nick); }
+                catch (err) { nickOk = false; console.warn("Nickname not saved:", err); }
+                picking = null;
+                closeSheet();
+                if (nickOk) toast("You're on GPS " + g.name + " — it now shows as “" + nick + "” in RouteWatcher.");
+                else toast("You're on GPS " + g.name + ", but its RouteWatcher nickname couldn't be set (permission denied). Tell your administrator.", true);
+            } catch (err) {
+                picking = null;
+                renderSheet();
+                $("sheetMsg").textContent = "Couldn't take GPS " + g.name + ": " + errText(err);
+            }
+        }
+
+        // Frees the GPS for other drivers and removes the nickname this driver gave it (unless someone changed it since)
+        async function releaseVehicle(gpsId, nick) {
+            await runTransaction(ref(db, P.claims + "/" + gpsId), cur => (cur === null || cur.ek === ek) ? null : undefined);
+            if (nick) {
+                await runTransaction(ref(db, P.nicknames + "/" + gpsId), cur => (cur === null || cur === nick) ? null : undefined)
+                    .catch(err => console.warn("Nickname not cleared:", err));
+            }
+        }
+
+        $("changeVehicleBtn").addEventListener("click", openSheet);
+        $("sheetBackdrop").addEventListener("click", () => closeSheet());
+        $("sheetSkip").addEventListener("click", () => closeSheet());
+        document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen) closeSheet(); });
+
+        // ---------- Punch-in reminder ----------
+        // Fires {reminderMinutes} after today's scheduled start (set in the admin panel) if there is no punch today.
+        let swReg = null, reminderTimer = null;
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("sw.js").then(r => { swReg = r; }).catch(err => console.warn("Service worker:", err));
+        }
+        const canNotify = "Notification" in window;
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+        function reminderInfo() {
+            if (!emp) return null;
+            const today = dayKey(now());
+            const sched = scheduleFor(emp, today);
+            if (!sched) return null;
+            return { today: today, start: sched.start, at: keyToEpoch(today, sched.start) + settings.reminderMinutes * 60000 };
+        }
+
+        function renderReminderCard() {
+            const info = reminderInfo();
+            const mins = settings.reminderMinutes;
+            const btn = $("remindBtn");
+            let text = "<strong>Punch-in reminder</strong>";
+            text += info ? "Today at " + esc(fmtTime(info.at)) + " if you haven't punched in (" + mins + " min after your " + esc(fmtHHMM(info.start)) + " start)."
+                : "You'll get a reminder " + mins + " minutes after your scheduled start on work days.";
+            btn.hidden = true;
+            btn.classList.remove("on");
+            if (!canNotify) {
+                text += isIOS && !standalone ? " On iPhone, tap Share → Add to Home Screen and open the clock from there to turn on notifications."
+                    : " This browser can't show notifications.";
+            } else if (Notification.permission === "granted") {
+                btn.hidden = false; btn.textContent = "On"; btn.classList.add("on");
+            } else if (Notification.permission === "denied") {
+                text += " Notifications are blocked for this site — allow them in your browser settings.";
+            } else {
+                btn.hidden = false; btn.textContent = "Turn on";
+            }
+            const el = $("remindText");
+            if (el.dataset.html !== text) { el.innerHTML = text; el.dataset.html = text; }
+        }
+
+        $("remindBtn").addEventListener("click", async () => {
+            if (!canNotify || Notification.permission === "granted") return;
+            try { await Notification.requestPermission(); } catch (e) {}
+            renderReminderCard();
+            if (Notification.permission === "granted") {
+                toast("Reminders are on. Keep the time clock open (or added to your home screen) so it can remind you.");
+                scheduleReminder();
+            }
+        });
+
+        function scheduleReminder() {
+            clearTimeout(reminderTimer);
+            const info = reminderInfo();
+            if (!info) return;
+            const wait = info.at - now();
+            if (wait > 0) reminderTimer = setTimeout(checkReminder, Math.min(wait + 500, 2147483000));
+            else checkReminder();
+        }
+
+        function checkReminder() {
+            const info = reminderInfo();
+            if (!info || !user || !emp || emp.active === false) return;
+            const t = now();
+            if (t < info.at) return;
+            if (current() || shifts.some(s => dayKey(s.in) === info.today)) { hideBanner(); return; }
+            const text = "Your shift started at " + fmtHHMM(info.start) + ". Hold the button to punch in.";
+            if (bannerDismissedFor !== info.today) showBanner("You haven't punched in yet", text);
+            const key = "tc_reminded_" + ek + "_" + info.today;
+            let done = false;
+            try { done = localStorage.getItem(key) === "1"; } catch (e) {}
+            if (done) return;
+            try { localStorage.setItem(key, "1"); } catch (e) {}
+            notify("Time to punch in", text);
+        }
+
+        async function notify(title, body) {
+            if (!canNotify || Notification.permission !== "granted") return;
+            const opts = { body: body, icon: ICON, badge: ICON, tag: "tc-punch-reminder", renotify: true,
+                requireInteraction: true, vibrate: [200, 100, 200], data: { url: location.href } };
+            try {
+                const reg = swReg || (navigator.serviceWorker ? await navigator.serviceWorker.ready : null);
+                if (reg) { await reg.showNotification(title, opts); return; }
+            } catch (e) { console.warn("SW notification failed:", e); }
+            try { new Notification(title, opts); } catch (e) { console.warn("Notification failed:", e); }
+        }
+
+        function showBanner(title, text) {
+            $("bannerText").innerHTML = "<strong>" + esc(title) + "</strong>" + esc(text);
+            $("banner").classList.add("show");
+        }
+        function hideBanner() { $("banner").classList.remove("show"); }
+        let bannerDismissedFor = null;
+        $("bannerClose").addEventListener("click", () => { bannerDismissedFor = dayKey(now()); hideBanner(); });
+
+        // Timers are paused in background tabs, so check again whenever the page comes back and every 30 s
+        setInterval(checkReminder, 30000);
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") { render(); scheduleReminder(); }
+        });
+    </script>
+</body>
+</html>

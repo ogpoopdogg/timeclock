@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0c0e10">
+    <meta name="robots" content="noindex">
+    <title>Time Clock Admin &middot; E&amp;C Courier</title>
+    <link rel="icon" href="icon-512.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0c0e10;
+            --asphalt: #101214;
+            --asphalt-2: #171a1d;
+            --asphalt-3: #1f2327;
+            --asphalt-4: #2a2f34;
+            --line: rgba(255, 255, 255, 0.09);
+            --shoulder: rgba(255, 255, 255, 0.16);
+            --text: #eef0f2;
+            --muted: #9aa1a9;
+            --dim: #6b727a;
+            --yellow: #ffcc00;
+            --green: #35d07f;
+            --red: #ff6b5e;
+            --blue: #8ab4ff;
+
+            --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+            --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --pad: clamp(16px, 4vw, 40px);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+        body {
+            min-height: 100vh; font-family: var(--font-body); font-size: 1rem; line-height: 1.5; color: var(--text);
+            background:
+                radial-gradient(1100px 520px at 90% -10%, rgba(255, 204, 0, 0.07), transparent 60%),
+                var(--bg);
+            -webkit-font-smoothing: antialiased; overflow-x: hidden;
+            padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+        }
+        button, input, select, textarea { font: inherit; color: inherit; }
+        [hidden] { display: none !important; }
+        .wrap { width: 100%; max-width: 1240px; margin: 0 auto; padding-left: var(--pad); padding-right: var(--pad); }
+
+        /* ---------- Top bar ---------- */
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 18px; padding-bottom: 14px; }
+        .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; min-width: 0; }
+        .brand img { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; background: #000; box-shadow: 0 0 0 1px rgba(255, 204, 0, 0.45); }
+        .brand-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+        .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; white-space: nowrap; }
+        .brand-sub { font-size: 0.8rem; color: var(--yellow); letter-spacing: 0.1em; text-transform: uppercase; }
+        .top-right { display: flex; align-items: center; gap: 16px; }
+        .clock { text-align: right; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        .clock-time { font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; }
+        .clock-date { font-size: 0.82rem; color: var(--muted); }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            height: 40px; padding: 0 16px; border: 0; border-radius: 10px; cursor: pointer; white-space: nowrap;
+            font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; letter-spacing: 0.03em;
+            background: var(--asphalt-3); box-shadow: inset 0 0 0 1px var(--shoulder); color: var(--text);
+            transition: background 0.2s, box-shadow 0.2s, transform 0.2s var(--ease-out), color 0.2s, opacity 0.2s;
+        }
+        .btn:hover { background: var(--asphalt-4); }
+        .btn:active { transform: scale(0.97); }
+        .btn:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+        .btn:disabled { opacity: 0.5; cursor: progress; }
+        .btn svg { width: 18px; height: 18px; }
+        .btn.primary { background: var(--yellow); color: #111; box-shadow: 0 8px 24px rgba(255, 204, 0, 0.18); }
+        .btn.primary:hover { background: #ffd633; }
+        .btn.ghost { background: transparent; color: var(--muted); }
+        .btn.ghost:hover { color: var(--yellow); box-shadow: inset 0 0 0 1px var(--yellow); }
+        .btn.danger { color: var(--red); background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 107, 94, 0.5); }
+        .btn.danger:hover { background: rgba(255, 107, 94, 0.1); }
+        .btn.sm { height: 32px; padding: 0 11px; font-size: 0.92rem; border-radius: 8px; }
+
+        /* ---------- Tabs ---------- */
+        .tabs {
+            position: relative; display: flex; gap: 4px; padding: 5px; border-radius: 14px; overflow-x: auto;
+            background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line); scrollbar-width: none; margin-bottom: 22px;
+        }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab-ink {
+            position: absolute; top: 5px; bottom: 5px; left: 0; width: 0; border-radius: 10px; background: var(--yellow);
+            box-shadow: 0 6px 18px rgba(255, 204, 0, 0.25);
+            transition: transform 0.45s var(--ease-out), width 0.45s var(--ease-out);
+        }
+        .tab {
+            position: relative; z-index: 1; flex: 1 0 auto; height: 42px; padding: 0 18px; border: 0; border-radius: 10px;
+            background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            font-family: var(--font-display); font-weight: 700; font-size: 1.08rem; letter-spacing: 0.04em; color: var(--muted);
+            transition: color 0.3s var(--ease-out);
+        }
+        .tab svg { width: 18px; height: 18px; }
+        .tab:hover { color: var(--text); }
+        .tab[aria-selected="true"] { color: #111; }
+        .tab:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+        .tab-count {
+            min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; font-size: 0.85rem; display: inline-grid; place-items: center;
+            background: rgba(53, 208, 127, 0.18); color: var(--green);
+        }
+        .tab[aria-selected="true"] .tab-count { background: rgba(0, 0, 0, 0.15); color: #111; }
+
+        .panel { animation: panelIn 0.5s var(--ease-out) both; padding-bottom: 60px; }
+        @keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+        .panel-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+        .panel-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 0.95; }
+        .panel-sub { color: var(--muted); margin-top: 4px; }
+        .panel-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+        /* ---------- KPI tiles ---------- */
+        .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+        .kpi {
+            position: relative; overflow: hidden; padding: 18px; border-radius: 16px;
+            background: linear-gradient(180deg, var(--asphalt-2), rgba(23, 26, 29, 0.5)); box-shadow: inset 0 0 0 1px var(--line);
+            animation: panelIn 0.5s var(--ease-out) both;
+        }
+        .kpi:nth-child(2) { animation-delay: 0.05s; } .kpi:nth-child(3) { animation-delay: 0.1s; } .kpi:nth-child(4) { animation-delay: 0.15s; }
+        .kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--k, var(--yellow)); }
+        .kpi-label { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; color: var(--muted); }
+        .kpi-value { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 1; margin-top: 6px; font-variant-numeric: tabular-nums; }
+        .kpi-value small { font-size: 0.45em; color: var(--muted); font-weight: 600; margin-left: 3px; }
+
+        /* ---------- Live board ---------- */
+        .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+        .person {
+            position: relative; padding: 16px; border-radius: 16px; overflow: hidden;
+            background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+            animation: panelIn 0.5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms);
+            transition: box-shadow 0.3s, transform 0.3s var(--ease-out);
+        }
+        .person:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--shoulder), 0 14px 30px rgba(0, 0, 0, 0.35); }
+        .person.in { box-shadow: inset 0 0 0 1px rgba(53, 208, 127, 0.35); }
+        .person.late { box-shadow: inset 0 0 0 1px rgba(255, 107, 94, 0.5); }
+        .person.in::after {
+            content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+            background: linear-gradient(90deg, transparent, var(--green), transparent); animation: slide 2.4s linear infinite;
+        }
+        @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+        .person-top { display: flex; align-items: center; gap: 12px; }
+        .avatar {
+            width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; position: relative;
+            font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; color: #111; background: var(--muted);
+        }
+        .person.in .avatar { background: var(--green); }
+        .person.late .avatar { background: var(--red); }
+        .person.done .avatar { background: var(--yellow); }
+        .person.in .avatar::after {
+            content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--green); animation: ping 2s ease-out infinite;
+        }
+        @keyframes ping { from { transform: scale(0.85); opacity: 0.9; } to { transform: scale(1.35); opacity: 0; } }
+        .person-name { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; line-height: 1.05; }
+        .person-email { font-size: 0.82rem; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .person-state { margin-top: 12px; font-weight: 600; }
+        .person-state.in { color: var(--green); }
+        .person-state.late { color: var(--red); }
+        .person-detail { color: var(--muted); font-size: 0.9rem; margin-top: 2px; font-variant-numeric: tabular-nums; }
+        .person-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .elapsed { font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; font-variant-numeric: tabular-nums; color: var(--green); }
+
+        .tag {
+            display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; white-space: nowrap;
+            background: rgba(255, 255, 255, 0.06); color: var(--muted);
+        }
+        .tag.gps { color: var(--yellow); background: rgba(255, 204, 0, 0.09); }
+        .tag.edit { color: var(--blue); background: rgba(138, 180, 255, 0.1); }
+        .tag.live { color: var(--green); background: rgba(53, 208, 127, 0.1); }
+        .tag.warn { color: var(--red); background: rgba(255, 107, 94, 0.1); }
+        .tag.off { color: var(--dim); }
+
+        .empty-state {
+            padding: 46px 20px; text-align: center; color: var(--muted); border-radius: 16px;
+            background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+        }
+        .empty-state strong { display: block; font-family: var(--font-display); font-size: 1.5rem; color: var(--text); margin-bottom: 4px; }
+
+        /* ---------- Timesheets ---------- */
+        .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+        .week-switch { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 12px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line); }
+        .week-switch .week-label { padding: 0 10px; min-width: 190px; text-align: center; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
+        .icon-btn {
+            width: 34px; height: 34px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; display: grid; place-items: center; color: var(--text);
+            transition: background 0.2s, transform 0.2s var(--ease-out);
+        }
+        .icon-btn:hover { background: var(--asphalt-4); }
+        .icon-btn:active { transform: scale(0.92); }
+        .icon-btn svg { width: 18px; height: 18px; }
+        .icon-btn:focus-visible { outline: 2px solid var(--yellow); }
+
+        .select, .input, .textarea {
+            height: 42px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--asphalt-3);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); transition: box-shadow 0.2s; color-scheme: dark;
+        }
+        .textarea { height: auto; min-height: 70px; padding: 10px 12px; resize: vertical; width: 100%; }
+        .select:focus, .input:focus, .textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--yellow); }
+        .select { padding-right: 30px; }
+
+        .sheet-card {
+            border-radius: 18px; overflow: hidden; margin-bottom: 18px;
+            background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+            animation: panelIn 0.5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 50ms);
+        }
+        .sheet-card-head {
+            display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line);
+            background: linear-gradient(90deg, rgba(255, 204, 0, 0.05), transparent 60%);
+        }
+        .sheet-card-head .avatar { width: 38px; height: 38px; font-size: 1rem; background: var(--yellow); }
+        .sheet-card-name { flex: 1; min-width: 0; }
+        .sheet-card-total { text-align: right; font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
+        .sheet-card-total small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 0.78rem; color: var(--muted); }
+
+        .day-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+        .day-cell { padding: 10px 8px; text-align: center; border-right: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+        .day-cell:last-child { border-right: 0; }
+        .day-cell .dn { font-family: var(--font-display); font-weight: 700; color: var(--muted); font-size: 0.92rem; letter-spacing: 0.04em; }
+        .day-cell .dh { font-weight: 600; }
+        .day-cell .dh.zero { color: var(--dim); font-weight: 400; }
+        .day-cell.today { background: rgba(255, 204, 0, 0.05); }
+        .day-cell.today .dn { color: var(--yellow); }
+
+        table.punches { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+        .punches th {
+            text-align: left; font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase;
+            color: var(--dim); padding: 10px 18px 6px;
+        }
+        .punches td { padding: 10px 18px; border-top: 1px solid var(--line); vertical-align: middle; }
+        .punches tr { transition: background 0.2s; }
+        .punches tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
+        .punches tr.flash { animation: rowFlash 1.6s var(--ease-out); }
+        @keyframes rowFlash { 0% { background: rgba(255, 204, 0, 0.22); } 100% { background: transparent; } }
+        .punches .num { text-align: right; font-weight: 600; }
+        .punches .actions { text-align: right; white-space: nowrap; width: 1%; }
+        .punches .muted { color: var(--muted); }
+        .punches .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .no-punches { padding: 16px 18px; color: var(--dim); }
+
+        /* ---------- Employees ---------- */
+        .emp-list { display: flex; flex-direction: column; gap: 10px; }
+        .emp-row {
+            display: grid; grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1.6fr) auto auto; align-items: center; gap: 16px;
+            padding: 14px 16px; border-radius: 14px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+            animation: panelIn 0.45s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 35ms);
+        }
+        .emp-row.inactive { opacity: 0.55; }
+        .emp-row .avatar { background: var(--yellow); width: 40px; height: 40px; font-size: 1rem; }
+        .sched-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+        .sched-chip {
+            display: inline-flex; flex-direction: column; align-items: center; min-width: 50px; padding: 4px 6px; border-radius: 8px;
+            background: rgba(255, 255, 255, 0.04); font-size: 0.75rem; color: var(--dim); line-height: 1.15;
+        }
+        .sched-chip b { font-family: var(--font-display); font-size: 0.85rem; color: var(--muted); letter-spacing: 0.04em; }
+        .sched-chip.on { background: rgba(255, 204, 0, 0.08); color: var(--text); }
+        .sched-chip.on b { color: var(--yellow); }
+
+        /* ---------- Vehicles ---------- */
+        .gps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+        .gps-card {
+            position: relative; padding: 16px; border-radius: 16px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+            animation: panelIn 0.45s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 35ms); overflow: hidden;
+        }
+        .gps-card.taken { box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.35); }
+        .gps-card .gps-name { font-family: var(--font-display); font-weight: 800; font-size: 2rem; line-height: 1; display: flex; align-items: center; gap: 10px; }
+        .gps-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c, var(--yellow)); box-shadow: 0 0 10px var(--c, var(--yellow)); }
+        .gps-card .gps-info { color: var(--muted); font-size: 0.9rem; margin-top: 8px; min-height: 2.9em; }
+        .gps-card .gps-info strong { color: var(--text); }
+        .gps-card .gps-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
+
+        /* ---------- Settings ---------- */
+        .settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+        .card { padding: 20px; border-radius: 18px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line); }
+        .card h3 { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; margin-bottom: 4px; }
+        .card .hint { color: var(--muted); font-size: 0.92rem; margin-bottom: 16px; }
+        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+        .field label, .label {
+            font-family: var(--font-display); font-weight: 700; font-size: 0.9rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+        }
+        .field .input, .field .select { width: 100%; }
+        .log { display: flex; flex-direction: column; max-height: 460px; overflow-y: auto; }
+        .log-item { padding: 10px 0; border-top: 1px solid var(--line); font-size: 0.9rem; }
+        .log-item:first-child { border-top: 0; }
+        .log-item .when { color: var(--dim); font-size: 0.8rem; }
+        .log-item .what { color: var(--text); }
+        .log-item .why { color: var(--muted); font-style: italic; }
+
+        /* ---------- Modal ---------- */
+        .modal-backdrop {
+            position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
+            background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease-out);
+        }
+        .modal-backdrop.show { opacity: 1; pointer-events: auto; }
+        .modal {
+            width: min(600px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; border-radius: 20px; padding: 22px;
+            background: linear-gradient(180deg, #1b1f23, #141719); box-shadow: 0 0 0 1px var(--shoulder), 0 30px 80px rgba(0, 0, 0, 0.6);
+            transform: translateY(16px) scale(0.97); transition: transform 0.45s var(--ease-spring);
+        }
+        .modal-backdrop.show .modal { transform: none; }
+        .modal h2 { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; line-height: 1; margin-bottom: 4px; }
+        .modal .modal-sub { color: var(--muted); margin-bottom: 18px; font-size: 0.95rem; }
+        .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+        .modal-grid .full { grid-column: 1 / -1; }
+        .modal-foot { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 8px; }
+        .modal-foot .spacer { flex: 1; }
+        .modal-msg { color: var(--red); min-height: 1.4em; font-size: 0.92rem; margin: 2px 0 8px; }
+        .modal .calc { color: var(--muted); font-size: 0.92rem; margin-bottom: 12px; }
+        .modal .calc strong { color: var(--text); }
+
+        .sched-editor { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+        .sched-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+        .sched-row .input { width: 100%; height: 38px; }
+        .sched-row.off .input { opacity: 0.3; pointer-events: none; }
+        .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-family: var(--font-display); font-weight: 700; }
+        .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+        .switch .track {
+            width: 38px; height: 22px; border-radius: 11px; background: var(--asphalt-4); position: relative; flex: none;
+            transition: background 0.25s var(--ease-out);
+        }
+        .switch .track::after {
+            content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--text);
+            transition: transform 0.3s var(--ease-spring);
+        }
+        .switch input:checked + .track { background: var(--yellow); }
+        .switch input:checked + .track::after { transform: translateX(16px); background: #111; }
+        .switch input:focus-visible + .track { outline: 2px solid var(--text); outline-offset: 2px; }
+        .copy-link { background: none; border: 0; color: var(--yellow); cursor: pointer; font-size: 0.88rem; text-decoration: underline; text-underline-offset: 3px; justify-self: start; }
+        details.create-login { margin: 6px 0 12px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line); }
+        details.create-login summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
+        details.create-login p { color: var(--muted); font-size: 0.88rem; margin: 8px 0 10px; }
+
+        /* ---------- Sign in / gate ---------- */
+        .gate { min-height: calc(100vh - 120px); display: grid; place-items: center; padding: 20px 0 60px; }
+        .gate-card {
+            width: 100%; max-width: 420px; padding: clamp(26px, 6vw, 40px); border-radius: 22px; position: relative; overflow: hidden;
+            background: linear-gradient(180deg, var(--asphalt-2), var(--asphalt)); box-shadow: 0 0 0 1px var(--line), 0 30px 80px rgba(0, 0, 0, 0.5);
+            animation: panelIn 0.6s var(--ease-out) both;
+        }
+        .gate-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--yellow); }
+        .gate-card h1 { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 0.95; margin-bottom: 6px; }
+        .gate-card .sub { color: var(--muted); margin-bottom: 24px; }
+        .gate-card .input { width: 100%; height: 48px; margin-bottom: 14px; }
+        .gate-card .btn { width: 100%; height: 50px; font-size: 1.2rem; }
+        .gate-msg { color: var(--red); min-height: 1.5em; margin-top: 12px; font-size: 0.95rem; }
+        .boot { min-height: 60vh; display: grid; place-items: center; color: var(--muted); text-align: center; }
+        .spinner { width: 42px; height: 42px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: var(--yellow); animation: spin 0.9s linear infinite; margin: 0 auto 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast {
+            position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); z-index: 100;
+            transform: translate(-50%, 160%); max-width: calc(100vw - 24px); padding: 12px 18px; border-radius: 14px;
+            background: rgba(31, 35, 39, 0.97); box-shadow: 0 0 0 1px var(--shoulder), 0 18px 40px rgba(0, 0, 0, 0.55);
+            transition: transform 0.5s var(--ease-spring), visibility 0s linear 0.5s; visibility: hidden;
+        }
+        .toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform 0.5s var(--ease-spring); }
+        .toast.warn { box-shadow: 0 0 0 1px rgba(255, 107, 94, 0.6), 0 18px 40px rgba(0, 0, 0, 0.55); }
+
+        /* ---------- Responsive ---------- */
+        @media (max-width: 960px) {
+            .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .settings-grid { grid-template-columns: 1fr; }
+            .emp-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+            .emp-row .sched-chips { grid-column: 1 / -1; order: 5; }
+            .emp-row .emp-status { display: none; }
+        }
+        @media (max-width: 720px) {
+            .clock { display: none; }
+            .tab .tab-text { display: none; }
+            .tab { padding: 0 14px; }
+            .punches thead { display: none; }
+            .punches, .punches tbody, .punches tr, .punches td { display: block; width: 100%; }
+            .punches tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 10px 16px; border-top: 1px solid var(--line); }
+            .punches td { border: 0; padding: 2px 0; }
+            .punches td[data-l]::before { content: attr(data-l) " "; color: var(--dim); font-size: 0.8rem; }
+            .punches td.day { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+            .punches .num { text-align: right; }
+            .punches .actions { grid-column: 1 / -1; text-align: left; width: auto; padding-top: 6px; }
+            .punches .tagcell { grid-column: 1 / -1; }
+            .day-cell { padding: 8px 2px; font-size: 0.82rem; }
+            .modal-grid { grid-template-columns: 1fr; }
+            .week-switch .week-label { min-width: 0; }
+        }
+        @media (max-width: 460px) {
+            .kpi-value { font-size: 2.1rem; }
+            .sched-row { grid-template-columns: 78px minmax(0, 1fr) minmax(0, 1fr); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+        }
+    </style>
+</head>
+<body>
+    <header class="wrap topbar">
+        <a class="brand" href="https://app.eandccourier.ca/" aria-label="E&amp;C Courier staff tools home">
+            <img src="icon-logo.png" alt="" width="40" height="40">
+            <span class="brand-text"><span class="brand-name">E&amp;C Courier</span><span class="brand-sub">Time Clock Admin</span></span>
+        </a>
+        <div class="top-right">
+            <div class="clock" aria-hidden="true"><div class="clock-time" id="clockTime"></div><div class="clock-date" id="clockDate"></div></div>
+            <button type="button" class="btn ghost sm" id="signOutBtn" hidden>Sign out</button>
+        </div>
+    </header>
+
+    <main class="wrap" id="bootScreen"><div class="boot"><div><div class="spinner"></div>Loading admin panel…</div></div></main>
+
+    <main class="wrap gate" id="gateScreen" hidden>
+        <form class="gate-card" id="gateForm" novalidate>
+            <h1 id="gateTitle">Admin sign in</h1>
+            <p class="sub" id="gateSub">Only the time clock administrator can open this panel.</p>
+            <div id="gateFields">
+                <label class="label" for="gEmail">Email</label>
+                <input class="input" id="gEmail" name="email" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" style="margin-top:6px">
+                <label class="label" for="gPass">Password</label>
+                <input class="input" id="gPass" name="password" type="password" autocomplete="current-password" style="margin-top:6px">
+                <button type="submit" class="btn primary" id="gateBtn">Sign in</button>
+            </div>
+            <button type="button" class="btn" id="gateSwitch" hidden>Sign in with a different account</button>
+            <p class="gate-msg" id="gateMsg" role="alert"></p>
+        </form>
+    </main>
+
+    <main class="wrap" id="appScreen" hidden>
+        <nav class="tabs" role="tablist" aria-label="Admin sections" id="tabs">
+            <span class="tab-ink" id="tabInk" aria-hidden="true"></span>
+            <button type="button" class="tab" role="tab" data-tab="live" aria-selected="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <span class="tab-text">Live</span><span class="tab-count" id="liveCount">0</span>
+            </button>
+            <button type="button" class="tab" role="tab" data-tab="sheets" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+                <span class="tab-text">Timesheets</span>
+            </button>
+            <button type="button" class="tab" role="tab" data-tab="people" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg>
+                <span class="tab-text">Employees</span>
+            </button>
+            <button type="button" class="tab" role="tab" data-tab="vehicles" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+                <span class="tab-text">Vehicles</span>
+            </button>
+            <button type="button" class="tab" role="tab" data-tab="settings" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+                <span class="tab-text">Settings</span>
+            </button>
+        </nav>
+
+        <!-- Live -->
+        <section class="panel" id="panel-live" role="tabpanel">
+            <div class="panel-head">
+                <div><h1 class="panel-title">Who's working</h1><p class="panel-sub" id="liveSub"></p></div>
+                <div class="panel-actions"><button type="button" class="btn" data-add-punch>+ Add punch</button></div>
+            </div>
+            <div class="kpis">
+                <div class="kpi" style="--k:var(--green)"><div class="kpi-label">On the clock</div><div class="kpi-value" id="kOn">0</div></div>
+                <div class="kpi" style="--k:var(--red)"><div class="kpi-label">Late / not in</div><div class="kpi-value" id="kLate">0</div></div>
+                <div class="kpi"><div class="kpi-label">Hours today</div><div class="kpi-value" id="kToday">0</div></div>
+                <div class="kpi" style="--k:var(--blue)"><div class="kpi-label">Hours this week</div><div class="kpi-value" id="kWeek">0</div></div>
+            </div>
+            <div class="board" id="board"></div>
+        </section>
+
+        <!-- Timesheets -->
+        <section class="panel" id="panel-sheets" role="tabpanel" hidden>
+            <div class="panel-head">
+                <div><h1 class="panel-title">Timesheets</h1><p class="panel-sub">Edit, add or remove punches. Every change is logged.</p></div>
+                <div class="panel-actions">
+                    <button type="button" class="btn" data-add-punch>+ Add punch</button>
+                    <button type="button" class="btn" id="exportBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar">
+                <div class="week-switch">
+                    <button type="button" class="icon-btn" id="wkPrev" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+                    <span class="week-label" id="wkLabel"></span>
+                    <button type="button" class="icon-btn" id="wkNext" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+                </div>
+                <button type="button" class="btn sm ghost" id="wkToday">This week</button>
+                <select class="select" id="empFilter" aria-label="Employee"></select>
+            </div>
+            <div id="sheets"></div>
+        </section>
+
+        <!-- Employees -->
+        <section class="panel" id="panel-people" role="tabpanel" hidden>
+            <div class="panel-head">
+                <div><h1 class="panel-title">Employees</h1><p class="panel-sub">Who can use the time clock, and when they're scheduled to start.</p></div>
+                <div class="panel-actions"><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
+            </div>
+            <div class="emp-list" id="empList"></div>
+        </section>
+
+        <!-- Vehicles -->
+        <section class="panel" id="panel-vehicles" role="tabpanel" hidden>
+            <div class="panel-head">
+                <div><h1 class="panel-title">Vehicles</h1><p class="panel-sub">GPS units registered in RouteWatcher (names from RouteWatcher Settings) and who has each one.</p></div>
+                <div class="panel-actions"><button type="button" class="btn" id="gpsRefresh">Refresh list</button></div>
+            </div>
+            <div class="gps-grid" id="gpsGrid"></div>
+        </section>
+
+        <!-- Settings -->
+        <section class="panel" id="panel-settings" role="tabpanel" hidden>
+            <div class="panel-head"><div><h1 class="panel-title">Settings</h1><p class="panel-sub">Applies to every employee.</p></div></div>
+            <div class="settings-grid">
+                <form class="card" id="settingsForm">
+                    <h3>Time clock</h3>
+                    <p class="hint">All times use Brandon, MB time (<span id="tzName"></span>).</p>
+                    <div class="field">
+                        <label for="sReminder">Punch-in reminder (minutes after scheduled start)</label>
+                        <input class="input" id="sReminder" type="number" min="0" max="240" step="1" inputmode="numeric">
+                    </div>
+                    <div class="field">
+                        <label for="sWeekStart">Work week starts on</label>
+                        <select class="select" id="sWeekStart"></select>
+                    </div>
+                    <button type="submit" class="btn primary">Save settings</button>
+                </form>
+                <div class="card">
+                    <h3>Change log</h3>
+                    <p class="hint">The 30 most recent admin changes to punches.</p>
+                    <div class="log" id="auditLog"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Shift modal -->
+    <div class="modal-backdrop" id="shiftModal">
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="smTitle" id="shiftForm" novalidate>
+            <h2 id="smTitle">Edit punch</h2>
+            <p class="modal-sub" id="smSub"></p>
+            <div class="modal-grid">
+                <div class="field full" id="smEmpField">
+                    <label for="smEmp">Employee</label>
+                    <select class="select" id="smEmp"></select>
+                </div>
+                <div class="field"><label for="smInDate">In · date</label><input class="input" id="smInDate" type="date" required></div>
+                <div class="field"><label for="smInTime">In · time</label><input class="input" id="smInTime" type="time" required></div>
+                <div class="field full">
+                    <label class="switch"><input type="checkbox" id="smOpen"><span class="track"></span>Still on the clock (no punch out)</label>
+                </div>
+                <div class="field smOut"><label for="smOutDate">Out · date</label><input class="input" id="smOutDate" type="date"></div>
+                <div class="field smOut"><label for="smOutTime">Out · time</label><input class="input" id="smOutTime" type="time"></div>
+                <div class="field full">
+                    <label for="smGps">Vehicle (GPS)</label>
+                    <select class="select" id="smGps"></select>
+                </div>
+                <div class="field full">
+                    <label for="smNote">Reason for change</label>
+                    <textarea class="textarea" id="smNote" maxlength="300" placeholder="e.g. Forgot to punch out, confirmed with driver"></textarea>
+                </div>
+            </div>
+            <p class="calc" id="smCalc"></p>
+            <p class="modal-msg" id="smMsg" role="alert"></p>
+            <div class="modal-foot">
+                <button type="button" class="btn danger" id="smDelete">Delete punch</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost" data-close>Cancel</button>
+                <button type="submit" class="btn primary" id="smSave">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Employee modal -->
+    <div class="modal-backdrop" id="empModal">
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="emTitle" id="empForm" novalidate>
+            <h2 id="emTitle">Add employee</h2>
+            <p class="modal-sub">Their first name becomes the GPS nickname in RouteWatcher when they pick a vehicle.</p>
+            <div class="modal-grid">
+                <div class="field"><label for="emName">Name</label><input class="input" id="emName" maxlength="60" placeholder="Matt Smith" autocomplete="off"></div>
+                <div class="field"><label for="emEmail">Sign-in email</label><input class="input" id="emEmail" type="email" placeholder="matt@ec.com" autocapitalize="off" spellcheck="false" autocomplete="off"></div>
+                <div class="field full"><label class="switch"><input type="checkbox" id="emActive" checked><span class="track"></span>Active (can punch in)</label></div>
+            </div>
+            <div class="label" style="margin:4px 0 8px">Weekly schedule · start and end times</div>
+            <div class="sched-editor" id="schedEditor"></div>
+            <button type="button" class="copy-link" id="copyMon">Copy Monday to Tuesday–Friday</button>
+            <details class="create-login" id="createLogin">
+                <summary>Create their sign-in account (optional)</summary>
+                <p>Skip this if they already sign in to RouteWatcher or another E&amp;C app with this email. Otherwise set a starting password (6+ characters) and give it to them.</p>
+                <input class="input" id="emPass" type="text" minlength="6" placeholder="Starting password" autocomplete="off" style="width:100%">
+            </details>
+            <p class="modal-msg" id="emMsg" role="alert"></p>
+            <div class="modal-foot">
+                <button type="button" class="btn danger" id="emDelete">Remove</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost" data-close>Cancel</button>
+                <button type="submit" class="btn primary" id="emSave">Save employee</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module">
+        let core;
+        try {
+            core = await import("./tc-core.js");
+        } catch (e) {
+            document.getElementById("bootScreen").innerHTML = '<div class="boot"><div>Couldn\'t load the admin panel. Check your connection and reload.</div></div>';
+            throw e;
+        }
+        const {
+            app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
+            zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
+            fmtClockDur, fmtHours, shiftList, shiftMs, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
+            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG
+        } = core;
+        const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
+        const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
+            await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
+        const { ref, onValue, get, set, update, push, remove, query, orderByChild, startAt, limitToLast, runTransaction, serverTimestamp } =
+            await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js");
+        const { firebaseConfig } = await import("./firebase-config.js");
+
+        const $ = id => document.getElementById(id);
+
+        // ---------- State ----------
+        let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
+        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, audit = [];
+        let viewWeek = null, rangeStart = null;
+        let unsubs = [], shiftUnsubs = {};
+        let activeTab = "live";
+
+        const now = () => Date.now() + serverOffset;
+
+        function show(screen) {
+            ["bootScreen", "gateScreen", "appScreen"].forEach(id => { $(id).hidden = id !== screen; });
+            $("signOutBtn").hidden = !user;
+        }
+
+        let toastTimer = null;
+        function toast(text, warn) {
+            const el = $("toast");
+            el.textContent = text;
+            el.classList.toggle("warn", !!warn);
+            el.classList.add("show");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => el.classList.remove("show"), warn ? 6500 : 3500);
+        }
+
+        // ---------- Header clock ----------
+        function tickHeader() {
+            const t = now();
+            $("clockTime").textContent = fmtTime(t);
+            $("clockDate").textContent = fmtKey(dayKey(t), true);
+        }
+        tickHeader();
+
+        // ---------- Auth gate ----------
+        $("gateForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const msg = $("gateMsg"), btn = $("gateBtn");
+            const email = $("gEmail").value.trim(), pass = $("gPass").value;
+            if (!email || !pass) { msg.textContent = "Enter your email and password."; return; }
+            if (!isAdminEmail(email)) { msg.textContent = "This account isn't the time clock administrator."; return; }
+            msg.textContent = ""; btn.disabled = true; btn.textContent = "Signing in…";
+            try { await signInWithEmailAndPassword(auth, email, pass); }
+            catch (err) { msg.textContent = AUTH_MESSAGES[err && err.code] || "Sign-in failed. Please try again."; $("gPass").value = ""; }
+            btn.disabled = false; btn.textContent = "Sign in";
+        });
+        $("gateSwitch").addEventListener("click", () => signOut(auth));
+        $("signOutBtn").addEventListener("click", () => signOut(auth));
+
+        function stopAll() {
+            unsubs.forEach(fn => fn()); unsubs = [];
+            Object.values(shiftUnsubs).forEach(fn => fn()); shiftUnsubs = {};
+        }
+
+        onAuthStateChanged(auth, u => {
+            stopAll();
+            user = u;
+            employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = [];
+            if (!u) {
+                $("gateTitle").textContent = "Admin sign in";
+                $("gateSub").textContent = "Only the time clock administrator can open this panel.";
+                $("gateFields").hidden = false; $("gateSwitch").hidden = true; $("gateMsg").textContent = "";
+                show("gateScreen");
+                return;
+            }
+            if (!isAdminEmail(u.email)) {
+                $("gateTitle").textContent = "Admin only";
+                $("gateSub").textContent = "You're signed in as " + u.email + ". Employees punch in at the time clock and can't change times here.";
+                $("gateFields").hidden = true; $("gateSwitch").hidden = false;
+                show("gateScreen");
+                return;
+            }
+            show("appScreen");
+            viewWeek = weekStartKey(dayKey(Date.now()), settings.weekStart);
+            const sub = (r, cb) => unsubs.push(onValue(r, cb, err => toast("Couldn't load " + r.key + ": " + errText(err), true)));
+            sub(ref(db, ".info/serverTimeOffset"), s => { serverOffset = Number(s.val()) || 0; });
+            sub(ref(db, P.settings), s => {
+                const first = !s.exists();
+                settings = settingsWithDefaults(s.val());
+                if (first) set(ref(db, P.settings), settings).catch(() => {});
+                fillSettingsForm();
+                renderAll();
+            });
+            sub(ref(db, P.employees), s => { employees = s.val() || {}; syncShiftListeners(); renderAll(); });
+            sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
+            sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
+            sub(query(ref(db, P.audit), limitToLast(30)), s => {
+                audit = Object.values(s.val() || {}).sort((a, b) => (b.at || 0) - (a.at || 0));
+                renderAudit();
+            });
+            loadGps();
+            renderAll();
+        });
+
+        // Shifts are loaded per employee from a little before the oldest week being looked at
+        function wantedRangeStart() {
+            const thisWeek = weekStartKey(dayKey(now()), settings.weekStart);
+            const oldest = viewWeek && viewWeek < thisWeek ? viewWeek : thisWeek;
+            return keyToEpoch(addDaysKey(oldest, -14));
+        }
+
+        function syncShiftListeners(force) {
+            const start = wantedRangeStart();
+            if (force || rangeStart === null || start < rangeStart) {
+                Object.values(shiftUnsubs).forEach(fn => fn()); shiftUnsubs = {};
+                rangeStart = start;
+            }
+            Object.keys(shiftUnsubs).forEach(k => {
+                if (!employees[k]) { shiftUnsubs[k](); delete shiftUnsubs[k]; delete shiftsByEk[k]; }
+            });
+            Object.keys(employees).forEach(k => {
+                if (shiftUnsubs[k]) return;
+                shiftUnsubs[k] = onValue(query(ref(db, P.shifts + "/" + k), orderByChild("in"), startAt(rangeStart)), s => {
+                    shiftsByEk[k] = shiftList(s.val());
+                    renderAll();
+                }, err => toast("Couldn't load punches: " + errText(err), true));
+            });
+        }
+
+        async function loadGps() {
+            try {
+                gpsUnits = gpsList((await get(ref(db, P.gps))).val());
+                gpsLoaded = true;
+            } catch (err) {
+                gpsUnits = []; gpsLoaded = true;
+                toast("Couldn't load GPS units from RouteWatcher: " + errText(err), true);
+            }
+            if (activeTab === "vehicles") renderVehicles();
+        }
+        $("gpsRefresh").addEventListener("click", loadGps);
+
+        // ---------- Tabs ----------
+        const tabs = Array.from(document.querySelectorAll(".tab"));
+        function moveInk() {
+            const t = tabs.find(b => b.dataset.tab === activeTab);
+            if (!t) return;
+            $("tabInk").style.width = t.offsetWidth + "px";
+            $("tabInk").style.transform = "translateX(" + t.offsetLeft + "px)";
+        }
+        function selectTab(name) {
+            activeTab = name;
+            tabs.forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+            ["live", "sheets", "people", "vehicles", "settings"].forEach(p => { $("panel-" + p).hidden = p !== name; });
+            moveInk();
+            renderAll();
+            try { history.replaceState(null, "", "#" + name); } catch (e) {}
+        }
+        tabs.forEach(b => b.addEventListener("click", () => selectTab(b.dataset.tab)));
+        $("tabs").addEventListener("keydown", e => {
+            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+            const i = tabs.findIndex(b => b.dataset.tab === activeTab);
+            const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+            selectTab(next.dataset.tab); next.focus();
+        });
+        window.addEventListener("resize", moveInk);
+        const initialTab = location.hash.slice(1);
+        if (tabs.some(b => b.dataset.tab === initialTab)) activeTab = initialTab;
+
+        // ---------- Helpers ----------
+        function empList() {
+            return Object.entries(employees).map(([k, e]) => Object.assign({ ek: k }, e))
+                .sort((a, b) => (a.active === false) - (b.active === false) || displayName(a, a.email).localeCompare(displayName(b, b.email)));
+        }
+        function shiftsOf(k) { return shiftsByEk[k] || []; }
+        function findShift(k, id) { return shiftsOf(k).find(s => s.id === id) || null; }
+
+        function renderAll() {
+            if (!user || $("appScreen").hidden) return;
+            requestAnimationFrame(moveInk);
+            const onCount = empList().filter(e => openShift(shiftsOf(e.ek))).length;
+            $("liveCount").textContent = onCount;
+            if (activeTab === "live") renderLive();
+            else if (activeTab === "sheets") renderSheets();
+            else if (activeTab === "people") renderPeople();
+            else if (activeTab === "vehicles") renderVehicles();
+        }
+
+        // ---------- Live ----------
+        function liveStatus(e, t, today) {
+            const list = shiftsOf(e.ek);
+            const open = openShift(list);
+            const todays = list.filter(s => dayKey(s.in) === today);
+            const sched = scheduleFor(e, today);
+            if (open) return { kind: "in", open: open, todays: todays, sched: sched };
+            if (todays.length) return { kind: "done", todays: todays, sched: sched };
+            if (!sched) return { kind: "off", sched: null, todays: todays };
+            const startTs = keyToEpoch(today, sched.start);
+            if (t >= startTs + settings.reminderMinutes * 60000) return { kind: "late", sched: sched, startTs: startTs, todays: todays };
+            if (t >= startTs) return { kind: "due", sched: sched, startTs: startTs, todays: todays };
+            return { kind: "sched", sched: sched, startTs: startTs, todays: todays };
+        }
+
+        function renderLive() {
+            const t = now(), today = dayKey(t);
+            const days = weekDays(weekStartKey(today, settings.weekStart));
+            const people = empList().filter(e => e.active !== false);
+            let on = 0, late = 0, todayMs = 0, weekMs = 0;
+            const cards = people.map((e, i) => {
+                const st = liveStatus(e, t, today);
+                const list = shiftsOf(e.ek);
+                const dayMs = st.todays.reduce((n, s) => n + shiftMs(s, t), 0);
+                todayMs += dayMs;
+                weekMs += weekTotals(list, days, t).total;
+                let cls = "", state = "", detail = "", foot = "";
+                const name = displayName(e, e.email);
+                if (st.kind === "in") {
+                    on++; cls = "in";
+                    state = '<div class="person-state in">On the clock</div>';
+                    detail = "Since " + esc(fmtTime(st.open.in)) + (dayKey(st.open.in) !== today ? " on " + esc(fmtKey(dayKey(st.open.in))) : "");
+                    foot = '<span class="elapsed" data-since="' + st.open.in + '">' + esc(fmtClockDur(t - st.open.in)) + "</span>" +
+                        (st.open.vehicleName ? '<span class="tag gps">GPS ' + esc(st.open.vehicleName) + "</span>" : '<span class="tag">No vehicle</span>') +
+                        '<button type="button" class="btn sm" data-punchout="' + esc(e.ek) + '" data-id="' + esc(st.open.id) + '">Punch out</button>';
+                } else if (st.kind === "late") {
+                    late++; cls = "late";
+                    state = '<div class="person-state late">Not punched in</div>';
+                    detail = "Scheduled " + esc(fmtHHMM(st.sched.start)) + " · " + esc(fmtDur(t - st.startTs)) + " late";
+                    foot = '<span class="tag warn">Late</span><button type="button" class="btn sm" data-add-for="' + esc(e.ek) + '">Add punch</button>';
+                } else if (st.kind === "due") {
+                    state = '<div class="person-state">Starting now</div>';
+                    detail = "Scheduled " + esc(fmtHHMM(st.sched.start));
+                    foot = '<span class="tag">Grace period</span>';
+                } else if (st.kind === "done") {
+                    cls = "done";
+                    state = '<div class="person-state">Done for today</div>';
+                    detail = esc(fmtDur(dayMs)) + " worked";
+                    foot = '<span class="tag">' + st.todays.length + (st.todays.length === 1 ? " shift" : " shifts") + "</span>";
+                } else if (st.kind === "sched") {
+                    state = '<div class="person-state">Not in yet</div>';
+                    detail = "Scheduled " + esc(fmtHHMM(st.sched.start)) + (st.sched.end ? " – " + esc(fmtHHMM(st.sched.end)) : "");
+                    foot = '<span class="tag">Upcoming</span>';
+                } else {
+                    state = '<div class="person-state" style="color:var(--dim)">Off today</div>';
+                    detail = "No shift scheduled";
+                    foot = '<span class="tag off">Off</span>';
+                }
+                return '<article class="person ' + cls + '" style="--i:' + i + '">' +
+                    '<div class="person-top"><div class="avatar">' + esc(initials(name)) + '</div><div style="min-width:0">' +
+                    '<div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div></div>" +
+                    state + '<div class="person-detail">' + detail + "</div>" + '<div class="person-foot">' + foot + "</div></article>";
+            });
+            $("kOn").textContent = on;
+            $("kLate").textContent = late;
+            $("kToday").innerHTML = esc(fmtHours(todayMs)) + "<small>h</small>";
+            $("kWeek").innerHTML = esc(fmtHours(weekMs)) + "<small>h</small>";
+            $("liveSub").textContent = people.length ? people.length + " active employees · " + fmtKey(today, true)
+                : "Add employees in the Employees tab to get started.";
+            const html = cards.length ? cards.join("") :
+                '<div class="empty-state"><strong>No employees yet</strong>Add your team in the Employees tab, then they can sign in to the time clock.</div>';
+            const board = $("board");
+            if (board.dataset.html !== html.replace(/data-since[^>]*>[^<]*</g, "")) {
+                board.innerHTML = html;
+                board.dataset.html = html.replace(/data-since[^>]*>[^<]*</g, "");
+            }
+        }
+
+        $("board").addEventListener("click", async e => {
+            const out = e.target.closest("[data-punchout]");
+            if (out) {
+                const k = out.dataset.punchout, s = findShift(k, out.dataset.id);
+                const emp = employees[k];
+                if (!s || !confirm("Punch " + displayName(emp, emp && emp.email) + " out now?")) return;
+                out.disabled = true;
+                try {
+                    await saveShift(k, s, { in: s.in, out: now(), vehicleId: s.vehicleId || null }, "Punched out by admin", "punch-out");
+                    toast(displayName(emp, emp.email) + " punched out.");
+                } catch (err) { toast("Couldn't punch out: " + errText(err), true); out.disabled = false; }
+                return;
+            }
+            const add = e.target.closest("[data-add-for]");
+            if (add) openShiftModal(add.dataset.addFor, null);
+        });
+
+        // ---------- Timesheets ----------
+        function renderEmpFilter() {
+            const sel = $("empFilter");
+            const cur = sel.value || "all";
+            const opts = '<option value="all">All employees</option>' + empList().map(e =>
+                '<option value="' + esc(e.ek) + '">' + esc(displayName(e, e.email)) + (e.active === false ? " (inactive)" : "") + "</option>").join("");
+            if (sel.dataset.html !== opts) { sel.innerHTML = opts; sel.dataset.html = opts; }
+            sel.value = Array.from(sel.options).some(o => o.value === cur) ? cur : "all";
+        }
+
+        function renderSheets() {
+            renderEmpFilter();
+            const t = now(), today = dayKey(t);
+            const thisWeek = weekStartKey(today, settings.weekStart);
+            const days = weekDays(viewWeek);
+            $("wkLabel").textContent = (viewWeek === thisWeek ? "This week · " : "") + fmtKey(days[0]) + " – " + fmtKey(days[6]);
+            $("wkNext").disabled = viewWeek >= thisWeek;
+            $("wkToday").hidden = viewWeek === thisWeek;
+            const filter = $("empFilter").value;
+            const people = empList().filter(e => filter === "all" ? (e.active !== false || weekTotals(shiftsOf(e.ek), days, t).total > 0) : e.ek === filter);
+            if (!people.length) {
+                $("sheets").innerHTML = '<div class="empty-state"><strong>No employees</strong>Add employees in the Employees tab.</div>';
+                return;
+            }
+            $("sheets").innerHTML = people.map((e, i) => {
+                const { byDay, total } = weekTotals(shiftsOf(e.ek), days, t);
+                const name = displayName(e, e.email);
+                const strip = days.map(k => {
+                    const ms = byDay[k].ms;
+                    return '<div class="day-cell' + (k === today ? " today" : "") + '"><div class="dn">' + esc(DOW_SHORT[new Date(k + "T12:00:00Z").getUTCDay()]) + " " + esc(k.slice(8)) +
+                        '</div><div class="dh' + (ms ? "" : " zero") + '">' + (ms ? esc(fmtHours(ms)) : "—") + "</div></div>";
+                }).join("");
+                const rows = days.flatMap(k => byDay[k].shifts).map(s => {
+                    const live = typeof s.out !== "number";
+                    const tags = [];
+                    if (live) tags.push('<span class="tag live">On the clock</span>');
+                    if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
+                    else if (s.edited) tags.push('<span class="tag edit" title="' + esc((s.edited.note || "") + " — " + (s.edited.by || "")) + '">Edited</span>');
+                    if (s.edited && s.edited.note) tags.push('<span class="tag" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note.length > 34 ? s.edited.note.slice(0, 33) + "…" : s.edited.note) + "”</span>");
+                    return '<tr data-row="' + esc(e.ek + "/" + s.id) + '">' +
+                        '<td class="day">' + esc(fmtKey(dayKey(s.in))) + "</td>" +
+                        '<td data-l="In">' + esc(fmtTime(s.in)) + "</td>" +
+                        '<td data-l="Out">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "")) + "</td>" +
+                        '<td class="num">' + esc(fmtHours(shiftMs(s, t))) + "</td>" +
+                        '<td data-l="GPS">' + (s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>" : '<span class="muted">—</span>') + "</td>" +
+                        '<td class="tagcell"><div class="tags">' + tags.join("") + "</div></td>" +
+                        '<td class="actions"><button type="button" class="btn sm" data-edit="' + esc(e.ek) + '" data-id="' + esc(s.id) + '">Edit</button></td></tr>';
+                }).join("");
+                return '<article class="sheet-card" style="--i:' + i + '">' +
+                    '<div class="sheet-card-head"><div class="avatar">' + esc(initials(name)) + '</div><div class="sheet-card-name">' +
+                    '<div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
+                    '<button type="button" class="btn sm ghost" data-add-for="' + esc(e.ek) + '">+ Punch</button>' +
+                    '<div class="sheet-card-total">' + esc(fmtHours(total)) + "<small>hours · " + esc(fmtDur(total)) + "</small></div></div>" +
+                    '<div class="day-strip">' + strip + "</div>" +
+                    (rows ? '<table class="punches"><thead><tr><th>Day</th><th>In</th><th>Out</th><th class="num">Hours</th><th>GPS</th><th>Notes</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
+                        : '<p class="no-punches">No punches this week.</p>') + "</article>";
+            }).join("");
+            if (flashRow) {
+                const tr = document.querySelector('[data-row="' + CSS.escape(flashRow) + '"]');
+                if (tr) tr.classList.add("flash");
+                flashRow = null;
+            }
+        }
+        let flashRow = null;
+
+        $("sheets").addEventListener("click", e => {
+            const ed = e.target.closest("[data-edit]");
+            if (ed) { openShiftModal(ed.dataset.edit, ed.dataset.id); return; }
+            const add = e.target.closest("[data-add-for]");
+            if (add) openShiftModal(add.dataset.addFor, null);
+        });
+        $("empFilter").addEventListener("change", renderSheets);
+        function setWeek(k) { viewWeek = k; syncShiftListeners(); renderSheets(); }
+        $("wkPrev").addEventListener("click", () => setWeek(addDaysKey(viewWeek, -7)));
+        $("wkNext").addEventListener("click", () => setWeek(addDaysKey(viewWeek, 7)));
+        $("wkToday").addEventListener("click", () => setWeek(weekStartKey(dayKey(now()), settings.weekStart)));
+        document.querySelectorAll("[data-add-punch]").forEach(b => b.addEventListener("click", () => openShiftModal(null, null)));
+
+        $("exportBtn").addEventListener("click", () => {
+            const t = now(), days = weekDays(viewWeek);
+            const filter = $("empFilter").value;
+            const rows = [["Employee", "Email", "Date", "In", "Out", "Hours", "GPS", "Edited by admin", "Note"]];
+            empList().filter(e => filter === "all" || e.ek === filter).forEach(e => {
+                const { byDay, total } = weekTotals(shiftsOf(e.ek), days, t);
+                const list = days.flatMap(k => byDay[k].shifts);
+                if (!list.length && filter === "all" && e.active === false) return;
+                list.forEach(s => rows.push([displayName(e, e.email), e.email, dayKey(s.in), fmtTime(s.in),
+                    typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
+                    fmtHours(shiftMs(s, t)), s.vehicleName || "", s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || ""]));
+                rows.push([displayName(e, e.email), e.email, "WEEK TOTAL", "", "", fmtHours(total), "", "", ""]);
+            });
+            const csv = rows.map(r => r.map(v => {
+                const s = String(v);
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(",")).join("\r\n");
+            const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "timesheet-" + days[0] + "-to-" + days[6] + ".csv";
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        });
+
+        // ---------- Shift modal (edit / add) ----------
+        let smCtx = null; // { ek, shift }
+        function gpsOptions(selectedId) {
+            const known = gpsUnits.map(g => {
+                const c = claims[g.id];
+                const busy = c && !(smCtx && smCtx.shift && c.shiftId === smCtx.shift.id);
+                return '<option value="' + esc(g.id) + '">GPS ' + esc(g.name) + (busy ? " — in use by " + esc(c.nickname || c.name) : "") + "</option>";
+            });
+            const extra = selectedId && !gpsUnits.some(g => g.id === selectedId) && smCtx && smCtx.shift
+                ? ['<option value="' + esc(selectedId) + '">GPS ' + esc(smCtx.shift.vehicleName || selectedId) + " (no longer in RouteWatcher)</option>"] : [];
+            return '<option value="">No vehicle</option>' + extra.concat(known).join("");
+        }
+
+        function openModal(id) {
+            const m = $(id);
+            m.classList.add("show");
+            setTimeout(() => { const f = m.querySelector("input:not([type=checkbox]):not([disabled]), select"); if (f) f.focus(); }, 60);
+        }
+        function closeModal(id) { $(id).classList.remove("show"); }
+        document.querySelectorAll(".modal-backdrop").forEach(m => {
+            m.addEventListener("mousedown", e => { if (e.target === m) closeModal(m.id); });
+            m.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => closeModal(m.id)));
+        });
+        document.addEventListener("keydown", e => {
+            if (e.key === "Escape") document.querySelectorAll(".modal-backdrop.show").forEach(m => closeModal(m.id));
+        });
+
+        function openShiftModal(ek, shiftId) {
+            const people = empList();
+            if (!people.length) { toast("Add an employee first.", true); return; }
+            const shift = ek && shiftId ? findShift(ek, shiftId) : null;
+            smCtx = { ek: ek || (people.find(p => p.active !== false) || people[0]).ek, shift: shift };
+            $("smTitle").textContent = shift ? "Edit punch" : "Add punch";
+            const emp = employees[smCtx.ek];
+            $("smSub").textContent = shift ? displayName(emp, emp.email) + " · originally " + fmtKey(dayKey(shift.in)) + ", " + fmtTime(shift.in) +
+                (typeof shift.out === "number" ? " → " + fmtTime(shift.out) : " (still on the clock)") : "Add a missed punch or a whole shift.";
+            $("smEmpField").hidden = !!shift;
+            $("smEmp").innerHTML = people.map(p => '<option value="' + esc(p.ek) + '">' + esc(displayName(p, p.email)) + "</option>").join("");
+            $("smEmp").value = smCtx.ek;
+            const t = now(), today = dayKey(t);
+            const sched = !shift && emp ? scheduleFor(emp, today) : null;
+            $("smInDate").value = shift ? dayKey(shift.in) : today;
+            $("smInTime").value = shift ? hhmmOf(shift.in) : (sched ? sched.start : "08:00");
+            const hasOut = shift ? typeof shift.out === "number" : true;
+            $("smOpen").checked = !hasOut;
+            $("smOutDate").value = shift && hasOut ? dayKey(shift.out) : $("smInDate").value;
+            $("smOutTime").value = shift && hasOut ? hhmmOf(shift.out) : (sched && sched.end ? sched.end : "16:30");
+            $("smGps").innerHTML = gpsOptions(shift && shift.vehicleId);
+            $("smGps").value = shift && shift.vehicleId ? shift.vehicleId : "";
+            $("smNote").value = "";
+            $("smMsg").textContent = "";
+            $("smDelete").hidden = !shift;
+            syncOutFields();
+            openModal("shiftModal");
+        }
+
+        function syncOutFields() {
+            document.querySelectorAll(".smOut").forEach(f => { f.hidden = $("smOpen").checked; });
+            updateCalc();
+        }
+        $("smOpen").addEventListener("change", syncOutFields);
+        $("smEmp").addEventListener("change", () => { if (smCtx && !smCtx.shift) smCtx.ek = $("smEmp").value; });
+        ["smInDate", "smInTime", "smOutDate", "smOutTime"].forEach(id => $(id).addEventListener("input", () => {
+            if (id === "smInDate" && $("smOutDate").value < $("smInDate").value) $("smOutDate").value = $("smInDate").value;
+            updateCalc();
+        }));
+
+        function readShiftForm() {
+            const inDate = $("smInDate").value, inTime = $("smInTime").value;
+            if (!inDate || !inTime) return { error: "Enter the punch-in date and time." };
+            const inTs = keyToEpoch(inDate, inTime);
+            let outTs = null;
+            if (!$("smOpen").checked) {
+                const outDate = $("smOutDate").value, outTime = $("smOutTime").value;
+                if (!outDate || !outTime) return { error: "Enter the punch-out date and time, or tick “Still on the clock”." };
+                outTs = keyToEpoch(outDate, outTime);
+                if (outTs <= inTs) return { error: "Punch out must be after punch in. (For an overnight shift, set the next day's date.)" };
+                if (outTs - inTs > 24 * 3600000) return { error: "That shift is longer than 24 hours — check the dates." };
+            }
+            if (inTs > now() + 60000) return { error: "Punch in can't be in the future." };
+            if (outTs && outTs > now() + 60000) return { error: "Punch out can't be in the future. Tick “Still on the clock” instead." };
+            return { in: inTs, out: outTs, vehicleId: $("smGps").value || null };
+        }
+
+        function updateCalc() {
+            const r = readShiftForm();
+            $("smCalc").innerHTML = r.error ? "" : (r.out ? "Shift length <strong>" + esc(fmtDur(r.out - r.in)) + "</strong> (" + esc(fmtHours(r.out - r.in)) + " h)"
+                : "On the clock since <strong>" + esc(fmtTime(r.in)) + "</strong>");
+        }
+
+        $("shiftForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const r = readShiftForm();
+            if (r.error) { $("smMsg").textContent = r.error; return; }
+            const k = smCtx.shift ? smCtx.ek : $("smEmp").value;
+            if (r.out === null && openShift(shiftsOf(k).filter(s => !smCtx.shift || s.id !== smCtx.shift.id))) {
+                $("smMsg").textContent = "This employee already has an open punch. Close that one first."; return;
+            }
+            const btn = $("smSave");
+            btn.disabled = true;
+            try {
+                await saveShift(k, smCtx.shift, r, $("smNote").value.trim(), smCtx.shift ? "edit" : "add");
+                closeModal("shiftModal");
+                toast(smCtx.shift ? "Punch updated." : "Punch added.");
+                if (activeTab === "sheets") {
+                    const wk = weekStartKey(dayKey(r.in), settings.weekStart);
+                    if (wk !== viewWeek) setWeek(wk);
+                }
+            } catch (err) {
+                $("smMsg").textContent = "Couldn't save: " + errText(err);
+            }
+            btn.disabled = false;
+        });
+
+        $("smDelete").addEventListener("click", async () => {
+            const s = smCtx && smCtx.shift;
+            if (!s || !confirm("Delete this punch? This can't be undone (it stays in the change log).")) return;
+            try {
+                await remove(ref(db, P.shifts + "/" + smCtx.ek + "/" + s.id));
+                if (s.vehicleId) await releaseClaim(s.vehicleId, s.id);
+                await logAudit(smCtx.ek, s.id, "delete", s, null, $("smNote").value.trim());
+                closeModal("shiftModal");
+                toast("Punch deleted.");
+            } catch (err) { $("smMsg").textContent = "Couldn't delete: " + errText(err); }
+        });
+
+        // Writes a shift as the admin. Keeps vehicle claims and RouteWatcher nicknames in step:
+        // a closed shift frees its GPS; an open shift with a GPS holds it.
+        async function saveShift(k, before, r, note, action) {
+            const id = before ? before.id : push(ref(db, P.shifts + "/" + k)).key;
+            const gps = r.vehicleId ? gpsUnits.find(g => g.id === r.vehicleId) : null;
+            const emp = employees[k];
+            const nick = nicknameFor(emp, emp && emp.email);
+            const data = {
+                in: r.in,
+                out: r.out || null,
+                vehicleId: r.vehicleId || null,
+                vehicleName: r.vehicleId ? (gps ? gps.name : (before && before.vehicleName) || null) : null,
+                nickname: r.vehicleId ? ((before && before.vehicleId === r.vehicleId && before.nickname) || nick) : null,
+                src: before ? (before.src || "clock") : "admin",
+                edited: { by: user.email, at: serverTimestamp(), note: note || "" }
+            };
+            await set(ref(db, P.shifts + "/" + k + "/" + id), data);
+            // Free the old GPS if the vehicle changed or the shift is now closed
+            if (before && before.vehicleId && (before.vehicleId !== data.vehicleId || data.out)) await releaseClaim(before.vehicleId, id);
+            // Claim the GPS for an open shift
+            if (!data.out && data.vehicleId) {
+                const c = claims[data.vehicleId];
+                if (c && c.shiftId !== id && !confirm("GPS " + data.vehicleName + " is in use by " + (c.nickname || c.name) + ". Move it to " + displayName(emp, emp.email) + "?")) {
+                    // leave the claim alone
+                } else {
+                    await set(ref(db, P.claims + "/" + data.vehicleId), { ek: k, email: emp.email, name: displayName(emp, emp.email), nickname: data.nickname,
+                        shiftId: id, vehicleName: data.vehicleName, at: now() });
+                    await set(ref(db, P.nicknames + "/" + data.vehicleId), data.nickname).catch(err => toast("GPS nickname not set: " + errText(err), true));
+                }
+            }
+            flashRow = k + "/" + id;
+            await logAudit(k, id, action, before, Object.assign({}, data, { edited: null }), note);
+        }
+
+        async function releaseClaim(gpsId, shiftId) {
+            const c = claims[gpsId];
+            await runTransaction(ref(db, P.claims + "/" + gpsId), cur => (cur === null || !shiftId || cur.shiftId === shiftId) ? null : undefined);
+            if (c && c.nickname && (!shiftId || c.shiftId === shiftId)) {
+                await runTransaction(ref(db, P.nicknames + "/" + gpsId), cur => (cur === null || cur === c.nickname) ? null : undefined)
+                    .catch(err => console.warn("Nickname not cleared:", err));
+            }
+        }
+
+        function strip(s) {
+            if (!s) return null;
+            const o = {};
+            ["in", "out", "vehicleId", "vehicleName", "src"].forEach(k => { if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
+            return o;
+        }
+        function logAudit(k, shiftId, action, before, after, note) {
+            return push(ref(db, P.audit), { at: serverTimestamp(), by: user.email, ek: k, shiftId: shiftId, action: action,
+                before: strip(before), after: strip(after), note: note || "" }).catch(err => console.warn("Audit not saved:", err));
+        }
+
+        function renderAudit() {
+            const verbs = { edit: "edited a punch for", add: "added a punch for", delete: "deleted a punch for", "punch-out": "punched out" };
+            const html = audit.map(a => {
+                const emp = employees[a.ek];
+                const who = emp ? displayName(emp, emp.email) : String(a.ek || "").replace(/,/g, ".");
+                const range = s => s ? fmtKey(dayKey(s.in)) + " " + fmtTime(s.in) + " → " + (s.out ? fmtTime(s.out) : "open") : "";
+                return '<div class="log-item"><div class="when">' + esc(a.at ? fmtDate(a.at) + " · " + fmtTime(a.at) : "") + " · " + esc(a.by || "") + "</div>" +
+                    '<div class="what">' + esc(verbs[a.action] || a.action) + " <strong>" + esc(who) + "</strong></div>" +
+                    '<div class="when">' + (a.before ? esc(range(a.before)) : "") + (a.before && a.after ? " ⟶ " : "") + (a.after ? esc(range(a.after)) : "") + "</div>" +
+                    (a.note ? '<div class="why">“' + esc(a.note) + "”</div>" : "") + "</div>";
+            }).join("");
+            $("auditLog").innerHTML = html || '<p class="hint" style="margin:0">No changes yet.</p>';
+        }
+
+        // ---------- Employees ----------
+        function schedSummary(e) {
+            return '<div class="sched-chips">' + [1, 2, 3, 4, 5, 6, 0].map(d => {
+                const s = e.schedule && e.schedule[DOW_KEYS[d]];
+                return '<span class="sched-chip' + (s && s.start ? " on" : "") + '"><b>' + DOW_SHORT[d] + "</b>" +
+                    (s && s.start ? esc(fmtHHMM(s.start).replace(":00", "").replace(" ", "").toLowerCase()) : "off") + "</span>";
+            }).join("") + "</div>";
+        }
+
+        function renderPeople() {
+            const list = empList();
+            $("empList").innerHTML = list.length ? list.map((e, i) => {
+                const name = displayName(e, e.email);
+                const open = openShift(shiftsOf(e.ek));
+                return '<div class="emp-row' + (e.active === false ? " inactive" : "") + '" style="--i:' + i + '">' +
+                    '<div class="avatar">' + esc(initials(name)) + "</div>" +
+                    '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
+                    schedSummary(e) +
+                    '<div class="emp-status">' + (e.active === false ? '<span class="tag off">Inactive</span>' : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') + "</div>" +
+                    '<button type="button" class="btn sm" data-emp="' + esc(e.ek) + '">Edit</button></div>';
+            }).join("") : '<div class="empty-state"><strong>No employees yet</strong>Click “Add employee” to put your first driver on the time clock.</div>';
+        }
+
+        $("empList").addEventListener("click", e => { const b = e.target.closest("[data-emp]"); if (b) openEmpModal(b.dataset.emp); });
+        $("addEmpBtn").addEventListener("click", () => openEmpModal(null));
+
+        let emCtx = null;
+        function buildSchedEditor(schedule) {
+            $("schedEditor").innerHTML = [1, 2, 3, 4, 5, 6, 0].map(d => {
+                const key = DOW_KEYS[d], s = schedule && schedule[key];
+                const on = !!(s && s.start);
+                return '<div class="sched-row' + (on ? "" : " off") + '" data-day="' + key + '">' +
+                    '<label class="switch"><input type="checkbox"' + (on ? " checked" : "") + ' aria-label="Works ' + DOW_LONG[d] + '"><span class="track"></span>' + DOW_SHORT[d] + "</label>" +
+                    '<input class="input" type="time" data-f="start" aria-label="' + DOW_LONG[d] + ' start" value="' + esc(on ? s.start : "08:00") + '">' +
+                    '<input class="input" type="time" data-f="end" aria-label="' + DOW_LONG[d] + ' end" value="' + esc(on && s.end ? s.end : "16:30") + '"></div>';
+            }).join("");
+        }
+        $("schedEditor").addEventListener("change", e => {
+            if (e.target.type === "checkbox") e.target.closest(".sched-row").classList.toggle("off", !e.target.checked);
+        });
+        $("copyMon").addEventListener("click", () => {
+            const mon = $("schedEditor").querySelector('[data-day="mon"]');
+            const on = mon.querySelector("input[type=checkbox]").checked;
+            const st = mon.querySelector('[data-f="start"]').value, en = mon.querySelector('[data-f="end"]').value;
+            ["tue", "wed", "thu", "fri"].forEach(k => {
+                const row = $("schedEditor").querySelector('[data-day="' + k + '"]');
+                row.querySelector("input[type=checkbox]").checked = on;
+                row.classList.toggle("off", !on);
+                row.querySelector('[data-f="start"]').value = st;
+                row.querySelector('[data-f="end"]').value = en;
+            });
+        });
+
+        function openEmpModal(k) {
+            const e = k ? employees[k] : null;
+            emCtx = { ek: k };
+            $("emTitle").textContent = e ? "Edit employee" : "Add employee";
+            $("emName").value = e ? (e.name || "") : "";
+            $("emEmail").value = e ? e.email : "";
+            $("emEmail").disabled = !!e;
+            $("emActive").checked = e ? e.active !== false : true;
+            $("emPass").value = "";
+            $("createLogin").open = false;
+            $("createLogin").hidden = !!e;
+            $("emDelete").hidden = !e;
+            $("emMsg").textContent = "";
+            buildSchedEditor(e ? e.schedule : { mon: { start: "08:00", end: "16:30" }, tue: { start: "08:00", end: "16:30" }, wed: { start: "08:00", end: "16:30" }, thu: { start: "08:00", end: "16:30" }, fri: { start: "08:00", end: "16:30" } });
+            openModal("empModal");
+        }
+
+        $("empForm").addEventListener("submit", async ev => {
+            ev.preventDefault();
+            const msg = $("emMsg");
+            const email = normEmail($("emEmail").value);
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.textContent = "Enter a valid email address."; return; }
+            const k = emCtx.ek || emailKey(email);
+            if (!emCtx.ek && employees[k]) { msg.textContent = email + " is already on the time clock."; return; }
+            const schedule = {};
+            for (const row of $("schedEditor").querySelectorAll(".sched-row")) {
+                if (!row.querySelector("input[type=checkbox]").checked) continue;
+                const start = row.querySelector('[data-f="start"]').value, end = row.querySelector('[data-f="end"]').value;
+                if (!start) { msg.textContent = "Set a start time for every working day."; return; }
+                schedule[row.dataset.day] = end ? { start: start, end: end } : { start: start };
+            }
+            const pass = $("emPass").value;
+            if (!emCtx.ek && pass && pass.length < 6) { msg.textContent = "The starting password needs at least 6 characters."; return; }
+            const btn = $("emSave");
+            btn.disabled = true; msg.textContent = "";
+            try {
+                const before = employees[k] || {};
+                await set(ref(db, P.employees + "/" + k), {
+                    email: email, name: $("emName").value.trim(), active: $("emActive").checked, schedule: schedule,
+                    createdAt: before.createdAt || serverTimestamp()
+                });
+                let note = "";
+                if (!emCtx.ek && pass) note = await createLogin(email, pass);
+                closeModal("empModal");
+                toast((emCtx.ek ? "Saved " : "Added ") + displayName({ name: $("emName").value }, email) + "." + note, /couldn't/i.test(note));
+            } catch (err) { msg.textContent = "Couldn't save: " + errText(err); }
+            btn.disabled = false;
+        });
+
+        // Creates the Firebase sign-in account on a separate app instance so the admin stays signed in
+        async function createLogin(email, pass) {
+            const tmp = initializeApp(firebaseConfig, "tc-create-" + Date.now());
+            try {
+                const tmpAuth = getAuth(tmp);
+                await createUserWithEmailAndPassword(tmpAuth, email, pass);
+                await signOut(tmpAuth);
+                return " Their sign-in account was created.";
+            } catch (err) {
+                if (err && err.code === "auth/email-already-in-use") return " They already have a sign-in account, so their existing password works.";
+                return " Their sign-in account couldn't be created (" + ((err && err.code) || "error") + ").";
+            } finally {
+                deleteApp(tmp).catch(() => {});
+            }
+        }
+
+        $("emDelete").addEventListener("click", async () => {
+            const k = emCtx && emCtx.ek;
+            if (!k) return;
+            const e = employees[k];
+            if (!confirm("Remove " + displayName(e, e.email) + " from the time clock?\n\nTheir past punches are kept. To keep them on timesheets, untick “Active” instead.")) return;
+            try { await remove(ref(db, P.employees + "/" + k)); closeModal("empModal"); toast("Removed " + displayName(e, e.email) + "."); }
+            catch (err) { $("emMsg").textContent = "Couldn't remove: " + errText(err); }
+        });
+
+        // ---------- Vehicles ----------
+        function renderVehicles() {
+            const grid = $("gpsGrid");
+            if (!gpsLoaded) { grid.innerHTML = '<div class="empty-state">Loading GPS units…</div>'; return; }
+            const orphan = Object.keys(claims).filter(id => !gpsUnits.some(g => g.id === id)).map(id => ({ id: id, name: claims[id].vehicleName || id, color: "#6b727a" }));
+            const all = gpsUnits.concat(orphan);
+            if (!all.length) { grid.innerHTML = '<div class="empty-state"><strong>No GPS units</strong>Add GPS units in RouteWatcher → Settings (with a Device ID) and they show up here.</div>'; return; }
+            grid.innerHTML = all.map((g, i) => {
+                const c = claims[g.id];
+                const nick = typeof nicknames[g.id] === "string" ? nicknames[g.id] : "";
+                return '<article class="gps-card' + (c ? " taken" : "") + '" style="--i:' + i + ";--c:" + esc(g.color) + '">' +
+                    '<div class="gps-name"><span class="gps-dot"></span>' + esc(g.name) + "</div>" +
+                    '<div class="gps-info">' + (c ? "In use by <strong>" + esc(c.name || c.nickname) + "</strong> since " + esc(fmtTime(c.at)) +
+                        (dayKey(c.at) !== dayKey(now()) ? " (" + esc(fmtKey(dayKey(c.at))) + ")" : "") : "Available") +
+                    "<br>RouteWatcher nickname: " + (nick ? "<strong>" + esc(nick) + "</strong>" : "none") + "</div>" +
+                    '<div class="gps-foot">' + (c ? '<span class="tag gps">Taken</span><button type="button" class="btn sm" data-release="' + esc(g.id) + '">Release</button>'
+                        : '<span class="tag live">Free</span>') + "</div></article>";
+            }).join("");
+        }
+        $("gpsGrid").addEventListener("click", async e => {
+            const b = e.target.closest("[data-release]");
+            if (!b) return;
+            const c = claims[b.dataset.release];
+            if (!c || !confirm("Release GPS " + c.vehicleName + " from " + (c.name || c.nickname) + "? Their RouteWatcher nickname on it is removed too.")) return;
+            try {
+                await releaseClaim(b.dataset.release, null);
+                const s = c.ek && c.shiftId ? findShift(c.ek, c.shiftId) : null;
+                if (s && typeof s.out !== "number" && s.vehicleId === b.dataset.release) {
+                    await update(ref(db, P.shifts + "/" + c.ek + "/" + s.id), { vehicleId: null, vehicleName: null, nickname: null });
+                }
+                toast("GPS " + c.vehicleName + " released.");
+            } catch (err) { toast("Couldn't release: " + errText(err), true); }
+        });
+
+        // ---------- Settings ----------
+        $("tzName").textContent = TZ;
+        $("sWeekStart").innerHTML = DOW_LONG.map((d, i) => '<option value="' + i + '">' + d + "</option>").join("");
+        function fillSettingsForm() {
+            if (document.activeElement && $("settingsForm").contains(document.activeElement)) return;
+            $("sReminder").value = settings.reminderMinutes;
+            $("sWeekStart").value = String(settings.weekStart);
+        }
+        $("settingsForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const next = settingsWithDefaults({ reminderMinutes: $("sReminder").value, weekStart: $("sWeekStart").value });
+            try {
+                await set(ref(db, P.settings), next);
+                viewWeek = weekStartKey(dayKey(now()), next.weekStart);
+                syncShiftListeners(true);
+                toast("Settings saved.");
+            } catch (err) { toast("Couldn't save settings: " + errText(err), true); }
+        });
+
+        // ---------- Ticking ----------
+        setInterval(() => {
+            tickHeader();
+            if (!user || $("appScreen").hidden) return;
+            const t = now();
+            document.querySelectorAll(".elapsed[data-since]").forEach(el => { el.textContent = fmtClockDur(t - Number(el.dataset.since)); });
+            if (zoned(t).ss === 0) renderAll();
+        }, 1000);
+
+        selectTab(activeTab);
+    </script>
+</body>
+</html>
