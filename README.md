@@ -66,13 +66,23 @@ the home-screen icon. iOS only allows web notifications for home-screen web apps
 
 ## Reminders when the app is closed
 
-`functions/` holds a Firebase Cloud Function, `timeclockPunchReminders`. It runs every
-5 minutes (at :00, :05, :10 …) and sends a web push notification to any active employee
-who is scheduled today and hasn't punched in by their start time plus the reminder
-delay, so the notification arrives 0–5 minutes after that time. Each person
-gets at most one per day. It stops trying at their scheduled end time, or 2 hours after
-the reminder was due if no end time is set. A second function, `timeclockTestPush`,
-powers the **Send test** button.
+`functions/` sends each employee **one** reminder, only on days they're scheduled,
+and only if they haven't punched in by their start time plus the reminder delay.
+It uses one-shot timers ([Cloud Tasks](https://cloud.google.com/tasks/docs)) instead
+of checking all day:
+
+- `timeclockPlanReminders` runs once a day at 12:01 AM (Brandon time) and sets one
+  timer per employee scheduled that day, for exactly start + reminder delay.
+- `timeclockPunchReminder` is what each timer runs. If the person hasn't punched in,
+  their phones get the notification. Otherwise nothing is sent.
+- `timeclockReplanEmployee` and `timeclockReplanAll` move a timer when you change
+  someone's schedule, or the reminder delay, during the day. A timer whose time no
+  longer matches the schedule does nothing when it fires.
+- `timeclockTestPush` powers the **Send test** button.
+
+Each person gets at most one reminder per day. If a schedule is changed after the
+reminder time has already passed, the reminder is sent right away, unless it's past
+their scheduled end time (or more than 2 hours late when no end time is set).
 
 Until the steps below are done, phones only get the reminder while the time clock is
 open. Nothing else changes.
@@ -113,25 +123,52 @@ the command above deploys only that codebase. The dispatch app's functions
 `pollNow` in the same project are left alone. If the CLI ever asks whether to delete
 other functions, answer **No**.
 
-The first deploy may ask to turn on the Cloud Scheduler API. Say yes, because the
-5-minute schedule runs on it.
+The first deploy may ask to turn on the **Cloud Scheduler** and **Cloud Tasks** APIs.
+Say yes to both: the daily planner runs on Cloud Scheduler, and the timers on Cloud
+Tasks.
+
+#### After the first night: check the timers were set
+
+Firebase console → **Functions** → **Logs** (or Google Cloud console → *Logging*).
+After 12:01 AM, `timeclockPlanReminders` should log *"Punch-in reminder timers"*,
+with *"set for …"* next to everyone scheduled that day.
+
+If it logs a **permission denied** error instead, the functions' service account
+can't create timers yet. Whether this happens depends on how the project's default
+permissions were set up, which can't be seen from this repo. Fix it once, in Cloud Shell:
+
+```sh
+PROJECT=eandccourier-36fcc
+SA="$(gcloud projects describe $PROJECT --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
+for ROLE in roles/cloudtasks.enqueuer roles/iam.serviceAccountUser roles/run.invoker roles/cloudfunctions.invoker; do
+  gcloud projects add-iam-policy-binding $PROJECT --member="serviceAccount:$SA" --role="$ROLE" --condition=None
+done
+```
+
+Why each one:
+- **Cloud Tasks Enqueuer** lets the planner create timers.
+- **Service Account User** lets each timer call the reminder function as that account.
+- The two **Invoker** roles let the timer start the function. The `firebase-functions`
+  library lists the Enqueuer and Invoker roles as the permissions task functions need.
 
 #### Running cost (estimate from Google's published prices, October 2026, USD)
 
-Running every 5 minutes is 8,640 runs a month (12 × 24 × 30). Each function has 1 vCPU
-and 256 MiB of memory.
+Runs scale with the number of reminders, not with time. For example, with 10
+employees each scheduled 22 days a month, that's 30 planner runs + 220 timers =
+**about 250 runs a month**. Each function has 1 vCPU and 256 MiB of memory.
 
-| Piece | Free allowance | Price after that | This feature |
+| Piece | Free allowance | Price after that | This feature (10 employees) |
 | --- | --- | --- | --- |
-| Function runs ([Cloud Run](https://cloud.google.com/run/pricing)) | 180,000 vCPU-s, 360,000 GiB-s, 2M requests a month, per billing account | $0.000024/vCPU-s, $0.0000025/GiB-s, $0.40/million requests | 4,320–25,920 vCPU-s (0.5–3 s per run): $0.11–$0.64 if no free allowance is left |
-| Scheduler ([Cloud Scheduler](https://cloud.google.com/scheduler/pricing)) | 3 jobs per billing account | $0.10 per job per 31 days | 1 job: $0, or $0.10 if the account already has 3+ jobs |
-| Database reads ([Firebase](https://firebase.google.com/pricing)) | ~10 GB/month (360 MB/day) | $1/GB | roughly 0.04–0.1 GB a month |
+| Function runs ([Cloud Run](https://cloud.google.com/run/pricing)) | 180,000 vCPU-s, 360,000 GiB-s, 2M requests a month, per billing account | $0.000024/vCPU-s, $0.0000025/GiB-s, $0.40/million requests | 125–750 vCPU-s (0.5–3 s per run): $0.003–$0.02 if no free allowance is left |
+| Timers ([Cloud Tasks](https://cloud.google.com/tasks/pricing)) | 1,000,000 operations a month, per billing account | $0.40 per million | about 440 (create + deliver): $0 |
+| Daily planner ([Cloud Scheduler](https://cloud.google.com/scheduler/pricing)) | 3 jobs per billing account | $0.10 per job per 31 days | 1 job: $0, or $0.10 if the account already has 3+ jobs |
+| Database reads ([Firebase](https://firebase.google.com/pricing)) | ~10 GB/month (360 MB/day) | $1/GB | well under 0.01 GB |
 | Push notifications (FCM) | No-cost product | — | $0 |
 
-On its own, this feature fits inside the free allowances. It only costs money if
-the other apps on the same billing account have already used them up. In that case
-the worst case is about **$0.25–$0.90 USD a month**. To see the real numbers, check
-Google Cloud console → **Billing → Reports**, filtered by service.
+On its own, this feature fits inside the free allowances. Even if the other apps on
+the billing account have used them all, the worst case is about **$0.12 USD a month**,
+almost all of it the scheduler's $0.10. To see the real numbers, check Google Cloud
+console → **Billing → Reports**, filtered by service.
 
 ### 4. Turn it on for each phone
 

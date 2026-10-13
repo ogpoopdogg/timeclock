@@ -20,42 +20,57 @@ test('schedule times are Brandon time, across daylight saving changes', () => {
   assert.strictEqual(R.dayKey(at('2026-10-13T05:00:00Z')), '2026-10-13');
 });
 
-test('not due before start + reminder minutes', () => {
-  const e = { 'matt@ec,com': emp() };
-  assert.deepStrictEqual(R.dueCandidates(MON_0800 + 9 * MIN, { reminderMinutes: 10 }, e, null), []);
-});
-
-test('due from start + reminder minutes', () => {
-  const e = { 'matt@ec,com': emp() };
-  const due = R.dueCandidates(MON_0800 + 10 * MIN, { reminderMinutes: 10 }, e, null);
-  assert.strictEqual(due.length, 1);
-  assert.strictEqual(due[0].ek, 'matt@ec,com');
-  assert.strictEqual(due[0].dueAt, MON_0800 + 10 * MIN);
+test('plans one reminder at start + reminder minutes', () => {
+  const p = R.planFor(MON_0800 - 8 * 3600000, { reminderMinutes: 10 }, emp()); // planned at midnight
+  assert.deepStrictEqual(p, { day: '2026-10-12', start: '08:00', dueAt: MON_0800 + 10 * MIN, until: R.keyToEpoch('2026-10-12', '16:30') });
 });
 
 test('uses the admin reminder setting, and 10 minutes when unset', () => {
-  const e = { 'matt@ec,com': emp() };
-  assert.strictEqual(R.dueCandidates(MON_0800 + 10 * MIN, null, e, null).length, 1);
-  assert.strictEqual(R.dueCandidates(MON_0800 + 10 * MIN, { reminderMinutes: 15 }, e, null).length, 0);
-  assert.strictEqual(R.dueCandidates(MON_0800 + 15 * MIN, { reminderMinutes: 15 }, e, null).length, 1);
+  assert.strictEqual(R.planFor(MON_0800, null, emp()).dueAt, MON_0800 + 10 * MIN);
+  assert.strictEqual(R.planFor(MON_0800, { reminderMinutes: 15 }, emp()).dueAt, MON_0800 + 15 * MIN);
+  assert.strictEqual(R.planFor(MON_0800, { reminderMinutes: 0 }, emp()).dueAt, MON_0800);
 });
 
-test('skips inactive employees, days off, and people already handled today', () => {
-  const t = MON_0800 + 20 * MIN;
-  assert.strictEqual(R.dueCandidates(t, null, { a: emp({ active: false }) }, null).length, 0);
-  assert.strictEqual(R.dueCandidates(t, null, { a: emp({ schedule: { tue: mon } }) }, null).length, 0);
-  assert.strictEqual(R.dueCandidates(t, null, { a: emp() }, { a: { at: 1 } }).length, 0);
-  assert.strictEqual(R.dueCandidates(t, null, { a: emp(), b: emp() }, { a: { at: 1 } }).length, 1);
+test('no reminder for inactive employees or days off', () => {
+  assert.strictEqual(R.planFor(MON_0800, null, emp({ active: false })), null);
+  assert.strictEqual(R.planFor(MON_0800, null, emp({ schedule: { tue: mon } })), null);
+  assert.strictEqual(R.planFor(MON_0800, null, null), null);
 });
 
-test('stops at the scheduled end, or 2 hours after due when there is no end', () => {
-  const e = { a: emp() };
+test('no reminder once the scheduled end (or 2 hours after due) has passed', () => {
   const end = R.keyToEpoch('2026-10-12', '16:30');
-  assert.strictEqual(R.dueCandidates(end - MIN, null, e, null).length, 1);
-  assert.strictEqual(R.dueCandidates(end, null, e, null).length, 0);
-  const noEnd = { a: emp({ schedule: { mon: { start: '08:00' } } }) };
-  assert.strictEqual(R.dueCandidates(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS - MIN, null, noEnd, null).length, 1);
-  assert.strictEqual(R.dueCandidates(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS, null, noEnd, null).length, 0);
+  assert.ok(R.planFor(end - MIN, null, emp()));
+  assert.strictEqual(R.planFor(end, null, emp()), null);
+  const noEnd = emp({ schedule: { mon: { start: '08:00' } } });
+  assert.ok(R.planFor(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS - MIN, null, noEnd));
+  assert.strictEqual(R.planFor(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS, null, noEnd), null);
+});
+
+test('timer fires at the due time, or straight away when planned late', () => {
+  const p = R.planFor(MON_0800 - 8 * 3600000, null, emp());
+  assert.strictEqual(R.timerFor('a', p, MON_0800 - 8 * 3600000).fireAt, MON_0800 + 10 * MIN);
+  const late = R.planFor(MON_0800 + 42 * MIN + 17000, null, emp()); // schedule changed at 8:42:17
+  assert.strictEqual(R.timerFor('a', late, MON_0800 + 42 * MIN + 17000).fireAt, MON_0800 + 42 * MIN);
+});
+
+test('timer IDs: same plan -> same ID (never queued twice), different plan -> different ID', () => {
+  const t0 = MON_0800 - 8 * 3600000;
+  const p = R.planFor(t0, null, emp());
+  const a = R.timerFor('matt@ec,com', p, t0).id;
+  assert.strictEqual(a, R.timerFor('matt@ec,com', p, t0 + 3600000).id);
+  assert.match(a, /^tc-[0-9a-f]{40}$/);
+  assert.notStrictEqual(a, R.timerFor('gil@ec,com', p, t0).id);
+  assert.notStrictEqual(a, R.timerFor('matt@ec,com', R.planFor(t0, { reminderMinutes: 15 }, emp()), t0).id);
+  // Re-planned after the due time (fires immediately): a fresh ID, so it isn't blocked by the earlier timer
+  assert.notStrictEqual(a, R.timerFor('matt@ec,com', p, MON_0800 + 20 * MIN).id);
+});
+
+test('a fired timer only counts if it still matches the current schedule', () => {
+  const p = R.planFor(MON_0800 + 10 * MIN, null, emp());
+  assert.strictEqual(R.isCurrent(p, { day: '2026-10-12', dueAt: MON_0800 + 10 * MIN }), true);
+  const moved = R.planFor(MON_0800 + 10 * MIN, null, emp({ schedule: { mon: { start: '09:00', end: '17:00' } } }));
+  assert.strictEqual(R.isCurrent(moved, { day: '2026-10-12', dueAt: MON_0800 + 10 * MIN }), false);
+  assert.strictEqual(R.isCurrent(null, { day: '2026-10-12', dueAt: MON_0800 + 10 * MIN }), false);
 });
 
 test('punched in today, or still on the clock from yesterday, counts as punched', () => {

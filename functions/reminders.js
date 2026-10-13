@@ -4,12 +4,14 @@
    Brandon, MB wall-clock times (America/Winnipeg), whatever the server's zone. */
 'use strict';
 
+const crypto = require('crypto');
+
 const TZ = 'America/Winnipeg';
 const DOW_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: 1 };
 // With no scheduled end time, stop trying this long after the reminder was due
-// (e.g. the function was down for a while: don't remind someone at 3 PM about 8 AM)
+// (e.g. a schedule edited late in the day: don't remind someone at 3 PM about 8 AM)
 const LATE_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 const partsFmt = new Intl.DateTimeFormat('en-US', {
@@ -71,29 +73,42 @@ function firstName(emp) {
 }
 
 /**
- * Employees whose reminder is due now and hasn't been handled today.
- * sentToday: { [ek]: anything } for today's date (reminders already sent or skipped).
- * Returns [{ ek, emp, start, dueAt }]. The caller still checks their punches.
+ * Today's single reminder for one employee, or null when there is none to send:
+ * inactive, not scheduled today, or already past the point where a reminder is useful.
+ * dueAt = scheduled start + reminder delay; until = scheduled end (or dueAt + 2 h).
  */
-function dueCandidates(now, settings, employees, sentToday) {
+function planFor(now, settings, emp) {
+  if (!emp || emp.active === false) return null;
   const s = settingsWithDefaults(settings);
-  const today = dayKey(now);
-  const out = [];
-  for (const [ek, emp] of Object.entries(employees || {})) {
-    if (!emp || emp.active === false) continue;
-    if (sentToday && sentToday[ek]) continue;
-    const sched = scheduleFor(emp, today);
-    if (!sched) continue;
-    const startTs = keyToEpoch(today, sched.start);
-    const dueAt = startTs + s.reminderMinutes * 60000;
-    let until = dueAt + LATE_WINDOW_MS;
-    if (sched.end && /^\d{2}:\d{2}$/.test(sched.end)) {
-      const endTs = keyToEpoch(today, sched.end);
-      if (endTs > dueAt) until = endTs;
-    }
-    if (now >= dueAt && now < until) out.push({ ek: ek, emp: emp, start: sched.start, dueAt: dueAt });
+  const day = dayKey(now);
+  const sched = scheduleFor(emp, day);
+  if (!sched) return null;
+  const dueAt = keyToEpoch(day, sched.start) + s.reminderMinutes * 60000;
+  let until = dueAt + LATE_WINDOW_MS;
+  if (sched.end && /^\d{2}:\d{2}$/.test(sched.end)) {
+    const endTs = keyToEpoch(day, sched.end);
+    if (endTs > dueAt) until = endTs;
   }
-  return out;
+  if (now >= until) return null;
+  return { day: day, start: sched.start, dueAt: dueAt, until: until };
+}
+
+/**
+ * When to fire the one-shot timer for a plan, and its Cloud Tasks ID.
+ * Normally it fires at dueAt. If the plan is made after dueAt (schedule changed to an
+ * earlier time, or the daily planner ran late), it fires straight away instead.
+ * The ID is the same for the same plan, so planning twice never queues two timers,
+ * and it is a hash, which spreads IDs evenly the way Cloud Tasks recommends.
+ */
+function timerFor(ek, plan, now) {
+  const fireAt = plan.dueAt > now ? plan.dueAt : Math.floor(now / 60000) * 60000;
+  const id = 'tc-' + crypto.createHash('sha256').update(ek + '|' + plan.day + '|' + plan.dueAt + '|' + fireAt).digest('hex').slice(0, 40);
+  return { id: id, fireAt: fireAt };
+}
+
+/** True when a timer that has just fired still matches the employee's current plan. */
+function isCurrent(plan, payload) {
+  return !!(plan && payload && plan.day === payload.day && plan.dueAt === payload.dueAt);
 }
 
 /** True if any shift started today, or a shift is still open (punched in yesterday and never out). */
@@ -112,5 +127,5 @@ function reminderMessage(emp, start) {
 
 module.exports = {
   TZ, DOW_KEYS, LATE_WINDOW_MS, zoned, dayKey, addDaysKey, keyToEpoch, settingsWithDefaults,
-  scheduleFor, dueCandidates, hasPunchedToday, reminderMessage, firstName
+  scheduleFor, planFor, timerFor, isCurrent, hasPunchedToday, reminderMessage, firstName
 };
