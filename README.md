@@ -47,6 +47,30 @@ Reminders. On iPhone they have to *Add to Home Screen* first, then open the cloc
 the home-screen icon. iOS only allows web notifications for home-screen web apps
 (iOS 16.4 or later).
 
+## Installing the app, and how updates reach it
+
+Both pages install as apps: the time clock as **E&C Clock**, the admin panel as
+**Clock Admin**. Each has its own icon.
+
+- **Android, or Chrome/Edge on a computer:** tap **Install** in the top bar, or use the
+  browser menu → *Install app* / *Add to Home screen*.
+- **iPhone/iPad:** open the page in Safari → **Share** → **Add to Home Screen**. The
+  **Install** button shows these steps.
+
+**Updates are automatic.** Edit and commit the files on GitHub as usual. There's no
+version number to change, and nobody needs to reinstall or clear anything.
+- **Opening the app:** the service worker (`sw.js`) asks the server for the newest copy
+  of every file each time the app opens. A saved copy is used only when the phone is
+  offline, so the app still opens without signal.
+- **App left open:** `pwa.js` checks for changes whenever someone returns to the app, and
+  every 20 minutes. When something changed, it shows "Updating to the latest version…"
+  and reloads by itself. It never does this in the middle of a punch or a vehicle pick,
+  or while an admin edit window is open or a field is being typed in. It waits until
+  that's finished.
+
+GitHub Pages usually takes a minute or two to publish a commit. After that, the next
+open (or the next check) picks it up.
+
 ## How it works
 
 - **Hold to punch.** Press and hold the ring for 1.5 seconds. A shorter press does

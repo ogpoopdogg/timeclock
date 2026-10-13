@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0c0e10">
     <meta name="robots" content="noindex">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Clock Admin">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Time Clock Admin &middot; E&amp;C Courier</title>
+    <link rel="manifest" href="manifest-admin.json">
     <link rel="icon" href="icon-512.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -404,6 +409,7 @@
         </a>
         <div class="top-right">
             <div class="clock" aria-hidden="true"><div class="clock-time" id="clockTime"></div><div class="clock-date" id="clockDate"></div></div>
+            <button type="button" class="btn ghost sm" id="installBtn" hidden>Install</button>
             <button type="button" class="btn ghost sm" id="signOutBtn" hidden>Sign out</button>
         </div>
     </header>
@@ -620,6 +626,7 @@
         const { ref, onValue, get, set, update, push, remove, query, orderByChild, startAt, limitToLast, runTransaction, serverTimestamp } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js");
         const { firebaseConfig } = await import("./firebase-config.js");
+        const { setupPwa } = await import("./pwa.js");
 
         const $ = id => document.getElementById(id);
 
@@ -646,6 +653,15 @@
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => el.classList.remove("show"), warn ? 6500 : 3500);
         }
+
+        // ---------- Installable app + automatic updates (pwa.js) ----------
+        // An update waits while an edit window is open or you're typing, so nothing you're entering is lost.
+        setupPwa({
+            installButton: $("installBtn"),
+            toast: toast,
+            isBusy: () => !!document.querySelector(".modal-backdrop.show") ||
+                !!(document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName))
+        });
 
         // ---------- Header clock ----------
         function tickHeader() {

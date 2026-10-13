@@ -73,6 +73,7 @@
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
             padding-top: 18px; padding-bottom: 18px;
         }
+        .top-actions { display: flex; gap: 8px; flex: none; }
         .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
         .brand img {
             width: 40px; height: 40px; border-radius: 10px; object-fit: contain; background: #000;
@@ -531,7 +532,10 @@
                 <span class="brand-sub">Time Clock</span>
             </div>
         </div>
-        <button type="button" class="chip-btn" id="signOutBtn" hidden>Sign out</button>
+        <div class="top-actions">
+            <button type="button" class="chip-btn" id="installBtn" hidden>Install</button>
+            <button type="button" class="chip-btn" id="signOutBtn" hidden>Sign out</button>
+        </div>
     </header>
 
     <!-- Loading -->
@@ -705,6 +709,7 @@
         const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { firebaseConfig } = await import("./firebase-config.js");
         const { WEB_APP_ID, VAPID_KEY } = await import("./push-config.js");
+        const { setupPwa } = await import("./pwa.js");
         let pushApp = null;
 
         const $ = id => document.getElementById(id);
@@ -847,7 +852,8 @@
             const pill = $("vehiclePill");
             if (open) {
                 pill.hidden = false;
-                $("vpLabel").textContent = open.vehicleId ? "GPS" : "Vehicle";
+                $("vpLabel").textContent = open.vehicleId ? "" : "Vehicle";
+                $("vpLabel").hidden = !!open.vehicleId;
                 $("vpName").textContent = open.vehicleId ? (open.vehicleName || "—") : "None selected";
                 $("changeVehicleBtn").textContent = open.vehicleId ? "Change" : "Pick";
             } else {
@@ -917,7 +923,7 @@
                 const live = typeof s.out !== "number";
                 const tags = [];
                 if (live) tags.push('<span class="tag live">On the clock</span>');
-                if (s.vehicleName) tags.push('<span class="tag gps">GPS ' + esc(s.vehicleName) + "</span>");
+                if (s.vehicleName) tags.push('<span class="tag gps">' + esc(s.vehicleName) + "</span>");
                 if (s.edited) tags.push('<span class="tag edit" title="' + esc(s.edited.note || "") + '">Edited by admin</span>');
                 return '<div class="shift"><div><div class="shift-date">' + esc(fmtKey(dayKey(s.in))) + '</div>' +
                     '<div class="shift-times">' + esc(fmtTime(s.in)) + " → " + (live ? "now" : esc(fmtTime(s.out))) + "</div></div>" +
@@ -1123,7 +1129,7 @@
             const open = current();
             if (!open) { closeSheet(); return; }
             const grid = $("gpsGrid");
-            $("sheetSkip").textContent = open.vehicleId ? "Keep GPS " + open.vehicleName : "Not driving today";
+            $("sheetSkip").textContent = open.vehicleId ? "Keep vehicle " + open.vehicleName : "Not driving today";
             if (gpsError) { grid.innerHTML = ""; $("sheetMsg").textContent = gpsError; return; }
             if (!gpsUnits.length) { grid.innerHTML = '<p class="empty">No GPS units are set up in RouteWatcher yet.</p>'; return; }
             const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gps : null;
@@ -1133,7 +1139,7 @@
                 const taken = c && !mine;
                 const state = mine ? "Your vehicle" : taken ? "In use · " + (c.nickname || c.name || "another driver") : "Available";
                 return '<button type="button" class="gps' + (mine ? " mine" : "") + (picking === g.id ? " picking" : "") + '" data-gps="' + esc(g.id) + '"' +
-                    (taken ? " disabled" : "") + ' style="--i:' + i + ';--gps-color:' + esc(g.color) + '" aria-label="GPS ' + esc(g.name) + ", " + esc(state) + '">' +
+                    (taken ? " disabled" : "") + ' style="--i:' + i + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
                     '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></span>' +
                     '<span class="gps-name">' + esc(g.name) + '</span><span class="gps-state">' + esc(state) + "</span></button>";
             }).join("");
@@ -1166,7 +1172,7 @@
                     renderSheet();
                     const el = $("gpsGrid").querySelector('[data-gps="' + CSS.escape(g.id) + '"]');
                     if (el) { el.classList.add("flash-taken"); }
-                    $("sheetMsg").textContent = "Someone just took GPS " + g.name + ". Pick another one.";
+                    $("sheetMsg").textContent = "Someone just took vehicle " + g.name + ". Pick another one.";
                     return;
                 }
                 const prevId = open.vehicleId, prevNick = open.nickname;
@@ -1182,7 +1188,7 @@
             } catch (err) {
                 picking = null;
                 renderSheet();
-                $("sheetMsg").textContent = "Couldn't take GPS " + g.name + ": " + errText(err);
+                $("sheetMsg").textContent = "Couldn't take vehicle " + g.name + ": " + errText(err);
             }
         }
 
@@ -1203,9 +1209,12 @@
         // ---------- Punch-in reminder ----------
         // Fires {reminderMinutes} after today's scheduled start (set in the admin panel) if there is no punch today.
         let swReg = null, reminderTimer = null;
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.register("sw.js").then(r => { swReg = r; }).catch(err => console.warn("Service worker:", err));
-        }
+        // Installable app + automatic updates (pwa.js). Never reload mid-punch or while picking a vehicle.
+        setupPwa({
+            installButton: $("installBtn"),
+            toast: toast,
+            isBusy: () => holding || busy || sheetOpen || !!picking || $("success").classList.contains("show")
+        }).registration.then(r => { swReg = r; });
         const canNotify = "Notification" in window;
         const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
         const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
