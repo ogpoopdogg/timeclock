@@ -1041,7 +1041,7 @@
                 if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
                 burst();
                 const after = current();
-                showSuccess(!open, after ? after.in : now(), open);
+                showSuccess(!open, after ? after.in : now());
             } catch (err) {
                 $("punchMsg").textContent = (open ? "Punch out" : "Punch in") + " failed: " + errText(err);
                 punchEl.classList.remove("shake"); void punchEl.offsetWidth; punchEl.classList.add("shake");
@@ -1066,12 +1066,12 @@
             if (open.vehicleId) await releaseVehicle(open.vehicleId, open.nickname).catch(err => console.warn("Vehicle release:", err));
         }
 
-        function showSuccess(isIn, ts, prevShift) {
+        function showSuccess(isIn, ts) {
             const el = $("success");
             el.style.setProperty("--sc-rgb", isIn ? "53, 208, 127" : "255, 204, 0");
             $("scTitle").textContent = isIn ? "Punched in" : "Punched out";
             $("scTime").textContent = fmtTime(isIn ? ts : now());
-            $("scSub").textContent = isIn ? "Drive Safe, " + firstName(emp, user.email) : "Shift length " + fmtDur(now() - prevShift.in);
+            $("scSub").textContent = isIn ? "Drive Safe, " + firstName(emp, user.email) : "";
             el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
             afterPunchInPick = isIn;
             clearTimeout(showSuccess.t);
