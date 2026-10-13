@@ -127,8 +127,8 @@
             content: ""; position: absolute; left: 50%; bottom: 50%; width: 3px; border-radius: 2px;
             background: var(--yellow); transform-origin: 50% 100%;
         }
-        .signin-dial::before { height: 26px; margin-left: -1.5px; animation: spin 12s linear infinite; }
-        .signin-dial::after { height: 36px; width: 2px; margin-left: -1px; background: var(--text); animation: spin 2s linear infinite; }
+        .signin-dial::before { height: 26px; margin-left: -1.5px; transform: rotate(210deg); } /* hour hand at 7 */
+        .signin-dial::after { height: 36px; width: 2px; margin-left: -1px; background: var(--text); transform: rotate(0deg); } /* minute hand at 12 */
         .signin h1 {
             font-family: var(--font-display); font-weight: 800; font-size: clamp(2.3rem, 9vw, 3rem);
             line-height: 0.95; text-align: center; margin-bottom: 6px;
@@ -200,7 +200,6 @@
 
         .sched-line { margin-top: 10px; color: var(--muted); font-size: 0.95rem; min-height: 1.5em; }
         .sched-line strong { color: var(--text); font-weight: 600; }
-        .sched-line.late strong { color: var(--red); }
 
         /* ---------- The punch ring ---------- */
         .punch {
@@ -673,7 +672,7 @@
         <div class="sheet-grab" aria-hidden="true"></div>
         <div class="sheet-head">
             <h2 id="sheetTitle">Pick your vehicle</h2>
-            <p id="sheetSub">Choose the GPS unit in the vehicle you're driving today. Vehicles other drivers have taken are greyed out.</p>
+            <p id="sheetSub">Please choose the vehicle you're driving today.</p>
         </div>
         <div class="sheet-body">
             <div class="gps-grid" id="gpsGrid"></div>
@@ -837,22 +836,10 @@
             $("todayLine").textContent = fmtKey(today, true);
             $("statusText").textContent = open ? "On the clock" : "Off the clock";
 
-            const sched = scheduleFor(emp, today);
+            // Under the status: only "Punched in at …" while on the clock (drivers have no set hours)
             const line = $("schedLine");
-            line.classList.remove("late");
-            if (open) {
-                line.innerHTML = "Punched in at <strong>" + esc(fmtTime(open.in)) + "</strong>" +
-                    (dayKey(open.in) !== today ? " on " + esc(fmtKey(dayKey(open.in))) : "");
-            } else if (sched) {
-                const startTs = keyToEpoch(today, sched.start);
-                const punchedToday = shifts.some(s => dayKey(s.in) === today);
-                const late = !punchedToday && t > startTs;
-                line.classList.toggle("late", late);
-                line.innerHTML = (late ? "You were scheduled to start at " : "Scheduled today ") + "<strong>" + esc(fmtHHMM(sched.start)) +
-                    (sched.end && !late ? " – " + esc(fmtHHMM(sched.end)) : "") + "</strong>";
-            } else {
-                line.textContent = "No shift scheduled today";
-            }
+            line.innerHTML = open ? "Punched in at <strong>" + esc(fmtTime(open.in)) + "</strong>" +
+                (dayKey(open.in) !== today ? " on " + esc(fmtKey(dayKey(open.in))) : "") : "";
 
             $("pbAction").textContent = open ? "Punch out" : "Punch in";
             $("punchBtn").setAttribute("aria-label", (open ? "Punch out" : "Punch in") + ". Press and hold for " + (HOLD_MS / 1000) + " seconds.");
@@ -1084,8 +1071,7 @@
             el.style.setProperty("--sc-rgb", isIn ? "53, 208, 127" : "255, 204, 0");
             $("scTitle").textContent = isIn ? "Punched in" : "Punched out";
             $("scTime").textContent = fmtTime(isIn ? ts : now());
-            $("scSub").textContent = isIn ? "Have a safe shift, " + firstName(emp, user.email) + "."
-                : "Shift length " + fmtDur(now() - prevShift.in) + " · see you next time.";
+            $("scSub").textContent = isIn ? "Drive Safe, " + firstName(emp, user.email) : "Shift length " + fmtDur(now() - prevShift.in);
             el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
             afterPunchInPick = isIn;
             clearTimeout(showSuccess.t);
@@ -1191,8 +1177,8 @@
                 catch (err) { nickOk = false; console.warn("Nickname not saved:", err); }
                 picking = null;
                 closeSheet();
-                if (nickOk) toast("You're on GPS " + g.name + " — it now shows as “" + nick + "” in RouteWatcher.");
-                else toast("You're on GPS " + g.name + ", but its RouteWatcher nickname couldn't be set (permission denied). Tell your administrator.", true);
+                if (nickOk) toast("You are driving vehicle " + g.name);
+                else toast("You are driving vehicle " + g.name + ". Its RouteWatcher name couldn't be updated, so tell your administrator.", true);
             } catch (err) {
                 picking = null;
                 renderSheet();

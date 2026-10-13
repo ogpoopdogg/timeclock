@@ -315,7 +315,7 @@
         .modal .calc strong { color: var(--text); }
 
         .sched-editor { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-        .sched-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+        .sched-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; align-items: center; }
         .sched-row .input { width: 100%; height: 38px; }
         .sched-row.off .input { opacity: 0.3; pointer-events: none; }
         .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-family: var(--font-display); font-weight: 700; }
@@ -389,7 +389,7 @@
         }
         @media (max-width: 460px) {
             .kpi-value { font-size: 2.1rem; }
-            .sched-row { grid-template-columns: 78px minmax(0, 1fr) minmax(0, 1fr); }
+            .sched-row { grid-template-columns: 78px minmax(0, 1fr); }
         }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
@@ -580,7 +580,7 @@
                 <div class="field"><label for="emEmail">Sign-in email</label><input class="input" id="emEmail" type="email" placeholder="matt@ec.com" autocapitalize="off" spellcheck="false" autocomplete="off"></div>
                 <div class="field full"><label class="switch"><input type="checkbox" id="emActive" checked><span class="track"></span>Active (can punch in)</label></div>
             </div>
-            <div class="label" style="margin:4px 0 8px">Weekly schedule · start and end times</div>
+            <div class="label" style="margin:4px 0 8px">Weekly schedule · start times</div>
             <div class="sched-editor" id="schedEditor"></div>
             <button type="button" class="copy-link" id="copyMon">Copy Monday to Tuesday–Friday</button>
             <details class="create-login" id="createLogin">
@@ -837,11 +837,11 @@
                 } else if (st.kind === "late") {
                     late++; cls = "late";
                     state = '<div class="person-state late">Not punched in</div>';
-                    detail = "Scheduled " + esc(fmtHHMM(st.sched.start)) + " · " + esc(fmtDur(t - st.startTs)) + " late";
+                    detail = "Starts " + esc(fmtHHMM(st.sched.start)) + " · " + esc(fmtDur(t - st.startTs)) + " late";
                     foot = '<span class="tag warn">Late</span><button type="button" class="btn sm" data-add-for="' + esc(e.ek) + '">Add punch</button>';
                 } else if (st.kind === "due") {
                     state = '<div class="person-state">Starting now</div>';
-                    detail = "Scheduled " + esc(fmtHHMM(st.sched.start));
+                    detail = "Starts " + esc(fmtHHMM(st.sched.start));
                     foot = '<span class="tag">Grace period</span>';
                 } else if (st.kind === "done") {
                     cls = "done";
@@ -850,7 +850,7 @@
                     foot = '<span class="tag">' + st.todays.length + (st.todays.length === 1 ? " shift" : " shifts") + "</span>";
                 } else if (st.kind === "sched") {
                     state = '<div class="person-state">Not in yet</div>';
-                    detail = "Scheduled " + esc(fmtHHMM(st.sched.start)) + (st.sched.end ? " – " + esc(fmtHHMM(st.sched.end)) : "");
+                    detail = "Starts " + esc(fmtHHMM(st.sched.start));
                     foot = '<span class="tag">Upcoming</span>';
                 } else {
                     state = '<div class="person-state" style="color:var(--dim)">Off today</div>';
@@ -1043,7 +1043,7 @@
             const hasOut = shift ? typeof shift.out === "number" : true;
             $("smOpen").checked = !hasOut;
             $("smOutDate").value = shift && hasOut ? dayKey(shift.out) : $("smInDate").value;
-            $("smOutTime").value = shift && hasOut ? hhmmOf(shift.out) : (sched && sched.end ? sched.end : "16:30");
+            $("smOutTime").value = shift && hasOut ? hhmmOf(shift.out) : "16:30";
             $("smGps").innerHTML = gpsOptions(shift && shift.vehicleId);
             $("smGps").value = shift && shift.vehicleId ? shift.vehicleId : "";
             $("smNote").value = "";
@@ -1232,8 +1232,7 @@
                 const on = !!(s && s.start);
                 return '<div class="sched-row' + (on ? "" : " off") + '" data-day="' + key + '">' +
                     '<label class="switch"><input type="checkbox"' + (on ? " checked" : "") + ' aria-label="Works ' + DOW_LONG[d] + '"><span class="track"></span>' + DOW_SHORT[d] + "</label>" +
-                    '<input class="input" type="time" data-f="start" aria-label="' + DOW_LONG[d] + ' start" value="' + esc(on ? s.start : "08:00") + '">' +
-                    '<input class="input" type="time" data-f="end" aria-label="' + DOW_LONG[d] + ' end" value="' + esc(on && s.end ? s.end : "16:30") + '"></div>';
+                    '<input class="input" type="time" data-f="start" aria-label="' + DOW_LONG[d] + ' start" value="' + esc(on ? s.start : "08:00") + '"></div>';
             }).join("");
         }
         $("schedEditor").addEventListener("change", e => {
@@ -1242,13 +1241,12 @@
         $("copyMon").addEventListener("click", () => {
             const mon = $("schedEditor").querySelector('[data-day="mon"]');
             const on = mon.querySelector("input[type=checkbox]").checked;
-            const st = mon.querySelector('[data-f="start"]').value, en = mon.querySelector('[data-f="end"]').value;
+            const st = mon.querySelector('[data-f="start"]').value;
             ["tue", "wed", "thu", "fri"].forEach(k => {
                 const row = $("schedEditor").querySelector('[data-day="' + k + '"]');
                 row.querySelector("input[type=checkbox]").checked = on;
                 row.classList.toggle("off", !on);
                 row.querySelector('[data-f="start"]').value = st;
-                row.querySelector('[data-f="end"]').value = en;
             });
         });
 
@@ -1265,7 +1263,7 @@
             $("createLogin").hidden = !!e;
             $("emDelete").hidden = !e;
             $("emMsg").textContent = "";
-            buildSchedEditor(e ? e.schedule : { mon: { start: "08:00", end: "16:30" }, tue: { start: "08:00", end: "16:30" }, wed: { start: "08:00", end: "16:30" }, thu: { start: "08:00", end: "16:30" }, fri: { start: "08:00", end: "16:30" } });
+            buildSchedEditor(e ? e.schedule : { mon: { start: "08:00" }, tue: { start: "08:00" }, wed: { start: "08:00" }, thu: { start: "08:00" }, fri: { start: "08:00" } });
             openModal("empModal");
         }
 
@@ -1279,9 +1277,9 @@
             const schedule = {};
             for (const row of $("schedEditor").querySelectorAll(".sched-row")) {
                 if (!row.querySelector("input[type=checkbox]").checked) continue;
-                const start = row.querySelector('[data-f="start"]').value, end = row.querySelector('[data-f="end"]').value;
+                const start = row.querySelector('[data-f="start"]').value;
                 if (!start) { msg.textContent = "Set a start time for every working day."; return; }
-                schedule[row.dataset.day] = end ? { start: start, end: end } : { start: start };
+                schedule[row.dataset.day] = { start: start }; // start time only: drivers have no set end
             }
             const pass = $("emPass").value;
             if (!emCtx.ek && pass && pass.length < 6) { msg.textContent = "The starting password needs at least 6 characters."; return; }

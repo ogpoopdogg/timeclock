@@ -36,8 +36,8 @@ lock to hold.
 
 ### 2. Add employees
 
-In the admin panel: **Employees → Add employee**. Enter their name, email and weekly
-start/end times. If they don't already have a login for the E&C apps, open *Create
+In the admin panel: **Employees → Add employee**. Enter their name, email and their
+start time for each day they work. There's no end time, because drivers' hours vary. If they don't already have a login for the E&C apps, open *Create
 their sign-in account* and set a starting password.
 
 ### 3. Employees add the clock to their phone
@@ -81,8 +81,8 @@ of checking all day:
 - `timeclockTestPush` powers the **Send test** button.
 
 Each person gets at most one reminder per day. If a schedule is changed after the
-reminder time has already passed, the reminder is sent right away, unless it's past
-their scheduled end time (or more than 2 hours late when no end time is set).
+reminder time has already passed, the reminder is sent right away, unless it's more
+than 2 hours late.
 
 Until the steps below are done, phones only get the reminder while the time clock is
 open. Nothing else changes.

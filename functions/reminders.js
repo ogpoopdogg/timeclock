@@ -10,7 +10,7 @@ const TZ = 'America/Winnipeg';
 const DOW_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: 1 };
-// With no scheduled end time, stop trying this long after the reminder was due
+// Stop trying this long after the reminder was due
 // (e.g. a schedule edited late in the day: don't remind someone at 3 PM about 8 AM)
 const LATE_WINDOW_MS = 2 * 60 * 60 * 1000;
 
@@ -75,7 +75,8 @@ function firstName(emp) {
 /**
  * Today's single reminder for one employee, or null when there is none to send:
  * inactive, not scheduled today, or already past the point where a reminder is useful.
- * dueAt = scheduled start + reminder delay; until = scheduled end (or dueAt + 2 h).
+ * dueAt = scheduled start + reminder delay; until = dueAt + 2 h. Schedules only have a
+ * start time (drivers work irregular hours); an old saved end time is ignored.
  */
 function planFor(now, settings, emp) {
   if (!emp || emp.active === false) return null;
@@ -84,11 +85,7 @@ function planFor(now, settings, emp) {
   const sched = scheduleFor(emp, day);
   if (!sched) return null;
   const dueAt = keyToEpoch(day, sched.start) + s.reminderMinutes * 60000;
-  let until = dueAt + LATE_WINDOW_MS;
-  if (sched.end && /^\d{2}:\d{2}$/.test(sched.end)) {
-    const endTs = keyToEpoch(day, sched.end);
-    if (endTs > dueAt) until = endTs;
-  }
+  const until = dueAt + LATE_WINDOW_MS;
   if (now >= until) return null;
   return { day: day, start: sched.start, dueAt: dueAt, until: until };
 }

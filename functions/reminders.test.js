@@ -22,7 +22,7 @@ test('schedule times are Brandon time, across daylight saving changes', () => {
 
 test('plans one reminder at start + reminder minutes', () => {
   const p = R.planFor(MON_0800 - 8 * 3600000, { reminderMinutes: 10 }, emp()); // planned at midnight
-  assert.deepStrictEqual(p, { day: '2026-10-12', start: '08:00', dueAt: MON_0800 + 10 * MIN, until: R.keyToEpoch('2026-10-12', '16:30') });
+  assert.deepStrictEqual(p, { day: '2026-10-12', start: '08:00', dueAt: MON_0800 + 10 * MIN, until: MON_0800 + 10 * MIN + R.LATE_WINDOW_MS });
 });
 
 test('uses the admin reminder setting, and 10 minutes when unset', () => {
@@ -37,13 +37,11 @@ test('no reminder for inactive employees or days off', () => {
   assert.strictEqual(R.planFor(MON_0800, null, null), null);
 });
 
-test('no reminder once the scheduled end (or 2 hours after due) has passed', () => {
-  const end = R.keyToEpoch('2026-10-12', '16:30');
-  assert.ok(R.planFor(end - MIN, null, emp()));
-  assert.strictEqual(R.planFor(end, null, emp()), null);
-  const noEnd = emp({ schedule: { mon: { start: '08:00' } } });
-  assert.ok(R.planFor(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS - MIN, null, noEnd));
-  assert.strictEqual(R.planFor(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS, null, noEnd), null);
+test('no reminder more than 2 hours after it was due; an old saved end time is ignored', () => {
+  for (const e of [emp(), emp({ schedule: { mon: { start: '08:00' } } })]) {
+    assert.ok(R.planFor(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS - MIN, null, e));
+    assert.strictEqual(R.planFor(MON_0800 + 10 * MIN + R.LATE_WINDOW_MS, null, e), null);
+  }
 });
 
 test('timer fires at the due time, or straight away when planned late', () => {
