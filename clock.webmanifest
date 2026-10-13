@@ -1,11 +1,12 @@
 {
-    "id": "/timeclock/admin.html",
-    "name": "E&C Time Clock Admin",
-    "short_name": "Clock Admin",
-    "description": "Who's working, timesheets, schedules and vehicles for the E&C time clock.",
-    "start_url": "./admin.html",
-    "scope": "./admin.html",
+    "id": "/timeclock/",
+    "name": "E&C Courier Time Clock",
+    "short_name": "E&C Clock",
+    "description": "Punch in and out, and pick your vehicle for the day.",
+    "start_url": "./",
+    "scope": "./",
     "display": "standalone",
+    "orientation": "portrait",
     "background_color": "#0c0e10",
     "theme_color": "#0c0e10",
     "icons": [
@@ -31,7 +32,7 @@
     "related_applications": [
         {
             "platform": "webapp",
-            "url": "https://app.eandccourier.ca/timeclock/manifest-admin.json"
+            "url": "https://app.eandccourier.ca/timeclock/clock.webmanifest"
         }
     ],
     "prefer_related_applications": false

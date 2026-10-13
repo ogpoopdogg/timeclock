@@ -7,10 +7,10 @@
 // - opens the clock when a notification is tapped.
 // Only this site's own files are handled here; Firebase and Google Fonts go straight to the network.
 
-const CACHE = "tc-offline-v1";
+const CACHE = "tc-offline-v2";
 const SHELL = [
     "./", "index.html", "admin.html", "tc-core.js", "pwa.js", "firebase-config.js", "push-config.js",
-    "manifest.json", "manifest-admin.json", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png"
+    "clock.webmanifest", "admin.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png"
 ];
 
 self.addEventListener("install", event => {
