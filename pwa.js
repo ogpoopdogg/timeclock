@@ -1,7 +1,7 @@
 // Installable-app (PWA) support shared by the time clock and the admin panel:
 // - registers the service worker (sw.js), which fetches the newest files on every open,
-// - shows an "Install" button where the browser allows installing (Android / desktop Chrome
-//   and Edge), and "Add to Home Screen" steps on iPhone and iPad,
+// - shows an "Install app" button until the app is installed: it opens the browser's install
+//   prompt where there is one (Android / desktop Chrome and Edge), otherwise shows the steps,
 // - checks for a newer version of the app while it stays open (on return to the app and
 //   every 20 minutes) and reloads to it automatically, but only when isBusy() says it's safe.
 // Nothing needs bumping when the files change: updates are detected from the file contents.
@@ -20,7 +20,7 @@ export function isIOS() {
 }
 
 /**
- * installButton: a hidden <button> to show when installing is possible
+ * installButton: the <button> shown until the app is installed
  * toast(text, warn): shows a short message
  * isBusy(): true while an automatic reload would interrupt the user
  * Returns { registration: Promise<ServiceWorkerRegistration|null> }
@@ -36,24 +36,40 @@ export function setupPwa({ installButton, toast, isBusy }) {
 }
 
 function setupInstall(button, toast) {
-    if (!button || isStandalone()) return;
-    let deferred = null;
+    if (!button) return;
+    if (isStandalone()) { button.hidden = true; return; } // already running as the installed app
+    const manifest = document.querySelector('link[rel="manifest"]');
+    const key = "tc_installed_" + (manifest ? manifest.getAttribute("href") : location.pathname);
+    let deferred = null, installed = false;
+    try { installed = localStorage.getItem(key) === "1"; } catch (e) {}
+    const remember = (value) => { installed = value; try { localStorage.setItem(key, value ? "1" : "0"); } catch (e) {} };
+    const render = () => { button.hidden = installed; };
+    render();
+
+    // Chrome/Edge can tell us if this app is already installed on the device (manifest related_applications)
+    if (navigator.getInstalledRelatedApps) {
+        navigator.getInstalledRelatedApps().then(apps => { if (apps && apps.length) { remember(true); render(); } }).catch(() => {});
+    }
+    // The browser only offers this when the app is NOT installed
     window.addEventListener("beforeinstallprompt", e => {
-        e.preventDefault(); // show our own button instead of the browser's mini bar
+        e.preventDefault(); // use our button instead of the browser's mini bar
         deferred = e;
-        button.hidden = false;
+        remember(false);
+        render();
     });
-    window.addEventListener("appinstalled", () => { deferred = null; button.hidden = true; });
-    if (isIOS()) button.hidden = false; // iOS has no install prompt; the button explains the steps
+    window.addEventListener("appinstalled", () => { deferred = null; remember(true); render(); });
+
     button.addEventListener("click", async () => {
         if (deferred) {
             const prompt = deferred;
             deferred = null;
             prompt.prompt();
             const choice = await prompt.userChoice.catch(() => null);
-            if (choice && choice.outcome === "accepted") button.hidden = true;
+            if (choice && choice.outcome === "accepted") { remember(true); render(); }
         } else if (isIOS()) {
             toast("To install: tap the Share button, then “Add to Home Screen”.");
+        } else {
+            toast("To install: open your browser menu (⋮) and tap “Install app” or “Add to Home screen”.");
         }
     });
 }

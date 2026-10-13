@@ -1,5 +1,5 @@
 {
-    "id": "./admin.html",
+    "id": "/timeclock/admin.html",
     "name": "E&C Time Clock Admin",
     "short_name": "Clock Admin",
     "description": "Who's working, timesheets, schedules and vehicles for the E&C time clock.",
@@ -9,8 +9,30 @@
     "background_color": "#0c0e10",
     "theme_color": "#0c0e10",
     "icons": [
-        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-    ]
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "related_applications": [
+        {
+            "platform": "webapp",
+            "url": "https://app.eandccourier.ca/timeclock/manifest-admin.json"
+        }
+    ],
+    "prefer_related_applications": false
 }

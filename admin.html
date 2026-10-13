@@ -62,6 +62,20 @@
         .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; white-space: nowrap; }
         .brand-sub { font-size: 0.8rem; color: var(--yellow); letter-spacing: 0.1em; text-transform: uppercase; }
         .top-right { display: flex; align-items: center; gap: 16px; }
+        /* "Install app": pulses until the app is installed (pwa.js hides it after) */
+        .install-btn {
+            display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: #111 !important; background: var(--yellow) !important;
+            box-shadow: none; animation: installPulse 1.8s ease-out infinite;
+        }
+        .install-btn svg { width: 16px; height: 16px; flex: none; }
+        .install-btn:hover, .install-btn:focus-visible { background: #ffd633 !important; }
+        @keyframes installPulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.7); }
+            70% { box-shadow: 0 0 0 12px rgba(255, 204, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
+        }
+        @media (max-width: 380px) { .install-btn .ib-long { display: none; } }
+
         .clock { text-align: right; line-height: 1.1; font-variant-numeric: tabular-nums; }
         .clock-time { font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; }
         .clock-date { font-size: 0.82rem; color: var(--muted); }
@@ -409,7 +423,7 @@
         </a>
         <div class="top-right">
             <div class="clock" aria-hidden="true"><div class="clock-time" id="clockTime"></div><div class="clock-date" id="clockDate"></div></div>
-            <button type="button" class="btn ghost sm" id="installBtn" hidden>Install</button>
+            <button type="button" class="btn sm install-btn" id="installBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Install<span class="ib-long"> app</span></span></button>
             <button type="button" class="btn ghost sm" id="signOutBtn" hidden>Sign out</button>
         </div>
     </header>
