@@ -31,6 +31,7 @@
             --yellow: #ffcc00;
             --green: #35d07f;
             --red: #ff6b5e;
+            --orange: #ff9f43;
             --accent: var(--yellow);
             --accent-rgb: 255, 204, 0;
 
@@ -351,6 +352,12 @@
         }
         .total-big small { font-size: 0.42em; color: var(--muted); font-weight: 600; margin-left: 4px; }
         .total-sub { color: var(--muted); font-size: 0.92rem; }
+        .week-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: -4px 0 16px; }
+        .split-box { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line); }
+        .split-box span { display: block; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-family: var(--font-display); font-weight: 700; }
+        .split-box strong { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+        .split-box.ot.has { background: rgba(255, 159, 67, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 159, 67, 0.45); }
+        .split-box.ot.has span, .split-box.ot.has strong { color: var(--orange); }
 
         .days { display: flex; flex-direction: column; gap: 8px; }
         .day {
@@ -360,9 +367,10 @@
         .day.is-today { background: rgba(255, 204, 0, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.2); }
         .day-name { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; line-height: 1.05; }
         .day-name small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 0.75rem; color: var(--dim); }
-        .day-bar { height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); overflow: hidden; position: relative; }
+        .day-bar { height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); overflow: hidden; position: relative; display: flex; }
+        .day-bar b { display: block; height: 100%; width: 0; background: var(--orange); transition: width 0.9s var(--ease-out); } /* overtime part */
         .day-bar i {
-            position: absolute; inset: 0 auto 0 0; border-radius: 6px; width: 0;
+            position: relative; display: block; height: 100%; flex: none; width: 0;
             background: linear-gradient(90deg, rgba(255, 204, 0, 0.6), var(--yellow));
             transition: width 0.9s var(--ease-out);
         }
@@ -375,6 +383,7 @@
         @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
         .day-hrs { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.95rem; }
         .day-hrs.zero { color: var(--dim); font-weight: 400; }
+        .day-hrs small { display: block; color: var(--orange); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 
         .shifts { display: flex; flex-direction: column; }
         .shift {
@@ -393,6 +402,7 @@
         .tag.gps { color: var(--yellow); background: rgba(255, 204, 0, 0.08); }
         .tag.edit { color: #8ab4ff; background: rgba(138, 180, 255, 0.1); }
         .tag.live { color: var(--green); background: rgba(53, 208, 127, 0.1); }
+        .tag.ot { color: var(--orange); background: rgba(255, 159, 67, 0.12); }
         .empty { color: var(--dim); font-size: 0.95rem; padding: 6px 0; }
 
         .remind-row { display: flex; align-items: center; gap: 14px; }
@@ -632,6 +642,10 @@
                     <div class="total-row">
                         <div class="total-big" id="weekTotal">0.00<small>hrs</small></div>
                         <div class="total-sub" id="weekTotalSub"></div>
+                    </div>
+                    <div class="week-split">
+                        <div class="split-box"><span>Regular</span><strong id="weekRegular">0.00</strong></div>
+                        <div class="split-box ot" id="weekOtBox"><span>Overtime</span><strong id="weekOvertime">0.00</strong></div>
                     </div>
                     <div class="days" id="days"></div>
                 </section>
@@ -896,7 +910,7 @@
             if (!viewWeek) return;
             const t = now(), today = dayKey(t);
             const days = weekDays(viewWeek);
-            const { byDay, total } = weekTotals(shifts, days, t);
+            const { byDay, byShift, total, regular, overtime } = weekTotals(shifts, days, t);
             const thisWeek = weekStartKey(today, settings.weekStart);
             $("weekLabel").textContent = viewWeek === thisWeek ? "This week" : fmtKey(days[0]) + " – " + fmtKey(days[6]);
             $("weekNext").disabled = viewWeek >= thisWeek;
@@ -904,6 +918,9 @@
             $("weekTotal").innerHTML = esc(fmtHours(total)) + "<small>hrs</small>";
             const count = days.reduce((n, k) => n + byDay[k].shifts.length, 0);
             $("weekTotalSub").textContent = fmtDur(total) + " · " + count + (count === 1 ? " shift" : " shifts");
+            $("weekRegular").textContent = fmtHours(regular);
+            $("weekOvertime").textContent = fmtHours(overtime);
+            $("weekOtBox").classList.toggle("has", overtime > 0);
 
             const maxMs = Math.max(8 * 3600000, ...days.map(k => byDay[k].ms));
             const daysEl = $("days");
@@ -911,7 +928,7 @@
             if (rebuild) {
                 daysEl.dataset.week = viewWeek;
                 daysEl.innerHTML = days.map(k => '<div class="day" data-k="' + k + '"><div class="day-name"></div>' +
-                    '<div class="day-bar"><i></i></div><div class="day-hrs"></div></div>').join("");
+                    '<div class="day-bar"><i></i><b></b></div><div class="day-hrs"></div></div>').join("");
             }
             days.forEach(k => {
                 const row = daysEl.querySelector('[data-k="' + k + '"]');
@@ -923,11 +940,13 @@
                 const bar = row.querySelector(".day-bar i");
                 const live = d.shifts.some(s => typeof s.out !== "number");
                 bar.classList.toggle("live", live);
-                const width = (d.ms / maxMs * 100).toFixed(2) + "%";
-                if (rebuild) requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = width; }));
-                else bar.style.width = width;
+                const otBar = row.querySelector(".day-bar b");
+                const width = (d.regular / maxMs * 100).toFixed(2) + "%", otWidth = (d.overtime / maxMs * 100).toFixed(2) + "%";
+                const setWidths = () => { bar.style.width = width; otBar.style.width = otWidth; };
+                if (rebuild) requestAnimationFrame(() => requestAnimationFrame(setWidths));
+                else setWidths();
                 const hrs = row.querySelector(".day-hrs");
-                hrs.textContent = d.ms ? fmtDur(d.ms) : "—";
+                hrs.innerHTML = d.ms ? esc(fmtDur(d.ms)) + (d.overtime > 0 ? "<small>+" + esc(fmtDur(d.overtime)) + " OT</small>" : "") : "—";
                 hrs.classList.toggle("zero", !d.ms);
             });
 
@@ -938,6 +957,8 @@
                 const tags = [];
                 if (live) tags.push('<span class="tag live">On the clock</span>');
                 if (s.vehicleName) tags.push('<span class="tag gps">' + esc(s.vehicleName) + "</span>");
+                const split = byShift[s.id];
+                if (split && split.overtime >= 60000) tags.push('<span class="tag ot">OT ' + esc(fmtDur(split.overtime)) + "</span>");
                 if (s.edited) tags.push('<span class="tag edit" title="' + esc(s.edited.note || "") + '">Edited by admin</span>');
                 return '<div class="shift"><div><div class="shift-date">' + esc(fmtKey(dayKey(s.in))) + '</div>' +
                     '<div class="shift-times">' + esc(fmtTime(s.in)) + " → " + (live ? "now" : esc(fmtTime(s.out))) + "</div></div>" +

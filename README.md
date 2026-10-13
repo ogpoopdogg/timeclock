@@ -47,6 +47,28 @@ Reminders. On iPhone they have to *Add to Home Screen* first, then open the cloc
 the home-screen icon. iOS only allows web notifications for home-screen web apps
 (iOS 16.4 or later).
 
+## Overtime
+
+Hours are split into **regular** and **overtime**, with each hour counted only once:
+
+- **Daily:** within a day, the first 8 hours worked are regular and the rest is overtime.
+- **Weekly:** regular hours add up through the week in time order. Once they pass 40,
+  any further hours are overtime. Daily overtime hours don't count toward the 40.
+
+The week starts on the day set in **Settings → Work week starts on**. A shift counts
+on the day it started, as for regular hours. For example, five 9-hour days give 40
+regular + 5 overtime, and six 8-hour days give 40 regular + 8 overtime. Where the split
+shows:
+
+- **Employees:** a Regular / Overtime split under the week total, an orange overtime
+  part on each day's bar, and an OT tag on each punch with overtime.
+- **Admin:** Reg / OT on each timesheet, OT per day and per punch, the overtime share
+  of "Hours this week" on the live board, and **Regular** and **Overtime** columns in
+  the CSV export.
+
+The thresholds are `DAILY_OT_MS` and `WEEKLY_OT_MS` in `tc-core.js`.
+`tests/overtime.test.mjs` checks the rules.
+
 ## Installing the app, and how updates reach it
 
 Both pages install as apps: the time clock as **E&C Clock**, the admin panel as

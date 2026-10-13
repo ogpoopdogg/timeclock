@@ -32,6 +32,7 @@
             --green: #35d07f;
             --red: #ff6b5e;
             --blue: #8ab4ff;
+            --orange: #ff9f43;
 
             --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
             --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -193,6 +194,9 @@
         .tag.edit { color: var(--blue); background: rgba(138, 180, 255, 0.1); }
         .tag.live { color: var(--green); background: rgba(53, 208, 127, 0.1); }
         .tag.warn { color: var(--red); background: rgba(255, 107, 94, 0.1); }
+        .tag.ot { color: var(--orange); background: rgba(255, 159, 67, 0.12); }
+        .kpi-sub { font-size: 0.85rem; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .kpi-sub.has { color: var(--orange); }
         .tag.off { color: var(--dim); }
 
         .empty-state {
@@ -242,6 +246,9 @@
         .day-cell .dn { font-family: var(--font-display); font-weight: 700; color: var(--muted); font-size: 0.92rem; letter-spacing: 0.04em; }
         .day-cell .dh { font-weight: 600; }
         .day-cell .dh.zero { color: var(--dim); font-weight: 400; }
+        .day-cell .dot { color: var(--orange); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+        .sheet-card-total .split { display: block; font-family: var(--font-body); font-weight: 600; font-size: 0.8rem; color: var(--text); margin-top: 3px; white-space: nowrap; }
+        .sheet-card-total .split b { color: var(--orange); font-weight: 700; }
         .day-cell.today { background: rgba(255, 204, 0, 0.05); }
         .day-cell.today .dn { color: var(--yellow); }
 
@@ -481,7 +488,7 @@
                 <div class="kpi" style="--k:var(--green)"><div class="kpi-label">On the clock</div><div class="kpi-value" id="kOn">0</div></div>
                 <div class="kpi" style="--k:var(--red)"><div class="kpi-label">Late / not in</div><div class="kpi-value" id="kLate">0</div></div>
                 <div class="kpi"><div class="kpi-label">Hours today</div><div class="kpi-value" id="kToday">0</div></div>
-                <div class="kpi" style="--k:var(--blue)"><div class="kpi-label">Hours this week</div><div class="kpi-value" id="kWeek">0</div></div>
+                <div class="kpi" style="--k:var(--blue)"><div class="kpi-label">Hours this week</div><div class="kpi-value" id="kWeek">0</div><div class="kpi-sub" id="kWeekOt">No overtime</div></div>
             </div>
             <div class="board" id="board"></div>
         </section>
@@ -848,13 +855,15 @@
             const t = now(), today = dayKey(t);
             const days = weekDays(weekStartKey(today, settings.weekStart));
             const people = empList().filter(e => e.active !== false);
-            let on = 0, late = 0, todayMs = 0, weekMs = 0;
+            let on = 0, late = 0, todayMs = 0, weekMs = 0, weekOt = 0;
             const cards = people.map((e, i) => {
                 const st = liveStatus(e, t, today);
                 const list = shiftsOf(e.ek);
                 const dayMs = st.todays.reduce((n, s) => n + shiftMs(s, t), 0);
                 todayMs += dayMs;
-                weekMs += weekTotals(list, days, t).total;
+                const wk = weekTotals(list, days, t);
+                weekMs += wk.total;
+                weekOt += wk.overtime;
                 let cls = "", state = "", detail = "", foot = "";
                 const name = displayName(e, e.email);
                 if (st.kind === "in") {
@@ -890,12 +899,15 @@
                 return '<article class="person ' + cls + '" style="--i:' + i + '">' +
                     '<div class="person-top"><div class="avatar">' + esc(initials(name)) + '</div><div style="min-width:0">' +
                     '<div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div></div>" +
-                    state + '<div class="person-detail">' + detail + "</div>" + '<div class="person-foot">' + foot + "</div></article>";
+                    state + '<div class="person-detail">' + detail + "</div>" + '<div class="person-foot">' + foot +
+                    (wk.overtime >= 60000 ? '<span class="tag ot">OT ' + esc(fmtHours(wk.overtime)) + " h this week</span>" : "") + "</div></article>";
             });
             $("kOn").textContent = on;
             $("kLate").textContent = late;
             $("kToday").innerHTML = esc(fmtHours(todayMs)) + "<small>h</small>";
             $("kWeek").innerHTML = esc(fmtHours(weekMs)) + "<small>h</small>";
+            $("kWeekOt").textContent = weekOt > 0 ? "incl. " + fmtHours(weekOt) + " h overtime" : "No overtime";
+            $("kWeekOt").classList.toggle("has", weekOt > 0);
             $("liveSub").textContent = people.length ? people.length + " active employees · " + fmtKey(today, true)
                 : "Add employees in the Employees tab to get started.";
             const html = cards.length ? cards.join("") :
@@ -949,17 +961,20 @@
                 return;
             }
             $("sheets").innerHTML = people.map((e, i) => {
-                const { byDay, total } = weekTotals(shiftsOf(e.ek), days, t);
+                const { byDay, byShift, total, regular, overtime } = weekTotals(shiftsOf(e.ek), days, t);
                 const name = displayName(e, e.email);
                 const strip = days.map(k => {
-                    const ms = byDay[k].ms;
+                    const ms = byDay[k].ms, ot = byDay[k].overtime;
                     return '<div class="day-cell' + (k === today ? " today" : "") + '"><div class="dn">' + esc(DOW_SHORT[new Date(k + "T12:00:00Z").getUTCDay()]) + " " + esc(k.slice(8)) +
-                        '</div><div class="dh' + (ms ? "" : " zero") + '">' + (ms ? esc(fmtHours(ms)) : "—") + "</div></div>";
+                        '</div><div class="dh' + (ms ? "" : " zero") + '">' + (ms ? esc(fmtHours(ms)) : "—") + "</div>" +
+                        (ot > 0 ? '<div class="dot">' + esc(fmtHours(ot)) + " OT</div>" : "") + "</div>";
                 }).join("");
                 const rows = days.flatMap(k => byDay[k].shifts).map(s => {
                     const live = typeof s.out !== "number";
                     const tags = [];
                     if (live) tags.push('<span class="tag live">On the clock</span>');
+                    const split = byShift[s.id];
+                    if (split && split.overtime >= 60000) tags.push('<span class="tag ot">OT ' + esc(fmtHours(split.overtime)) + "</span>");
                     if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
                     else if (s.edited) tags.push('<span class="tag edit" title="' + esc((s.edited.note || "") + " — " + (s.edited.by || "")) + '">Edited</span>');
                     if (s.edited && s.edited.note) tags.push('<span class="tag" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note.length > 34 ? s.edited.note.slice(0, 33) + "…" : s.edited.note) + "”</span>");
@@ -976,7 +991,8 @@
                     '<div class="sheet-card-head"><div class="avatar">' + esc(initials(name)) + '</div><div class="sheet-card-name">' +
                     '<div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
                     '<button type="button" class="btn sm ghost" data-add-for="' + esc(e.ek) + '">+ Punch</button>' +
-                    '<div class="sheet-card-total">' + esc(fmtHours(total)) + "<small>hours · " + esc(fmtDur(total)) + "</small></div></div>" +
+                    '<div class="sheet-card-total">' + esc(fmtHours(total)) + "<small>hours · " + esc(fmtDur(total)) + "</small>" +
+                    '<span class="split">Reg ' + esc(fmtHours(regular)) + ' · <b>OT ' + esc(fmtHours(overtime)) + "</b></span></div></div>" +
                     '<div class="day-strip">' + strip + "</div>" +
                     (rows ? '<table class="punches"><thead><tr><th>Day</th><th>In</th><th>Out</th><th class="num">Hours</th><th>GPS</th><th>Notes</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
                         : '<p class="no-punches">No punches this week.</p>') + "</article>";
@@ -1005,15 +1021,16 @@
         $("exportBtn").addEventListener("click", () => {
             const t = now(), days = weekDays(viewWeek);
             const filter = $("empFilter").value;
-            const rows = [["Employee", "Email", "Date", "In", "Out", "Hours", "GPS", "Edited by admin", "Note"]];
+            const rows = [["Employee", "Email", "Date", "In", "Out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note"]];
             empList().filter(e => filter === "all" || e.ek === filter).forEach(e => {
-                const { byDay, total } = weekTotals(shiftsOf(e.ek), days, t);
+                const { byDay, byShift, total, regular, overtime } = weekTotals(shiftsOf(e.ek), days, t);
                 const list = days.flatMap(k => byDay[k].shifts);
                 if (!list.length && filter === "all" && e.active === false) return;
                 list.forEach(s => rows.push([displayName(e, e.email), e.email, dayKey(s.in), fmtTime(s.in),
                     typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
-                    fmtHours(shiftMs(s, t)), s.vehicleName || "", s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || ""]));
-                rows.push([displayName(e, e.email), e.email, "WEEK TOTAL", "", "", fmtHours(total), "", "", ""]);
+                    fmtHours(shiftMs(s, t)), fmtHours(byShift[s.id].regular), fmtHours(byShift[s.id].overtime),
+                    s.vehicleName || "", s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || ""]));
+                rows.push([displayName(e, e.email), e.email, "WEEK TOTAL", "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", ""]);
             });
             const csv = rows.map(r => r.map(v => {
                 const s = String(v);

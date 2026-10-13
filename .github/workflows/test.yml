@@ -1,4 +1,4 @@
-name: Test reminder function
+name: Tests
 
 on:
   push:
@@ -15,3 +15,5 @@ jobs:
       - name: Unit tests (who gets a punch-in reminder, and when)
         working-directory: functions
         run: node --test
+      - name: Overtime rules (8 h a day, 40 h a week)
+        run: node --test tests/overtime.test.mjs

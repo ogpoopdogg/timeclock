@@ -173,20 +173,34 @@ export function openShift(list) {
     return null;
 }
 
-// Hours per day for one week; a shift counts on the day it started
+// Overtime: hours past 8 in a day, or past 40 regular hours in a week (counted once, never twice)
+export const DAILY_OT_MS = 8 * 3600000;
+export const WEEKLY_OT_MS = 40 * 3600000;
+
+// Hours per day for one week, split into regular and overtime; a shift counts on the day it started.
+// Shifts are taken in time order: within a day the first 8 hours worked are regular and the rest
+// is daily overtime; regular hours then add up across the week, and past 40 they become weekly
+// overtime. Daily overtime hours don't count toward the 40.
 export function weekTotals(list, days, now) {
-    const byDay = {};
-    days.forEach(k => { byDay[k] = { ms: 0, shifts: [] }; });
-    let total = 0;
-    for (const s of list) {
+    const byDay = {}, byShift = {};
+    days.forEach(k => { byDay[k] = { ms: 0, regular: 0, overtime: 0, shifts: [] }; });
+    let total = 0, regular = 0, overtime = 0;
+    const ordered = list.slice().sort((a, b) => a.in - b.in);
+    for (const s of ordered) {
         const k = dayKey(s.in);
-        if (!byDay[k]) continue;
+        const day = byDay[k];
+        if (!day) continue;
         const ms = shiftMs(s, now);
-        byDay[k].ms += ms;
-        byDay[k].shifts.push(s);
-        total += ms;
+        const withinDay = Math.min(ms, Math.max(0, DAILY_OT_MS - day.ms));   // part inside the day's first 8 h
+        const reg = Math.min(withinDay, Math.max(0, WEEKLY_OT_MS - regular)); // ...and inside the week's 40 h
+        const ot = ms - reg;
+        byShift[s.id] = { regular: reg, overtime: ot };
+        day.ms += ms; day.regular += reg; day.overtime += ot;
+        day.shifts.push(s);
+        total += ms; regular += reg; overtime += ot;
     }
-    return { byDay, total };
+    days.forEach(k => byDay[k].shifts.sort((a, b) => a.in - b.in));
+    return { byDay, byShift, total, regular, overtime };
 }
 
 export function scheduleFor(emp, key) {
