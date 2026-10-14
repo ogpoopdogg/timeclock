@@ -4,12 +4,12 @@
 //   A saved copy is used only when the phone is offline, so the app still opens.
 // - shows the punch-in reminders the server pushes while the time clock is closed (functions/index.js),
 // - lets the page show its own reminders as system notifications (Android Chrome needs a service worker for that),
-// - opens the clock when a notification is tapped.
+// - opens the clock when a notification is tapped (a "van swap" notification opens the van picker).
 // Only this site's own files are handled here; Firebase and Google Fonts go straight to the network.
 
 const CACHE = "tc-offline-v2";
 const SHELL = [
-    "./", "index.html", "admin.html", "tc-core.js", "pwa.js", "firebase-config.js", "push-config.js",
+    "./", "index.html", "admin.html", "tc-core.js", "pwa.js", "firebase-config.js", "push-config.js", "maps-config.js",
     "clock.webmanifest", "admin.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png"
 ];
 
@@ -77,7 +77,10 @@ self.addEventListener("notificationclick", event => {
     event.waitUntil(
         self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
             for (const client of list) {
-                if (client.url.startsWith(self.registration.scope) && "focus" in client) return client.focus();
+                if (client.url.startsWith(self.registration.scope) && !/admin\.html/.test(client.url) && "focus" in client) {
+                    client.postMessage({ type: "tc-open", url: target }); // e.g. …?swap=1 tells the open clock to show the van picker
+                    return client.focus();
+                }
             }
             return self.clients.openWindow ? self.clients.openWindow(target) : null;
         })

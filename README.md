@@ -22,6 +22,12 @@ rules** actually stop an employee from changing their own punches.
 - Only `justin@ec.com` can edit, add or delete punches, employees, schedules and settings.
 - Employees can read the GPS list and nicknames, and set a GPS nickname, so a vehicle
   pick shows up in RouteWatcher.
+- An employee on the clock can take a van another driver has (**Van swap**), but only
+  for their own open shift. Only the driver holding a van can release it.
+- Each punch and van swap can save where the phone was, once, within 5 minutes of the
+  punch. Only the server writes the street address.
+- Each employee can read and change only their own punch-in reminder setting
+  (`timeclock/prefs`).
 
 Firebase console → **Realtime Database** → **Rules**: merge the `timeclock` block and
 the `developer/dispatch_dashboard/drivers` and `driver_nicknames` entries into your
@@ -102,13 +108,102 @@ open (or the next check) picks it up.
   Settings, not the nickname. Units another driver has taken are greyed out. Picking
   one sets the shared nickname at `developer/dispatch_dashboard/driver_nicknames/{gpsId}`
   to the driver's first name. RouteWatcher and DriverMap read nicknames from that path.
+- **Van swap.** While on the clock, the big **Van swap** button under the punch ring
+  opens the van list. Vans other drivers have can be picked too. The app asks "Van 7 is
+  assigned to Matt. Take it?", then:
+  - The van moves to the driver who took it (and its RouteWatcher nickname with it).
+  - The server (`timeclockVanTaken`) unassigns the driver who had it and sends them a
+    notification right away: *"Dave took van 7. Are you in van 3 now? …"* (van 3 being
+    the one Dave left). Tapping it opens the van list with van 3 first, marked
+    *Likely yours*, so a straight swap is one tap.
+  - If they still haven't picked a van, they're reminded every 10 minutes, 3 times at
+    most. The reminders stop as soon as they pick a van or punch out. Van swap
+    alerts are sent even if they turned the punch-in reminder off.
+  - While they have no van, their clock shows a red "Dave took van 7" bar and a banner,
+    and the admin live board shows **Needs van swap**.
+  - The app can't tell which van a driver is sitting in. It only knows what drivers pick.
+    That's why the bumped driver is asked rather than moved automatically.
+- **Van history.** Every van pick, swap and "taken by" is saved on the shift with its time
+  (and location). The admin timesheet shows the whole list, and the CSV has a
+  **Van changes** column.
 - **Punch out** frees the GPS and removes the nickname the driver gave it (only if
-  nobody has changed it since).
+  nobody has changed it since, and only if another driver hasn't taken the van).
 - **Reminder.** If an employee is scheduled today and hasn't punched in by
   *start time + reminder minutes* (10 by default, set in **Settings**), the clock shows
   a phone notification and an in-page banner.
+- **Reminder on/off is saved.** The **Turn on / Turn off** choice is saved in Firebase
+  (`timeclock/prefs/{ek}/punchReminder`), not on the phone. It stays the way the driver
+  left it until they change it, after reinstalling the app, signing out or switching
+  phones. On a new phone the card says the reminder is on and shows **Allow**, because
+  each phone still has to allow notifications once. Drivers who turned reminders on
+  before this was added are saved as "on" the next time they open the clock.
+  **Admin → Employees** shows *Reminder off* for anyone who turned it off.
 - **Admin edits** are marked "Edited by admin" on the employee's own screen, and each
   one is saved to the change log (`timeclock/audit`) with the reason.
+
+## Punch locations
+
+Each punch in, punch out and van swap saves where the phone was: latitude, longitude
+and accuracy in metres. The phone's location is asked for when the punch is made, and
+saved right after, so a slow GPS fix never delays the punch. The app waits up to 10
+seconds for a fix.
+
+If the phone blocks location, or there's no fix within 10 seconds, the punch still
+goes through. The admin timesheet shows *No location* with the reason (blocked, timed
+out, unavailable).
+
+The first punch makes the phone ask the driver to allow location. On iPhone, the
+setting is under **Settings → Privacy & Security → Location Services**, for Safari
+websites or the home-screen app.
+
+**Admin:** each punch time in **Timesheets** has its street address underneath. Tap the
+address for a window with a Google map pinned to the spot, the coordinates, the
+accuracy, and an **Open in Google Maps** link. The CSV export has **In location** and
+**Out location** columns. Older punches (from before this was added) and punches the
+admin added by hand have no location.
+
+### 1. Turn on two Google Maps APIs and make two keys
+
+Google Cloud console (<https://console.cloud.google.com>), project
+**eandccourier-36fcc**:
+
+1. **APIs & Services → Library**: enable **Geocoding API** and **Maps Embed API**.
+   Google Maps Platform needs a billing account on the project.
+2. **APIs & Services → Credentials → Create credentials → API key**, twice:
+   - **Server key** (street addresses). Under *API restrictions*, choose *Restrict key*
+     and tick only **Geocoding API**. Leave *Application restrictions* as *None*
+     (the function calls Google from Google's servers). Then save it as a function
+     secret in Cloud Shell:
+     ```sh
+     npx firebase-tools functions:secrets:set MAPS_GEOCODING_KEY --project eandccourier-36fcc
+     ```
+     and paste the key when asked. It is never stored in this repo.
+   - **Browser key** (the map in the admin panel). Under *Application restrictions*
+     choose *Websites* and add `app.eandccourier.ca/*`. Under *API restrictions*,
+     tick only **Maps Embed API**. Paste it into `maps-config.js` and commit. Browsers
+     can see this key, which is why it's restricted to your site and that one API.
+3. Deploy the functions again (*Reminders when the app is closed → 3*), and merge
+   the updated `database.rules.json`.
+
+Until step 1 is done, locations are still saved and the admin sees the coordinates
+with an *Open in Google Maps* link, just without the street address or built-in map.
+
+### Cost
+
+These figures come from third-party summaries (October 2026), not Google's own page,
+so **check them** at <https://developers.google.com/maps/billing-and-pricing/pricing>
+before you rely on them:
+
+- Since March 2025, Google gives each Maps "Essentials" product a monthly number of free
+  requests instead of the old $200 credit. Geocoding is reported as **10,000 free
+  requests a month**, then about $5 per 1,000.
+- The Maps Embed API is reported as **free with no usage limit**.
+
+This app makes one Geocoding request per location saved: punch in, punch out and each
+van pick or swap. For example, 10 drivers × 22 days × 3 locations a day (in, out, one
+pick) = **660 a month**, well under 10,000. `timeclockShiftAddresses` also runs on each
+shift write (about 10 per shift). Most of those runs find nothing to look up and finish
+in a few milliseconds.
 
 ## Reminders when the app is closed
 
@@ -125,6 +220,10 @@ of checking all day:
   someone's schedule, or the reminder delay, during the day. A timer whose time no
   longer matches the schedule does nothing when it fires.
 - `timeclockTestPush` powers the **Send test** button.
+- `timeclockVanTaken` and `timeclockVanSwapReminder` handle van swaps (see
+  *How it works → Van swap*). They use the same Cloud Tasks timers.
+- `timeclockShiftAddresses` looks up street addresses for punch locations (see
+  *Punch locations* below).
 
 Each person gets at most one reminder per day. If a schedule is changed after the
 reminder time has already passed, the reminder is sent right away, unless it's more
@@ -147,8 +246,10 @@ Paste both into `push-config.js` and commit the change.
 
 ### 2. Add the database rules
 
-`database.rules.json` now also has `timeclock/push_tokens` and
-`timeclock/push_tests`. Merge them in the same way as the rest (see step 1 above).
+`database.rules.json` now also has `timeclock/push_tokens`, `timeclock/push_tests`,
+`timeclock/prefs` (the reminder on/off choice), the location and van-history fields on
+shifts, and the van-swap rule on `timeclock/vehicle_claims`. Merge them in the same way
+as the rest (see step 1 above).
 
 ### 3. Deploy the functions (once, and again whenever `functions/` changes)
 
@@ -162,6 +263,10 @@ cd timeclock/functions && npm install && cd ..
 npx firebase-tools login --no-localhost
 npx firebase-tools deploy --only functions:timeclock --project eandccourier-36fcc
 ```
+
+Before the first deploy that includes `timeclockShiftAddresses`, set up the Google key it
+uses (*Punch locations → 1* below). If the secret doesn't exist yet, the deploy stops
+and asks for its value.
 
 `firebase.json` puts these functions in their own *codebase* called `timeclock`, and
 the command above deploys only that codebase. The dispatch app's functions

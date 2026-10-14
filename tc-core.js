@@ -3,8 +3,17 @@
 // Database layout (Firebase Realtime Database, project eandccourier-36fcc):
 //   timeclock/settings                 { reminderMinutes, weekStart }
 //   timeclock/employees/{ek}           { email, name, active, schedule: { sun..sat: { start, end } } }
-//   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, src, edited }
-//   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at }
+//   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, src, edited,
+//                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint }
+//       vehicleId/vehicleName/nickname   the van the driver has now
+//       inLoc / outLoc                   where the phone was at the punch: { lat, lng, acc, at } or { err }
+//       inAddr / outAddr                 the street address for it, added by the server (functions/)
+//       vans/{id}                        every van change in the shift: { at, vehicleId, vehicleName, how, by, loc, addr }
+//                                        how: "pick" | "swap" | "taken" (another driver took it; written by the server)
+//       swapHint                         set by the server when another driver takes this driver's van:
+//                                        { at, by, vehicleId, vehicleName, suggestId, suggestName }
+//   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at, fromId, fromName }
+//   timeclock/prefs/{ek}               { punchReminder: true | false }  the driver's own choice, kept across phones
 //   timeclock/audit/{id}               admin edit history
 //   timeclock/push_tokens/{ek}/{key}   { token, at, device }  phones that get closed-app reminders
 //   timeclock/push_tests/{ek}          written to ask the server for a test notification
@@ -35,6 +44,7 @@ export const P = {
     audit: "timeclock/audit",
     pushTokens: "timeclock/push_tokens",
     pushTests: "timeclock/push_tests",
+    prefs: "timeclock/prefs",
     gps: "developer/dispatch_dashboard/drivers",
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
@@ -215,6 +225,51 @@ export function gpsList(drivers) {
         .map(([id, d]) => ({ id: id, name: String(d.name || "").trim() || "Unnamed GPS", color: d.color || "#ffcc00" }))
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 }
+
+// Every van change in a shift, oldest first
+export function vanHistory(shift) {
+    return Object.entries((shift && shift.vans) || {})
+        .filter(([, v]) => v && typeof v.at === "number")
+        .map(([id, v]) => Object.assign({ id: id }, v))
+        .sort((a, b) => a.at - b.at);
+}
+
+// ---------- Location ----------
+// Where the phone is right now, for a punch or a van swap. Never fails: resolves to
+// { lat, lng, acc, at } or { err: "denied" | "unavailable" | "timeout" | "unsupported" }.
+export const LOCATION_WAIT_MS = 10000;
+export function readLocation() {
+    return new Promise(resolve => {
+        if (!("geolocation" in navigator)) { resolve({ err: "unsupported" }); return; }
+        let done = false;
+        const finish = v => { if (!done) { done = true; resolve(v); } };
+        // Backstop: some browsers never call back while their permission prompt is open
+        const timer = setTimeout(() => finish({ err: "timeout" }), LOCATION_WAIT_MS + 2000);
+        try {
+            navigator.geolocation.getCurrentPosition(pos => {
+                clearTimeout(timer);
+                const c = pos.coords;
+                finish({ lat: round6(c.latitude), lng: round6(c.longitude), acc: Math.round(c.accuracy || 0), at: Math.round(pos.timestamp || Date.now()) });
+            }, err => {
+                clearTimeout(timer);
+                finish({ err: err && err.code === 1 ? "denied" : err && err.code === 3 ? "timeout" : "unavailable" });
+            }, { enableHighAccuracy: true, timeout: LOCATION_WAIT_MS, maximumAge: 15000 });
+        } catch (e) { clearTimeout(timer); finish({ err: "unavailable" }); }
+    });
+}
+const round6 = n => Math.round(n * 1e6) / 1e6; // about 0.1 m, plenty for a street address
+
+export function hasCoords(loc) { return !!(loc && typeof loc.lat === "number" && typeof loc.lng === "number"); }
+
+export const LOCATION_ERRORS = {
+    denied: "location blocked on the phone",
+    unavailable: "the phone couldn't find its location",
+    timeout: "no location fix within 10 seconds",
+    unsupported: "the browser can't share location"
+};
+
+// Google Maps link that works without a key (Maps URLs)
+export function mapsLink(loc) { return "https://www.google.com/maps/search/?api=1&query=" + loc.lat + "%2C" + loc.lng; }
 
 // ---------- Small DOM helpers ----------
 export function esc(v) {

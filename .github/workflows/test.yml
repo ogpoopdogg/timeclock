@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - name: Unit tests (who gets a punch-in reminder, and when)
+      - name: Unit tests (punch-in reminders, van swaps, punch addresses)
         working-directory: functions
         run: node --test
       - name: Overtime rules (8 h a day, 40 h a week)

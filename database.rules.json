@@ -19,7 +19,7 @@
           ".indexOn": ["in"],
           ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
           "$shiftId": {
-            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && newData.child('in').val() <= now && newData.child('in').val() > now - 60000 && !newData.child('out').exists() && !newData.child('edited').exists() && !newData.child('vehicleId').exists()",
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && newData.child('in').val() <= now && newData.child('in').val() > now - 60000 && !newData.child('out').exists() && !newData.child('edited').exists() && !newData.child('vehicleId').exists() && !newData.child('inLoc').exists() && !newData.child('inAddr').exists() && !newData.child('vans').exists() && !newData.child('swapHint').exists()",
             "out": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.exists() && newData.val() <= now && newData.val() > now - 60000"
             },
@@ -31,6 +31,47 @@
             },
             "nickname": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.parent().child('out').exists()"
+            },
+            "inLoc": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().child('in').val() > now - 300000",
+              ".validate": "newData.hasChildren(['lat', 'lng']) || newData.hasChildren(['err'])",
+              "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+              "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+              "acc": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "at": { ".validate": "newData.isNumber()" },
+              "err": { ".validate": "newData.isString() && newData.val().length <= 20" },
+              "$other": { ".validate": false }
+            },
+            "outLoc": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().child('out').val() > now - 300000",
+              ".validate": "newData.hasChildren(['lat', 'lng']) || newData.hasChildren(['err'])",
+              "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+              "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+              "acc": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "at": { ".validate": "newData.isNumber()" },
+              "err": { ".validate": "newData.isString() && newData.val().length <= 20" },
+              "$other": { ".validate": false }
+            },
+            "vans": {
+              "$vid": {
+                ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().parent().child('in').exists() && !data.parent().parent().child('out').exists() && newData.child('at').val() <= now && newData.child('at').val() > now - 60000",
+                ".validate": "newData.hasChildren(['at', 'vehicleId', 'vehicleName', 'how'])",
+                "at": { ".validate": "newData.isNumber()" },
+                "vehicleId": { ".validate": "newData.isString() && newData.val().length <= 128" },
+                "vehicleName": { ".validate": "newData.isString() && newData.val().length <= 60" },
+                "how": { ".validate": "newData.val() === 'pick' || newData.val() === 'swap'" },
+                "loc": {
+                  ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().child('at').val() > now - 300000",
+                  ".validate": "newData.hasChildren(['lat', 'lng']) || newData.hasChildren(['err'])",
+                  "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+                  "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+                  "acc": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                  "at": { ".validate": "newData.isNumber()" },
+                  "err": { ".validate": "newData.isString() && newData.val().length <= 20" },
+                  "$other": { ".validate": false }
+                },
+                "$other": { ".validate": false }
+              }
             }
           }
         }
@@ -52,10 +93,19 @@
         }
       },
 
+      "prefs": {
+        "$ek": {
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
+          ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && root.child('timeclock/employees').child($ek).exists()",
+          "punchReminder": { ".validate": "newData.isBoolean()" },
+          "$other": { ".validate": false }
+        }
+      },
+
       "vehicle_claims": {
         ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
         "$gpsId": {
-          ".write": "auth != null && ((!data.exists() && newData.child('ek').val() === auth.token.email.toLowerCase().replace('.', ',')) || (data.child('ek').val() === auth.token.email.toLowerCase().replace('.', ',') && (!newData.exists() || newData.child('ek').val() === auth.token.email.toLowerCase().replace('.', ','))))"
+          ".write": "auth != null && ((newData.exists() && newData.child('ek').val() === auth.token.email.toLowerCase().replace('.', ',') && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).child('active').val() !== false && newData.child('shiftId').isString() && root.child('timeclock/shifts').child(auth.token.email.toLowerCase().replace('.', ',')).child(newData.child('shiftId').val()).child('in').exists() && !root.child('timeclock/shifts').child(auth.token.email.toLowerCase().replace('.', ',')).child(newData.child('shiftId').val()).child('out').exists()) || (!newData.exists() && data.child('ek').val() === auth.token.email.toLowerCase().replace('.', ',')))"
         }
       }
     },

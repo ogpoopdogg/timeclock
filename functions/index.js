@@ -14,6 +14,19 @@
      schedule or the reminder delay changes during the day. A timer whose time
      no longer matches the current schedule does nothing when it fires.
    - timeclockTestPush powers the "Send test" button.
+   A driver who turned the punch-in reminder off (timeclock/prefs/<ek>) isn't sent it.
+
+   Van swaps (see swaps.js):
+   - timeclockVanTaken runs when a van changes hands in timeclock/vehicle_claims.
+     The driver who had it is unassigned and notified straight away, and a timer
+     is set for a reminder 10 minutes later.
+   - timeclockVanSwapReminder is that timer: if they still haven't picked a van,
+     it reminds them and sets the next one (3 reminders at most).
+
+   Punch addresses:
+   - timeclockShiftAddresses runs whenever a shift is written, and looks up the
+     street address (Google Geocoding API) for each new punch or van-swap location.
+     Needs the MAPS_GEOCODING_KEY secret (README "Punch locations").
 
    This is its own Firebase "codebase" (see ../firebase.json), so deploying it
    never touches the dispatch app's functions in the same project.
@@ -24,10 +37,12 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onValueWritten } = require('firebase-functions/v2/database');
 const { onTaskDispatched } = require('firebase-functions/v2/tasks');
+const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const { getFunctions } = require('firebase-admin/functions');
 const R = require('./reminders');
+const S = require('./swaps');
 
 admin.initializeApp();
 
@@ -35,7 +50,9 @@ admin.initializeApp();
 const REGION = 'us-central1';
 const MEMORY = '256MiB';
 const REMINDER_FUNCTION = 'timeclockPunchReminder';
-const CLOCK_URL = 'https://app.eandccourier.ca/timeclock/';
+const SWAP_REMINDER_FUNCTION = 'timeclockVanSwapReminder';
+const CLOCK_URL = S.CLOCK_URL;
+const MAPS_KEY = defineSecret('MAPS_GEOCODING_KEY');
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KEEP_SENT_DAYS = 30;
 
@@ -46,7 +63,7 @@ const DEAD_TOKEN_CODES = new Set([
 ]);
 
 /** Sends one notification to every phone the employee registered. Returns { sent, failed, removed }. */
-async function sendTo(ek, { title, body, tag }) {
+async function sendTo(ek, { title, body, tag, url }) {
   const db = admin.database();
   const devices = (await db.ref(`timeclock/push_tokens/${ek}`).once('value')).val() || {};
   const targets = Object.entries(devices)
@@ -58,7 +75,7 @@ async function sendTo(ek, { title, body, tag }) {
   // as the in-page reminder, so the two replace each other instead of doubling up.
   const res = await admin.messaging().sendEachForMulticast({
     tokens: targets.map((t) => t.token),
-    data: { title, body, tag, url: CLOCK_URL },
+    data: { title, body, tag, url: url || CLOCK_URL },
     webpush: { headers: { Urgency: 'high', TTL: '7200' } }
   });
   const dead = [];
@@ -113,6 +130,7 @@ exports.timeclockPlanReminders = onSchedule(
     const db = admin.database();
     const old = (await db.ref('timeclock/reminders_sent').orderByKey().endAt(cutoff).once('value')).val() || {};
     await Promise.all(Object.keys(old).map((k) => db.ref(`timeclock/reminders_sent/${k}`).remove()));
+    await db.ref('timeclock/swap_reminders_sent').remove(); // only guards against a timer firing twice, minutes apart
   }
 );
 
@@ -132,6 +150,10 @@ exports.timeclockPunchReminder = onTaskDispatched(
     const plan = R.planFor(now, settingsSnap.val(), emp);
     if (!R.isCurrent(plan, { day, dueAt })) {
       logger.info('Reminder timer no longer matches the schedule; skipped', { ek, day, dueAt });
+      return;
+    }
+    if (!S.wantsPunchReminder((await db.ref(`timeclock/prefs/${ek}`).once('value')).val())) {
+      logger.info('Punch-in reminder turned off by the employee; skipped', { ek, day });
       return;
     }
     const shifts = (await db.ref(`timeclock/shifts/${ek}`).orderByChild('in').startAt(now - 2 * DAY_MS).once('value')).val();
@@ -186,3 +208,103 @@ exports.timeclockTestPush = onValueWritten(
     await admin.database().ref(`timeclock/push_tests/${ek}`).remove();
   }
 );
+
+// ---------- Van swaps ----------
+
+async function setSwapTimer(ek, shiftId, takenAt, n) {
+  const timer = S.swapTimerFor(ek, shiftId, takenAt, n);
+  try {
+    await getFunctions().taskQueue(`locations/${REGION}/functions/${SWAP_REMINDER_FUNCTION}`).enqueue(
+      { ek, shiftId, takenAt, n },
+      { id: timer.id, scheduleTime: new Date(Math.max(timer.fireAt, Date.now())) }
+    );
+  } catch (err) {
+    if (!(err && err.code === 'functions/task-already-exists')) throw err;
+  }
+}
+
+// A driver picked a van another driver had (Van swap in the time clock, or the admin moved it):
+// unassign the driver who had it and tell them to pick the van they're in now.
+exports.timeclockVanTaken = onValueWritten(
+  { ref: '/timeclock/vehicle_claims/{gpsId}', region: REGION, memory: MEMORY },
+  async (event) => {
+    const bump = S.bumpFrom(event.data.before.val(), event.data.after.val(), event.params.gpsId);
+    if (!bump) return;
+    // The database the trigger fired on (in the emulator, admin.database() can point at another namespace)
+    const shiftRef = event.data.after.ref.root.child(`timeclock/shifts/${bump.ek}/${bump.shiftId}`);
+    const takenAt = Date.now();
+    const entryId = shiftRef.child('vans').push().key;
+    // null in, null out: the first try may run before the shift is loaded, and is then retried with it
+    const res = await shiftRef.transaction((cur) => (cur === null ? null : S.unassign(cur, bump, takenAt, entryId)));
+    const shift = res.snapshot.val();
+    if (!res.committed || !S.stillNeedsSwap(shift, takenAt)) {
+      logger.info('Van changed hands; previous driver already off it', { gpsId: bump.gpsId, ek: bump.ek });
+      return;
+    }
+    const msg = S.swapMessage(shift.swapHint, 0);
+    const result = await sendTo(bump.ek, { title: msg.title, body: msg.body, tag: 'tc-van-swap', url: S.SWAP_URL });
+    logger.info('Van taken; driver unassigned and notified', { gpsId: bump.gpsId, ek: bump.ek, by: bump.byEk, ...result });
+    await setSwapTimer(bump.ek, bump.shiftId, takenAt, 1);
+  }
+);
+
+// Follow-up reminder while the bumped driver still has no van
+exports.timeclockVanSwapReminder = onTaskDispatched(
+  { region: REGION, memory: MEMORY, retryConfig: { maxAttempts: 3, minBackoffSeconds: 60 }, rateLimits: { maxConcurrentDispatches: 6 } },
+  async (req) => {
+    const { ek, shiftId, takenAt, n } = req.data || {};
+    if (typeof ek !== 'string' || typeof shiftId !== 'string' || typeof takenAt !== 'number' || typeof n !== 'number') return;
+    const db = admin.database();
+    const shift = (await db.ref(`timeclock/shifts/${ek}/${shiftId}`).once('value')).val();
+    if (!S.stillNeedsSwap(shift, takenAt)) return; // picked a van, punched out, or lost another van since (that has its own reminders)
+    // Claim this reminder first, so a repeated timer can never send it twice
+    const sentRef = db.ref(`timeclock/swap_reminders_sent/${ek}/${shiftId}/${takenAt}_${n}`);
+    const claim = await sentRef.transaction((cur) => (cur ? undefined : { at: Date.now() }));
+    if (!claim.committed) return;
+    const msg = S.swapMessage(shift.swapHint, n);
+    const result = await sendTo(ek, { title: msg.title, body: msg.body, tag: 'tc-van-swap', url: S.SWAP_URL });
+    logger.info('Van swap reminder', { ek, shiftId, n, ...result });
+    if (n < S.SWAP_REMINDERS) await setSwapTimer(ek, shiftId, takenAt, n + 1);
+  }
+);
+
+// ---------- Punch addresses ----------
+
+async function lookUpAddress(lat, lng) {
+  try {
+    const res = await fetch(S.geocodeUrl(lat, lng, MAPS_KEY.value()), { signal: AbortSignal.timeout(10000) });
+    return S.pickAddress(await res.json());
+  } catch (err) {
+    logger.warn('Address lookup failed', { message: err && err.message });
+    return { err: 'LOOKUP_FAILED' };
+  }
+}
+
+// A punch or van change saved a location: add its street address to the shift
+exports.timeclockShiftAddresses = onValueWritten(
+  { ref: '/timeclock/shifts/{ek}/{shiftId}', region: REGION, memory: MEMORY, secrets: [MAPS_KEY] },
+  async (event) => {
+    const jobs = S.addressJobs(event.data.after.val());
+    if (!jobs.length) return;
+    const found = await Promise.all(jobs.map((j) => lookUpAddress(j.lat, j.lng)));
+    // Written in one transaction so a shift deleted meanwhile isn't brought back as a stub
+    await event.data.after.ref.transaction((cur) => {
+      if (cur === null) return null;
+      const still = new Set(S.addressJobs(cur).map((j) => j.addrPath + '|' + j.lat + '|' + j.lng));
+      jobs.forEach((j, i) => {
+        if (!still.has(j.addrPath + '|' + j.lat + '|' + j.lng)) return;
+        setPath(cur, found[i].addr ? j.addrPath : j.errPath, found[i].addr || found[i].err);
+      });
+      return cur;
+    });
+    logger.info('Punch addresses', { ek: event.params.ek, shiftId: event.params.shiftId, looked: jobs.length,
+      failed: found.filter((f) => f.err).map((f) => f.err) });
+  }
+);
+
+function setPath(obj, path, value) {
+  const parts = path.split('/');
+  let o = obj;
+  for (const p of parts.slice(0, -1)) o = o[p] = o[p] || {};
+  o[parts[parts.length - 1]] = value;
+}

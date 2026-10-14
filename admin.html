@@ -267,6 +267,25 @@
         .punches .muted { color: var(--muted); }
         .punches .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
         .no-punches { padding: 16px 18px; color: var(--dim); }
+        .punches td.when { vertical-align: top; }
+        .loc {
+            display: flex; align-items: flex-start; gap: 4px; max-width: 260px; margin-top: 3px; padding: 0; border: 0; background: none;
+            color: var(--blue); font: inherit; font-size: 0.8rem; line-height: 1.3; text-align: left; cursor: pointer;
+        }
+        .loc svg { width: 13px; height: 13px; flex: none; margin-top: 1px; }
+        .loc:hover span, .loc:focus-visible span { text-decoration: underline; }
+        .loc:focus-visible { outline: none; }
+        .loc.none { color: var(--dim); cursor: default; }
+        .vans { display: flex; flex-direction: column; gap: 6px; }
+        .van-step { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 0.85rem; }
+        .van-step .loc { flex-basis: 100%; margin-top: 0; }
+        .van-step .arrow { color: var(--muted); }
+        .map-modal { width: min(720px, 100%); }
+        .map-addr { font-weight: 600; font-size: 1.05rem; }
+        .map-meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+        .map-frame { display: block; width: 100%; height: min(420px, 55vh); border: 0; border-radius: 14px; background: var(--asphalt-3); margin-bottom: 10px; }
+        .map-nokey { color: var(--muted); font-size: 0.9rem; padding: 14px; border-radius: 12px; background: var(--asphalt-3); margin-bottom: 10px; }
+        a.btn { text-decoration: none; }
 
         /* ---------- Employees ---------- */
         .emp-list { display: flex; flex-direction: column; gap: 10px; }
@@ -408,7 +427,12 @@
             .punches td.day { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
             .punches .num { text-align: right; }
             .punches .actions { grid-column: 1 / -1; text-align: left; width: auto; padding-top: 6px; }
-            .punches .tagcell { grid-column: 1 / -1; }
+            .punches .tagcell, .punches .vancell { grid-column: 1 / -1; }
+            /* Day and hours on top, then each punch (with its address) on its own full-width line */
+            .punches td.day { order: 0; } .punches td.num { order: 1; }
+            .punches td.when { order: 2; grid-column: 1 / -1; }
+            .punches .vancell { order: 3; } .punches .tagcell { order: 4; } .punches .actions { order: 5; }
+            .loc { max-width: none; }
             .day-cell { padding: 8px 2px; font-size: 0.82rem; }
             .modal-grid { grid-template-columns: 1fr; }
             .week-switch .week-label { min-width: 0; }
@@ -625,6 +649,23 @@
         </form>
     </div>
 
+    <!-- Punch location -->
+    <div class="modal-backdrop" id="mapModal">
+        <div class="modal map-modal" role="dialog" aria-modal="true" aria-labelledby="mapTitle">
+            <h2 id="mapTitle">Punch in</h2>
+            <p class="modal-sub" id="mapSub"></p>
+            <p class="map-addr" id="mapAddr"></p>
+            <p class="map-meta" id="mapMeta"></p>
+            <iframe class="map-frame" id="mapFrame" title="Map of where the punch happened" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+            <p class="map-nokey" id="mapNoKey" hidden>The built-in map needs a Google Maps key in <code>maps-config.js</code> (README “Punch locations”). The link below opens the spot in Google Maps.</p>
+            <div class="modal-foot">
+                <a class="btn ghost" id="mapLink" target="_blank" rel="noopener">Open in Google Maps</a>
+                <span class="spacer"></span>
+                <button type="button" class="btn primary" data-close>Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script type="module">
@@ -639,7 +680,7 @@
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
-            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG
+            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -648,12 +689,14 @@
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js");
         const { firebaseConfig } = await import("./firebase-config.js");
         const { setupPwa } = await import("./pwa.js");
+        let MAPS_EMBED_KEY = "";
+        try { ({ MAPS_EMBED_KEY } = await import("./maps-config.js")); } catch (e) { console.warn("maps-config.js not loaded:", e); }
 
         const $ = id => document.getElementById(id);
 
         // ---------- State ----------
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
-        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, audit = [], pushTokens = {};
+        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, audit = [], pushTokens = {}, prefs = {};
         let viewWeek = null, rangeStart = null;
         let unsubs = [], shiftUnsubs = {};
         let activeTab = "live";
@@ -715,7 +758,7 @@
         onAuthStateChanged(auth, u => {
             stopAll();
             user = u;
-            employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = []; pushTokens = {};
+            employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = []; pushTokens = {}; prefs = {};
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
                 $("gateSub").textContent = "Only the time clock administrator can open this panel.";
@@ -744,6 +787,7 @@
             sub(ref(db, P.employees), s => { employees = s.val() || {}; syncShiftListeners(); renderAll(); });
             sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
             sub(ref(db, P.pushTokens), s => { pushTokens = s.val() || {}; if (activeTab === "people") renderPeople(); });
+            sub(ref(db, P.prefs), s => { prefs = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(query(ref(db, P.audit), limitToLast(30)), s => {
                 audit = Object.values(s.val() || {}).sort((a, b) => (b.at || 0) - (a.at || 0));
@@ -871,7 +915,9 @@
                     state = '<div class="person-state in">On the clock</div>';
                     detail = "Since " + esc(fmtTime(st.open.in)) + (dayKey(st.open.in) !== today ? " on " + esc(fmtKey(dayKey(st.open.in))) : "");
                     foot = '<span class="elapsed" data-since="' + st.open.in + '">' + esc(fmtClockDur(t - st.open.in)) + "</span>" +
-                        (st.open.vehicleName ? '<span class="tag gps">GPS ' + esc(st.open.vehicleName) + "</span>" : '<span class="tag">No vehicle</span>') +
+                        (st.open.vehicleName ? '<span class="tag gps">GPS ' + esc(st.open.vehicleName) + "</span>"
+                            : st.open.swapHint ? '<span class="tag warn" title="' + esc((st.open.swapHint.by || "Another driver") + " took van " + (st.open.swapHint.vehicleName || "")) + '">Needs van swap</span>'
+                            : '<span class="tag">No vehicle</span>') +
                         '<button type="button" class="btn sm" data-punchout="' + esc(e.ek) + '" data-id="' + esc(st.open.id) + '">Punch out</button>';
                 } else if (st.kind === "late") {
                     late++; cls = "late";
@@ -980,10 +1026,11 @@
                     if (s.edited && s.edited.note) tags.push('<span class="tag" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note.length > 34 ? s.edited.note.slice(0, 33) + "…" : s.edited.note) + "”</span>");
                     return '<tr data-row="' + esc(e.ek + "/" + s.id) + '">' +
                         '<td class="day">' + esc(fmtKey(dayKey(s.in))) + "</td>" +
-                        '<td data-l="In">' + esc(fmtTime(s.in)) + "</td>" +
-                        '<td data-l="Out">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "")) + "</td>" +
+                        '<td data-l="In" class="when">' + esc(fmtTime(s.in)) + locLine(e.ek, s.id, "in", s.inLoc, s.inAddr, s.inAddrErr) + "</td>" +
+                        '<td data-l="Out" class="when">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "") +
+                            locLine(e.ek, s.id, "out", s.outLoc, s.outAddr, s.outAddrErr)) + "</td>" +
                         '<td class="num">' + esc(fmtHours(shiftMs(s, t))) + "</td>" +
-                        '<td data-l="GPS">' + (s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>" : '<span class="muted">—</span>') + "</td>" +
+                        '<td data-l="GPS" class="vancell">' + vanCell(e.ek, s) + "</td>" +
                         '<td class="tagcell"><div class="tags">' + tags.join("") + "</div></td>" +
                         '<td class="actions"><button type="button" class="btn sm" data-edit="' + esc(e.ek) + '" data-id="' + esc(s.id) + '">Edit</button></td></tr>';
                 }).join("");
@@ -1005,7 +1052,61 @@
         }
         let flashRow = null;
 
+        // ---------- Punch locations ----------
+        const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>';
+        const coordsText = loc => loc.lat.toFixed(5) + ", " + loc.lng.toFixed(5);
+        function placeText(loc, addr, addrErr) { return addr || (addrErr ? coordsText(loc) : "Finding address… (" + coordsText(loc) + ")"); }
+
+        // The address under a punch time; tap it for the map. Punches from before locations were saved show nothing.
+        function locLine(k, shiftId, which, loc, addr, addrErr) {
+            if (!loc) return "";
+            if (!hasCoords(loc)) return '<div class="loc none" title="' + esc(LOCATION_ERRORS[loc.err] || loc.err || "") + '">No location · ' +
+                esc(LOCATION_ERRORS[loc.err] || "not recorded") + "</div>";
+            return '<button type="button" class="loc" data-map="' + esc(k + "|" + shiftId + "|" + which) + '" title="Show on the map">' + PIN +
+                "<span>" + esc(placeText(loc, addr, addrErr)) + "</span></button>";
+        }
+
+        // Every van in the shift, in order, with where each change happened
+        function vanCell(k, s) {
+            const list = vanHistory(s);
+            if (!list.length) return s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>" : '<span class="muted">—</span>';
+            return '<div class="vans">' + list.map(v => {
+                if (v.how === "taken") return '<div class="van-step taken"><span class="tag warn">' + esc(v.takenName || "Van") + " taken</span>" +
+                    '<span class="muted">' + esc(fmtTime(v.at)) + (v.by ? " · by " + esc(v.by) : "") + "</span></div>";
+                return '<div class="van-step">' + (v.how === "swap" ? '<span class="arrow" aria-label="swapped to">⇄</span>' : "") +
+                    '<span class="tag gps">' + esc(v.vehicleName) + '</span><span class="muted">' + esc(fmtTime(v.at)) + "</span>" +
+                    locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
+            }).join("") + "</div>";
+        }
+
+        function placeFor(s, which) {
+            if (which === "in") return { loc: s.inLoc, addr: s.inAddr, addrErr: s.inAddrErr, label: "Punch in", at: s.in };
+            if (which === "out") return { loc: s.outLoc, addr: s.outAddr, addrErr: s.outAddrErr, label: "Punch out", at: s.out };
+            const v = s.vans && s.vans[which.slice(4)];
+            return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: (v.how === "swap" ? "Van swap to " : "Picked van ") + v.vehicleName, at: v.at } : null;
+        }
+
+        function openMap(key) {
+            const [k, shiftId, which] = key.split("|");
+            const s = findShift(k, shiftId), emp = employees[k];
+            const p = s && placeFor(s, which);
+            if (!p || !hasCoords(p.loc)) { toast("That location isn't available any more.", true); return; }
+            $("mapTitle").textContent = p.label;
+            $("mapSub").textContent = displayName(emp, emp && emp.email) + " · " + fmtKey(dayKey(p.at)) + ", " + fmtTime(p.at);
+            $("mapAddr").textContent = p.addr || (p.addrErr ? "No street address found" : "Finding the address…");
+            $("mapMeta").textContent = coordsText(p.loc) + (p.loc.acc ? " · accurate to about " + p.loc.acc + " m" : "");
+            $("mapLink").href = mapsLink(p.loc);
+            const frame = $("mapFrame");
+            frame.hidden = !MAPS_EMBED_KEY;
+            $("mapNoKey").hidden = !!MAPS_EMBED_KEY;
+            if (MAPS_EMBED_KEY) frame.src = "https://www.google.com/maps/embed/v1/place?key=" + encodeURIComponent(MAPS_EMBED_KEY) +
+                "&q=" + p.loc.lat + "," + p.loc.lng + "&zoom=17";
+            openModal("mapModal");
+        }
+
         $("sheets").addEventListener("click", e => {
+            const pin = e.target.closest("[data-map]");
+            if (pin) { openMap(pin.dataset.map); return; }
             const ed = e.target.closest("[data-edit]");
             if (ed) { openShiftModal(ed.dataset.edit, ed.dataset.id); return; }
             const add = e.target.closest("[data-add-for]");
@@ -1021,7 +1122,12 @@
         $("exportBtn").addEventListener("click", () => {
             const t = now(), days = weekDays(viewWeek);
             const filter = $("empFilter").value;
-            const rows = [["Employee", "Email", "Date", "In", "Out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note"]];
+            const rows = [["Employee", "Email", "Date", "In", "Out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note",
+                "In location", "Out location", "Van changes"]];
+            const place = (loc, addr) => !loc ? "" : !hasCoords(loc) ? "No location (" + (LOCATION_ERRORS[loc.err] || "not recorded") + ")"
+                : (addr ? addr + " " : "") + "(" + coordsText(loc) + ")";
+            const vans = s => vanHistory(s).map(v => v.how === "taken" ? (v.takenName || "van") + " taken by " + (v.by || "another driver") + " " + fmtTime(v.at)
+                : v.vehicleName + " " + fmtTime(v.at) + (v.how === "swap" ? " (swap)" : "") + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")).join("; ");
             empList().filter(e => filter === "all" || e.ek === filter).forEach(e => {
                 const { byDay, byShift, total, regular, overtime } = weekTotals(shiftsOf(e.ek), days, t);
                 const list = days.flatMap(k => byDay[k].shifts);
@@ -1029,8 +1135,9 @@
                 list.forEach(s => rows.push([displayName(e, e.email), e.email, dayKey(s.in), fmtTime(s.in),
                     typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
                     fmtHours(shiftMs(s, t)), fmtHours(byShift[s.id].regular), fmtHours(byShift[s.id].overtime),
-                    s.vehicleName || "", s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || ""]));
-                rows.push([displayName(e, e.email), e.email, "WEEK TOTAL", "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", ""]);
+                    s.vehicleName || "", s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
+                    place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]));
+                rows.push([displayName(e, e.email), e.email, "WEEK TOTAL", "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", "", "", "", ""]);
             });
             const csv = rows.map(r => r.map(v => {
                 const s = String(v);
@@ -1062,7 +1169,10 @@
             m.classList.add("show");
             setTimeout(() => { const f = m.querySelector("input:not([type=checkbox]):not([disabled]), select"); if (f) f.focus(); }, 60);
         }
-        function closeModal(id) { $(id).classList.remove("show"); }
+        function closeModal(id) {
+            $(id).classList.remove("show");
+            if (id === "mapModal") $("mapFrame").removeAttribute("src");
+        }
         document.querySelectorAll(".modal-backdrop").forEach(m => {
             m.addEventListener("mousedown", e => { if (e.target === m) closeModal(m.id); });
             m.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => closeModal(m.id)));
@@ -1186,6 +1296,11 @@
                 src: before ? (before.src || "clock") : "admin",
                 edited: { by: user.email, at: serverTimestamp(), note: note || "" }
             };
+            // Keep where the driver punched and their van history. A reopened shift drops its punch-out location.
+            const keep = (key, when) => { if (before && before[key] !== undefined && when !== false) data[key] = before[key]; };
+            ["inLoc", "inAddr", "inAddrErr", "vans"].forEach(key => keep(key));
+            ["outLoc", "outAddr", "outAddrErr"].forEach(key => keep(key, !!data.out));
+            keep("swapHint", !data.out && !data.vehicleId);
             await set(ref(db, P.shifts + "/" + k + "/" + id), data);
             // Free the old GPS if the vehicle changed or the shift is now closed
             if (before && before.vehicleId && (before.vehicleId !== data.vehicleId || data.out)) await releaseClaim(before.vehicleId, id);
@@ -1250,8 +1365,10 @@
         // How many phones get this person's punch-in reminders while the time clock is closed
         function phoneTag(k) {
             const n = Object.keys(pushTokens[k] || {}).length;
+            const off = prefs[k] && prefs[k].punchReminder === false
+                ? ' <span class="tag off" title="They turned the punch-in reminder off on the time clock. Van swap alerts still reach their phone.">Reminder off</span>' : "";
             return n ? ' <span class="tag gps" title="Gets punch-in reminders even with the time clock closed">' + n + (n === 1 ? " phone" : " phones") + "</span>"
-                : ' <span class="tag off" title="Only reminded while the time clock is open on their phone">No phone alerts</span>';
+                + off : ' <span class="tag off" title="Only reminded while the time clock is open on their phone">No phone alerts</span>' + off;
         }
 
         function renderPeople() {

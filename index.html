@@ -312,14 +312,28 @@
         .punch-msg { text-align: center; min-height: 1.5em; color: var(--red); font-size: 0.95rem; margin-top: 8px; }
 
         .vehicle-pill {
-            display: inline-flex; align-items: center; gap: 10px; margin-top: 12px;
-            padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
-            animation: screenIn 0.5s var(--ease-out) both;
+            display: flex; align-items: center; gap: 12px; width: min(400px, 100%); margin: 12px auto 0;
+            padding: 8px 8px 8px 14px; border-radius: 16px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+            animation: screenIn 0.5s var(--ease-out) both; text-align: left;
         }
-        .vehicle-pill svg { width: 22px; height: 22px; color: var(--yellow); flex: none; }
-        .vehicle-pill .vp-label { color: var(--muted); font-size: 0.9rem; }
-        .vehicle-pill .vp-name { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; }
-        .vehicle-pill .chip-btn { height: 32px; padding: 0 12px; font-size: 0.95rem; }
+        .vehicle-pill .vp-icon { width: 24px; height: 24px; color: var(--yellow); flex: none; }
+        .vp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+        .vehicle-pill .vp-label { color: var(--muted); font-size: 0.8rem; }
+        .vehicle-pill .vp-name { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .swap-btn {
+            display: inline-flex; align-items: center; gap: 8px; flex: none; height: 48px; padding: 0 18px; border: 0; border-radius: 12px;
+            background: var(--yellow); color: #111; cursor: pointer;
+            font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; letter-spacing: 0.03em; text-transform: uppercase;
+            transition: transform 0.2s var(--ease-out), filter 0.2s;
+        }
+        .swap-btn svg { width: 20px; height: 20px; }
+        .swap-btn:hover, .swap-btn:focus-visible { outline: none; filter: brightness(1.08); }
+        .swap-btn:active { transform: scale(0.96); }
+        /* Another driver took this driver's van: they need to do a van swap */
+        .vehicle-pill.alert { box-shadow: inset 0 0 0 2px var(--red); background: rgba(255, 107, 94, 0.08); }
+        .vehicle-pill.alert .vp-icon, .vehicle-pill.alert .vp-label { color: var(--red); }
+        .vehicle-pill.alert .swap-btn { animation: swapPulse 1.6s ease-in-out infinite; }
+        @keyframes swapPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.55); } 50% { box-shadow: 0 0 0 9px rgba(255, 204, 0, 0); } }
 
         /* ---------- Cards (right column) ---------- */
         .side { display: flex; flex-direction: column; gap: 16px; padding-top: clamp(0px, 2vh, 18px); }
@@ -385,24 +399,6 @@
         .day-hrs.zero { color: var(--dim); font-weight: 400; }
         .day-hrs small { display: block; color: var(--orange); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 
-        .shifts { display: flex; flex-direction: column; }
-        .shift {
-            display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; gap: 4px 12px; padding: 12px 0;
-            border-top: 1px solid var(--line);
-        }
-        .shift:first-child { border-top: 0; padding-top: 2px; }
-        .shift-date { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
-        .shift-times { color: var(--muted); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
-        .shift-dur { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-        .shift-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-        .tag {
-            display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;
-            background: rgba(255, 255, 255, 0.06); color: var(--muted);
-        }
-        .tag.gps { color: var(--yellow); background: rgba(255, 204, 0, 0.08); }
-        .tag.edit { color: #8ab4ff; background: rgba(138, 180, 255, 0.1); }
-        .tag.live { color: var(--green); background: rgba(53, 208, 127, 0.1); }
-        .tag.ot { color: var(--orange); background: rgba(255, 159, 67, 0.12); }
         .empty { color: var(--dim); font-size: 0.95rem; padding: 6px 0; }
 
         .remind-row { display: flex; align-items: center; gap: 14px; }
@@ -414,7 +410,6 @@
         .remind-text { flex: 1; min-width: 0; font-size: 0.93rem; color: var(--muted); }
         .remind-text strong { display: block; color: var(--text); font-weight: 600; font-size: 1rem; }
         .remind-btns { display: flex; flex-direction: column; gap: 6px; flex: none; }
-        .remind-row .chip-btn.on { color: var(--green); box-shadow: inset 0 0 0 1px rgba(53, 208, 127, 0.5); cursor: default; }
 
         .lock-note { display: flex; gap: 10px; align-items: flex-start; color: var(--dim); font-size: 0.88rem; padding: 0 4px; }
         .lock-note svg { width: 16px; height: 16px; flex: none; margin-top: 3px; }
@@ -435,6 +430,7 @@
         @keyframes wiggle { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(-14deg); } 20%, 40% { transform: rotate(14deg); } }
         .banner-text { flex: 1; font-size: 0.95rem; }
         .banner-text strong { display: block; font-family: var(--font-display); font-size: 1.15rem; letter-spacing: 0.02em; }
+        .banner.tappable .banner-text { cursor: pointer; }
 
         /* ---------- Toast ---------- */
         .toast {
@@ -517,6 +513,11 @@
         .gps-state { font-size: 0.8rem; color: var(--green); }
         .gps:disabled { cursor: not-allowed; opacity: 0.42; filter: grayscale(1); background: rgba(31, 35, 39, 0.6); }
         .gps:disabled .gps-state { color: var(--muted); }
+        .gps.taken { background: rgba(31, 35, 39, 0.7); }
+        .gps.taken .gps-icon { filter: grayscale(0.7); opacity: 0.7; }
+        .gps.taken .gps-state { color: var(--orange); }
+        .gps.suggest { box-shadow: inset 0 0 0 2px var(--yellow), 0 0 0 4px rgba(255, 204, 0, 0.12); }
+        .gps.suggest .gps-state { color: var(--yellow); font-weight: 600; }
         .gps.mine { box-shadow: inset 0 0 0 2px var(--green); opacity: 1; filter: none; }
         .gps.mine .gps-state { color: var(--green); }
         .gps.picking::after {
@@ -623,9 +624,12 @@
                 <p class="punch-msg" id="punchMsg" role="alert" aria-live="assertive"></p>
 
                 <div class="vehicle-pill" id="vehiclePill" hidden>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-                    <span><span class="vp-label" id="vpLabel">Vehicle</span> <span class="vp-name" id="vpName"></span></span>
-                    <button type="button" class="chip-btn" id="changeVehicleBtn">Change</button>
+                    <svg class="vp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+                    <span class="vp-text"><span class="vp-label" id="vpLabel">Your van</span><span class="vp-name" id="vpName"></span></span>
+                    <button type="button" class="swap-btn" id="changeVehicleBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>
+                        <span id="swapBtnText">Van swap</span>
+                    </button>
                 </div>
             </section>
 
@@ -648,11 +652,6 @@
                         <div class="split-box ot" id="weekOtBox"><span>Overtime</span><strong id="weekOvertime">0.00</strong></div>
                     </div>
                     <div class="days" id="days"></div>
-                </section>
-
-                <section class="card" aria-labelledby="punchesTitle">
-                    <div class="card-head"><h2 class="card-title" id="punchesTitle">Punches this week</h2></div>
-                    <div class="shifts" id="shifts"></div>
                 </section>
 
                 <section class="card" aria-labelledby="remindTitle">
@@ -727,8 +726,8 @@
         const {
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
-            fmtClockDur, fmtHours, shiftList, shiftMs, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
-            AUTH_MESSAGES, DOW_SHORT
+            fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
+            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
@@ -748,6 +747,9 @@
         // ---------- State ----------
         let user = null, ek = null, emp = null, settings = settingsWithDefaults(null);
         let shifts = [], claims = {}, serverOffset = 0;
+        let prefs = null, prefsLoaded = false;   // timeclock/prefs/{ek}: the driver's saved reminder choice
+        let locSaving = 0;                  // locations still being written (don't reload the app meanwhile)
+        let swapLink = new URLSearchParams(location.search).has("swap"); // opened from a "van swap" notification
         let viewWeek = null;                // week start key shown in "My week"
         let unsubs = [];
         let empLoaded = false, shiftsLoaded = false;
@@ -806,6 +808,7 @@
         onAuthStateChanged(auth, u => {
             stopListening();
             user = u; emp = null; shifts = []; claims = {}; empLoaded = shiftsLoaded = false;
+            prefs = null; prefsLoaded = false;
             pushState = "off"; pushFor = null; pushKey = null;
             closeSheet(true);
             if (!u) { ek = null; show("signinScreen"); return; }
@@ -830,6 +833,9 @@
                 if (sheetOpen) renderSheet();
             }, err => { shiftsLoaded = true; toast("Couldn't load your punches: " + errText(err), true); route(); });
             listen(ref(db, P.claims), s => { claims = s.val() || {}; if (sheetOpen) renderSheet(); render(); }, () => {});
+            listen(ref(db, P.prefs + "/" + ek), s => { prefs = s.val() || {}; prefsLoaded = true; adoptOldReminder(); render(); scheduleReminder(); },
+                // Database rules not updated yet: behave as before (on when the phone allows notifications)
+                () => { prefs = { punchReminder: canNotify && Notification.permission === "granted" }; prefsLoaded = true; render(); });
         });
 
         function showNotice(title, text) {
@@ -854,6 +860,7 @@
             render();
             scheduleReminder();
             if (pushFor !== ek) { pushFor = ek; setupPush(); }
+            if (swapLink) openSwapFromNotification();
         }
 
         // ---------- Rendering ----------
@@ -878,14 +885,16 @@
             $("punchBtn").setAttribute("aria-label", (open ? "Punch out" : "Punch in") + ". Press and hold for " + (HOLD_MS / 1000) + " seconds.");
 
             const pill = $("vehiclePill");
+            pill.hidden = !open;
             if (open) {
-                pill.hidden = false;
-                $("vpLabel").textContent = open.vehicleId ? "" : "Vehicle";
-                $("vpLabel").hidden = !!open.vehicleId;
-                $("vpName").textContent = open.vehicleId ? (open.vehicleName || "—") : "None selected";
-                $("changeVehicleBtn").textContent = open.vehicleId ? "Change" : "Pick";
-            } else {
-                pill.hidden = true;
+                const lost = lostVan(open);
+                const has = !!open.vehicleId && !lost;
+                pill.classList.toggle("alert", !!lost);
+                $("vpLabel").textContent = lost ? (lost.by ? lost.by + " took van " + lost.vehicleName : "Van " + lost.vehicleName + " was taken")
+                    : has ? "Your van" : "No van selected";
+                $("vpName").textContent = lost ? "Pick your van" : has ? (open.vehicleName || "—") : "Tap to pick one";
+                $("swapBtnText").textContent = has || lost ? "Van swap" : "Pick van";
+                showSwapBanner(open, lost);
             }
 
             tickClock();
@@ -910,7 +919,7 @@
             if (!viewWeek) return;
             const t = now(), today = dayKey(t);
             const days = weekDays(viewWeek);
-            const { byDay, byShift, total, regular, overtime } = weekTotals(shifts, days, t);
+            const { byDay, total, regular, overtime } = weekTotals(shifts, days, t);
             const thisWeek = weekStartKey(today, settings.weekStart);
             $("weekLabel").textContent = viewWeek === thisWeek ? "This week" : fmtKey(days[0]) + " – " + fmtKey(days[6]);
             $("weekNext").disabled = viewWeek >= thisWeek;
@@ -949,25 +958,6 @@
                 hrs.innerHTML = d.ms ? esc(fmtDur(d.ms)) + (d.overtime > 0 ? "<small>+" + esc(fmtDur(d.overtime)) + " OT</small>" : "") : "—";
                 hrs.classList.toggle("zero", !d.ms);
             });
-
-            const list = days.flatMap(k => byDay[k].shifts).sort((a, b) => b.in - a.in);
-            $("punchesTitle").textContent = viewWeek === thisWeek ? "Punches this week" : "Punches that week";
-            const html = list.map(s => {
-                const live = typeof s.out !== "number";
-                const tags = [];
-                if (live) tags.push('<span class="tag live">On the clock</span>');
-                if (s.vehicleName) tags.push('<span class="tag gps">' + esc(s.vehicleName) + "</span>");
-                const split = byShift[s.id];
-                if (split && split.overtime >= 60000) tags.push('<span class="tag ot">OT ' + esc(fmtDur(split.overtime)) + "</span>");
-                if (s.edited) tags.push('<span class="tag edit" title="' + esc(s.edited.note || "") + '">Edited by admin</span>');
-                return '<div class="shift"><div><div class="shift-date">' + esc(fmtKey(dayKey(s.in))) + '</div>' +
-                    '<div class="shift-times">' + esc(fmtTime(s.in)) + " → " + (live ? "now" : esc(fmtTime(s.out))) + "</div></div>" +
-                    '<div class="shift-dur">' + esc(fmtDur(shiftMs(s, t))) + "</div>" +
-                    (tags.length ? '<div class="shift-tags">' + tags.join("") + "</div>" : "") + "</div>";
-            }).join("");
-            const shiftsEl = $("shifts");
-            const next = html || '<p class="empty">No punches yet.</p>';
-            if (shiftsEl.dataset.html !== next) { shiftsEl.innerHTML = next; shiftsEl.dataset.html = next; }
         }
 
         $("weekPrev").addEventListener("click", () => { viewWeek = addDaysKey(viewWeek, -7); renderWeek(); });
@@ -1076,9 +1066,10 @@
             punchBtn.disabled = true;
             punchEl.classList.add("busy");
             const open = current();
+            const where = readLocation(); // asked for now, saved once the punch is in (a slow GPS fix never delays the punch)
             try {
-                if (open) await punchOut(open);
-                else await punchIn();
+                if (open) { await punchOut(open); saveLocation(P.shifts + "/" + ek + "/" + open.id + "/outLoc", where); }
+                else saveLocation(P.shifts + "/" + ek + "/" + (await punchIn()) + "/inLoc", where);
                 if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
                 burst();
                 const after = current();
@@ -1100,6 +1091,15 @@
             const r = push(ref(db, P.shifts + "/" + ek));
             await set(r, { in: serverTimestamp(), src: "clock" });
             hideBanner();
+            return r.key;
+        }
+
+        // Saves where the phone was for a punch or van swap. The server adds the street address (functions/).
+        async function saveLocation(path, where) {
+            locSaving++;
+            try { await set(ref(db, path), await where); }
+            catch (err) { console.warn("Location not saved:", err); }
+            finally { locSaving--; }
         }
 
         async function punchOut(open) {
@@ -1140,6 +1140,7 @@
 
         async function openSheet() {
             if (!current()) return;
+            swapLink = false;
             sheetOpen = true;
             $("sheetMsg").textContent = "";
             $("gpsGrid").innerHTML = '<p class="empty">Loading vehicles…</p>';
@@ -1160,21 +1161,45 @@
             if (!instant) punchBtn.focus({ preventScroll: true });
         }
 
+        // The driver's van was taken by another driver (the server clears it and sets swapHint;
+        // until the server has done that, the claim already shows someone else has it)
+        function lostVan(open) {
+            if (!open) return null;
+            if (open.vehicleId) {
+                const c = claims[open.vehicleId];
+                return c && c.ek !== ek ? { by: c.nickname || c.name || "", vehicleName: open.vehicleName || "", suggestId: c.fromId || null,
+                    suggestName: c.fromName || null, at: c.at || 0 } : null;
+            }
+            return open.swapHint || null;
+        }
+
         function renderSheet() {
             const open = current();
             if (!open) { closeSheet(); return; }
             const grid = $("gpsGrid");
-            $("sheetSkip").textContent = open.vehicleId ? "Keep vehicle " + open.vehicleName : "Not driving today";
+            const lost = lostVan(open);
+            const has = !!open.vehicleId && !lost;
+            $("sheetTitle").textContent = has || lost ? "Van swap" : "Pick your vehicle";
+            $("sheetSub").textContent = lost ? (lost.by ? lost.by + " took van " + lost.vehicleName + ". " : "") + "Tap the van you're in now."
+                : has ? "Tap the van you're in now. If another driver has it, they'll be unassigned and asked to pick theirs."
+                : "Please choose the vehicle you're driving today.";
+            $("sheetSkip").textContent = has ? "Keep van " + open.vehicleName : lost ? "Close" : "Not driving today";
             if (gpsError) { grid.innerHTML = ""; $("sheetMsg").textContent = gpsError; return; }
             if (!gpsUnits.length) { grid.innerHTML = '<p class="empty">No GPS units are set up in RouteWatcher yet.</p>'; return; }
             const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gps : null;
-            grid.innerHTML = gpsUnits.map((g, i) => {
+            // The van the other driver left behind is most likely the one this driver is in now
+            const suggestId = lost && lost.suggestId && !claims[lost.suggestId] ? lost.suggestId : null;
+            const list = suggestId ? gpsUnits.filter(g => g.id === suggestId).concat(gpsUnits.filter(g => g.id !== suggestId)) : gpsUnits;
+            grid.innerHTML = list.map((g, i) => {
                 const c = claims[g.id];
-                const mine = c && c.ek === ek;
-                const taken = c && !mine;
-                const state = mine ? "Your vehicle" : taken ? "In use · " + (c.nickname || c.name || "another driver") : "Available";
-                return '<button type="button" class="gps' + (mine ? " mine" : "") + (picking === g.id ? " picking" : "") + '" data-gps="' + esc(g.id) + '"' +
-                    (taken ? " disabled" : "") + ' style="--i:' + i + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
+                const mine = c && c.ek === ek && !lost;
+                const taken = c && c.ek !== ek;
+                const suggest = g.id === suggestId;
+                const state = mine ? "Your van" : taken ? (c.nickname || c.name || "Another driver") + " has it · tap to take"
+                    : suggest ? "Likely yours" + (lost.by ? " · " + lost.by + "'s old van" : "") : "Available";
+                return '<button type="button" class="gps' + (mine ? " mine" : "") + (taken ? " taken" : "") + (suggest ? " suggest" : "") +
+                    (picking === g.id ? " picking" : "") + '" data-gps="' + esc(g.id) + '"' +
+                    ' style="--i:' + i + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
                     '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></span>' +
                     '<span class="gps-name">' + esc(g.name) + '</span><span class="gps-state">' + esc(state) + "</span></button>";
             }).join("");
@@ -1191,35 +1216,50 @@
         async function pickVehicle(g, btn) {
             const open = current();
             if (!open) return;
-            if (open.vehicleId === g.id) { closeSheet(); return; }
+            const lost = lostVan(open);
+            if (open.vehicleId === g.id && !lost) { closeSheet(); return; }
+            // Taking a van another driver has: they get unassigned, and the server tells them to do a van swap
+            const holder = claims[g.id] && claims[g.id].ek !== ek ? claims[g.id] : null;
+            const holderName = holder ? holder.nickname || holder.name || "another driver" : "";
+            if (holder && !confirm("Van " + g.name + " is assigned to " + holderName + ". Take it?\n\n" + holderName +
+                " will be unassigned and asked to pick the van they're in.")) return;
             picking = g.id;
             btn.classList.add("picking");
             $("sheetMsg").textContent = "";
+            const where = readLocation();
             const nick = nicknameFor(emp, user.email);
+            const prevId = open.vehicleId && !lost ? open.vehicleId : null;
+            const prevName = prevId ? open.vehicleName || null : null;
+            const prevNick = open.nickname;
             try {
                 const res = await runTransaction(ref(db, P.claims + "/" + g.id), cur => {
-                    if (cur && cur.ek !== ek) return; // someone else has it
+                    // Free, already mine, or still held by the driver this driver agreed to take it from
+                    if (cur && cur.ek !== ek && !(holder && cur.ek === holder.ek)) return;
                     return { ek: ek, email: normEmail(user.email), name: displayName(emp, user.email), nickname: nick,
-                        shiftId: open.id, vehicleName: g.name, at: now() };
+                        shiftId: open.id, vehicleName: g.name, at: now(), fromId: prevId, fromName: prevName };
                 });
                 if (!res.committed) {
                     picking = null;
                     renderSheet();
                     const el = $("gpsGrid").querySelector('[data-gps="' + CSS.escape(g.id) + '"]');
                     if (el) { el.classList.add("flash-taken"); }
-                    $("sheetMsg").textContent = "Someone just took vehicle " + g.name + ". Pick another one.";
+                    $("sheetMsg").textContent = "Someone else just took vehicle " + g.name + ". Pick again.";
                     return;
                 }
-                const prevId = open.vehicleId, prevNick = open.nickname;
                 await update(ref(db, P.shifts + "/" + ek + "/" + open.id), { vehicleId: g.id, vehicleName: g.name, nickname: nick });
+                const entry = push(ref(db, P.shifts + "/" + ek + "/" + open.id + "/vans"));
+                await set(entry, { at: serverTimestamp(), vehicleId: g.id, vehicleName: g.name, how: prevId || lost ? "swap" : "pick" })
+                    .catch(err => console.warn("Van history not saved:", err));
+                saveLocation(P.shifts + "/" + ek + "/" + open.id + "/vans/" + entry.key + "/loc", where);
                 if (prevId && prevId !== g.id) await releaseVehicle(prevId, prevNick).catch(err => console.warn("Vehicle release:", err));
                 let nickOk = true;
                 try { await set(ref(db, P.nicknames + "/" + g.id), nick); }
                 catch (err) { nickOk = false; console.warn("Nickname not saved:", err); }
                 picking = null;
                 closeSheet();
-                if (nickOk) toast("You are driving vehicle " + g.name);
-                else toast("You are driving vehicle " + g.name + ". Its RouteWatcher name couldn't be updated, so tell your administrator.", true);
+                const msg = (prevId || lost ? "Van swap done. " : "") + "You are driving vehicle " + g.name + (holder ? ". " + holderName + " has been unassigned." : "");
+                if (nickOk) toast(msg);
+                else toast(msg + " Its RouteWatcher name couldn't be updated, so tell your administrator.", true);
             } catch (err) {
                 picking = null;
                 renderSheet();
@@ -1229,7 +1269,8 @@
 
         // Frees the GPS for other drivers and removes the nickname this driver gave it (unless someone changed it since)
         async function releaseVehicle(gpsId, nick) {
-            await runTransaction(ref(db, P.claims + "/" + gpsId), cur => (cur === null || cur.ek === ek) ? null : undefined);
+            const res = await runTransaction(ref(db, P.claims + "/" + gpsId), cur => (cur === null || cur.ek === ek) ? null : undefined);
+            if (!res.committed) return; // another driver took this van: its RouteWatcher name is theirs now
             if (nick) {
                 await runTransaction(ref(db, P.nicknames + "/" + gpsId), cur => (cur === null || cur === nick) ? null : undefined)
                     .catch(err => console.warn("Nickname not cleared:", err));
@@ -1241,6 +1282,30 @@
         $("sheetSkip").addEventListener("click", () => closeSheet());
         document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen) closeSheet(); });
 
+        // ---------- Van taken by another driver ----------
+        let swapBannerFor = null, swapBannerDismissed = null;
+        function showSwapBanner(open, lost) {
+            const key = lost ? open.id + "|" + lost.vehicleName + "|" + lost.by : null; // same before and after the server records it
+            if (key && key !== swapBannerDismissed) {
+                if (bannerMode !== "swap" || swapBannerFor !== key) {
+                    swapBannerFor = key;
+                    showBanner("Van swap needed", (lost.by ? lost.by + " took van " + lost.vehicleName + ". " : "") + "Tap here and pick the van you're in.", "swap");
+                }
+            } else if (bannerMode === "swap") hideBanner();
+        }
+
+        // Tapping a "your van was taken" notification opens the clock at …/?swap=1, or messages the open clock (sw.js)
+        function openSwapFromNotification() {
+            swapLink = false;
+            try { if (location.search) history.replaceState(null, "", location.pathname + location.hash); } catch (e) {}
+            if (current() && !sheetOpen) openSheet();
+        }
+        if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
+            if (!e.data || e.data.type !== "tc-open" || !/[?&]swap/.test(e.data.url || "")) return;
+            swapLink = true;
+            if (user && emp && !$("clockScreen").hidden) openSwapFromNotification();
+        });
+
         // ---------- Punch-in reminder ----------
         // Fires {reminderMinutes} after today's scheduled start (set in the admin panel) if there is no punch today.
         let swReg = null, reminderTimer = null;
@@ -1248,7 +1313,7 @@
         setupPwa({
             installButton: $("installBtn"),
             toast: toast,
-            isBusy: () => holding || busy || sheetOpen || !!picking || $("success").classList.contains("show")
+            isBusy: () => holding || busy || sheetOpen || !!picking || locSaving > 0 || $("success").classList.contains("show")
         }).registration.then(r => { swReg = r; });
         const canNotify = "Notification" in window;
         const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1262,25 +1327,47 @@
             return { today: today, start: sched.start, at: keyToEpoch(today, sched.start) + settings.reminderMinutes * 60000 };
         }
 
+        // The driver's choice is saved in Firebase (timeclock/prefs/{ek}/punchReminder), so it stays the way they
+        // left it on every phone and after reinstalling, until they change it. Before this was saved, "on" meant
+        // notifications were allowed on the phone; adoptOldReminder saves that as "on" the first time.
+        function reminderWanted() { return !!prefs && prefs.punchReminder === true; }
+        function adoptOldReminder() {
+            if (!prefsLoaded || typeof prefs.punchReminder === "boolean") return;
+            if (canNotify && Notification.permission === "granted") savePunchReminder(true).catch(() => {});
+        }
+        async function savePunchReminder(on) {
+            prefs = Object.assign({}, prefs, { punchReminder: on });
+            renderReminderCard();
+            await set(ref(db, P.prefs + "/" + ek + "/punchReminder"), on);
+        }
+
         function renderReminderCard() {
             const info = reminderInfo();
             const mins = settings.reminderMinutes;
             const btn = $("remindBtn");
-            let text = "<strong>Punch-in reminder</strong>";
-            text += info ? "Today at " + esc(fmtTime(info.at)) + " if you haven't punched in (" + mins + " min after your " + esc(fmtHHMM(info.start)) + " start)."
-                : "You'll get a reminder " + mins + " minutes after your scheduled start on work days.";
-            btn.hidden = true;
-            btn.classList.remove("on");
+            const on = reminderWanted();
+            let text = "<strong>Punch-in reminder" + (prefsLoaded ? (on ? " · On" : " · Off") : "") + "</strong>";
+            if (!prefsLoaded) {
+                text += "Loading your setting…";
+            } else if (!on) {
+                text += "You won't be reminded to punch in. Van swap alerts still come through.";
+            } else {
+                text += info ? "Today at " + esc(fmtTime(info.at)) + " if you haven't punched in (" + mins + " min after your " + esc(fmtHHMM(info.start)) + " start)."
+                    : "You'll get a reminder " + mins + " minutes after your scheduled start on work days.";
+            }
+            btn.hidden = !prefsLoaded;
+            btn.classList.toggle("on", on);
+            btn.textContent = on ? "Turn off" : "Turn on";
             if (!canNotify) {
                 text += isIOS && !standalone ? " On iPhone, tap Share → Add to Home Screen and open the clock from there to turn on notifications."
                     : " This browser can't show notifications.";
-            } else if (Notification.permission === "granted") {
-                btn.hidden = false; btn.textContent = "On"; btn.classList.add("on");
-                text += PUSH_TEXT[pushState] || "";
             } else if (Notification.permission === "denied") {
                 text += " Notifications are blocked for this site — allow them in your browser settings.";
-            } else {
-                btn.hidden = false; btn.textContent = "Turn on";
+            } else if (Notification.permission !== "granted") {
+                text += on ? " This phone hasn't allowed notifications yet." : "";
+                if (on) btn.textContent = "Allow";
+            } else if (on) {
+                text += PUSH_TEXT[pushState] || "";
             }
             $("remindTestBtn").hidden = pushState !== "on";
             const el = $("remindText");
@@ -1288,14 +1375,23 @@
         }
 
         $("remindBtn").addEventListener("click", async () => {
-            if (!canNotify || Notification.permission === "granted") return;
-            try { await Notification.requestPermission(); } catch (e) {}
-            renderReminderCard();
-            if (Notification.permission === "granted") {
-                scheduleReminder();
+            const turningOff = reminderWanted() && (!canNotify || Notification.permission !== "default");
+            if (turningOff) {
+                try { await savePunchReminder(false); toast("Punch-in reminder off. You'll still get van swap alerts."); }
+                catch (err) { prefs.punchReminder = true; renderReminderCard(); toast("Couldn't save: " + errText(err), true); }
+                return;
+            }
+            // Ask the phone first, while this tap still counts as the driver's action (iPhone requires that)
+            if (canNotify && Notification.permission === "default") { try { await Notification.requestPermission(); } catch (e) {} }
+            try { await savePunchReminder(true); }
+            catch (err) { prefs.punchReminder = false; renderReminderCard(); toast("Couldn't save: " + errText(err), true); return; }
+            scheduleReminder();
+            if (canNotify && Notification.permission === "granted") {
                 await setupPush();
                 toast(pushState === "on" ? "Reminders are on. They reach this phone even when the time clock is closed."
                     : "Reminders are on. Keep the time clock open (or on your home screen) so it can remind you.");
+            } else {
+                toast("Reminder saved as on. Allow notifications for this site so the phone can show it.", true);
             }
         });
 
@@ -1374,12 +1470,12 @@
 
         function checkReminder() {
             const info = reminderInfo();
-            if (!info || !user || !emp || emp.active === false) return;
+            if (!info || !user || !emp || emp.active === false || !reminderWanted()) { if (bannerMode === "punch") hideBanner(); return; }
             const t = now();
             if (t < info.at) return;
-            if (current() || shifts.some(s => dayKey(s.in) === info.today)) { hideBanner(); return; }
+            if (current() || shifts.some(s => dayKey(s.in) === info.today)) { if (bannerMode === "punch") hideBanner(); return; }
             const text = "Your shift started at " + fmtHHMM(info.start) + ". Hold the button to punch in.";
-            if (bannerDismissedFor !== info.today) showBanner("You haven't punched in yet", text);
+            if (bannerDismissedFor !== info.today) showBanner("You haven't punched in yet", text, "punch");
             const key = "tc_reminded_" + ek + "_" + info.today;
             let done = false;
             try { done = localStorage.getItem(key) === "1"; } catch (e) {}
@@ -1399,13 +1495,21 @@
             try { new Notification(title, opts); } catch (e) { console.warn("Notification failed:", e); }
         }
 
-        function showBanner(title, text) {
+        let bannerMode = null; // "punch" (late punch-in) or "swap" (van taken)
+        function showBanner(title, text, mode) {
+            bannerMode = mode;
             $("bannerText").innerHTML = "<strong>" + esc(title) + "</strong>" + esc(text);
+            $("banner").classList.toggle("tappable", mode === "swap");
             $("banner").classList.add("show");
         }
-        function hideBanner() { $("banner").classList.remove("show"); }
+        function hideBanner() { bannerMode = null; $("banner").classList.remove("show"); }
         let bannerDismissedFor = null;
-        $("bannerClose").addEventListener("click", () => { bannerDismissedFor = dayKey(now()); hideBanner(); });
+        $("bannerClose").addEventListener("click", () => {
+            if (bannerMode === "swap") swapBannerDismissed = swapBannerFor;
+            else bannerDismissedFor = dayKey(now());
+            hideBanner();
+        });
+        $("bannerText").addEventListener("click", () => { if (bannerMode === "swap") { hideBanner(); swapBannerDismissed = swapBannerFor; openSheet(); } });
 
         // Timers are paused in background tabs, so check again whenever the page comes back and every 30 s
         setInterval(checkReminder, 30000);
