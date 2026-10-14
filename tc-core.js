@@ -26,13 +26,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getDatabase } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
-import { firebaseConfig, ALLOWED_EMAIL } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js";
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 
-export const ADMIN_EMAIL = ALLOWED_EMAIL.toLowerCase();
+// Accounts that can open the admin panel. database.rules.json lists the same emails, so change both together.
+export const ADMIN_EMAILS = ["justin@ec.com", "desirae@ec.com", "celeste@ec.com"];
 export const EMAIL_DOMAIN = "@ec.com";
 export const TZ = "America/Winnipeg"; // Brandon, MB runs on Central Time
 
@@ -70,7 +71,7 @@ function clampInt(v, min, max, fallback) {
 // ---------- People ----------
 export function normEmail(email) { return String(email || "").trim().toLowerCase(); }
 export function emailKey(email) { return normEmail(email).replace(/\./g, ","); }
-export function isAdminEmail(email) { return normEmail(email) === ADMIN_EMAIL; }
+export function isAdminEmail(email) { return ADMIN_EMAILS.includes(normEmail(email)); }
 
 function capitalize(word) { return word ? word.charAt(0).toUpperCase() + word.slice(1) : ""; }
 

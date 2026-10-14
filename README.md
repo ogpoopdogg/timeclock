@@ -3,7 +3,7 @@
 | Page | URL | Who |
 | --- | --- | --- |
 | Employee punch clock | `https://app.eandccourier.ca/timeclock/` | Anyone added in the admin panel |
-| Admin control panel | `https://app.eandccourier.ca/timeclock/admin.html` | `justin@ec.com` only (`ALLOWED_EMAIL` in `firebase-config.js`) |
+| Admin control panel | `https://app.eandccourier.ca/timeclock/admin.html` | `justin@ec.com`, `desirae@ec.com`, `celeste@ec.com` (`ADMIN_EMAILS` in `tc-core.js`) |
 
 Both pages use the same Firebase project as RouteWatcher (`eandccourier-36fcc`).
 `firebase-config.js` is a copy of the one in the `ogpoopdogg.github.io` repo.
@@ -19,7 +19,13 @@ rules** actually stop an employee from changing their own punches.
 - Employees can create a punch-in and add a punch-out on their own shifts only. The
   time must be the server's current time (no backdating), and a time can't be changed
   after it is saved.
-- Only `justin@ec.com` can edit, add or delete punches, employees, schedules and settings.
+- Only the admins (`justin@ec.com`, `desirae@ec.com`, `celeste@ec.com`) can edit, add or
+  delete punches, employees, schedules and settings. Admins can also read the GPS list
+  and set GPS nicknames without being on the employee list.
+- To add or remove an admin, change the email in **both** `ADMIN_EMAILS` in `tc-core.js`
+  (lets them into the admin panel) and `database.rules.json` (lets them read and change
+  the data), then publish the rules in the Firebase console. Each admin needs their own
+  sign-in account under Firebase **Authentication**.
 - Employees can read the GPS list and nicknames, and set a GPS nickname, so a vehicle
   pick shows up in RouteWatcher.
 - An employee on the clock can take a van another driver has (**Van swap**), but only
