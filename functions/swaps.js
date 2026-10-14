@@ -1,14 +1,11 @@
-/* E&C Time Clock – van swaps and punch addresses.
+/* E&C Time Clock – van swaps.
    Pure functions only (no Firebase), so they can be tested with `node --test`.
 
    Van swaps: when a driver picks a van another driver has (Van swap in the time
    clock), timeclock/vehicle_claims/<gpsId> changes hands. The driver who had it
    is unassigned and gets a notification right away, then reminders every
    SWAP_REMINDER_EVERY_MS until they pick the van they're in (at most
-   SWAP_REMINDERS of them), or punch out.
-
-   Addresses: each punch (inLoc / outLoc) and van change (vans/<id>/loc) saves
-   where the phone was; the server looks up the street address for it. */
+   SWAP_REMINDERS of them), or punch out. */
 'use strict';
 
 const crypto = require('crypto');
@@ -95,42 +92,7 @@ function wantsPunchReminder(prefs) {
   return !(prefs && prefs.punchReminder === false);
 }
 
-// ---------- Addresses ----------
-const hasCoords = (loc) => !!(loc && typeof loc.lat === 'number' && typeof loc.lng === 'number' &&
-  Math.abs(loc.lat) <= 90 && Math.abs(loc.lng) <= 180);
-
-/** Locations in a shift that still need an address: [{ lat, lng, addrPath, errPath }] (paths relative to the shift). */
-function addressJobs(shift) {
-  if (!shift) return [];
-  const jobs = [];
-  const want = (loc, addrPath, errPath, done) => {
-    if (hasCoords(loc) && !done) jobs.push({ lat: loc.lat, lng: loc.lng, addrPath: addrPath, errPath: errPath });
-  };
-  want(shift.inLoc, 'inAddr', 'inAddrErr', shift.inAddr || shift.inAddrErr);
-  want(shift.outLoc, 'outAddr', 'outAddrErr', shift.outAddr || shift.outAddrErr);
-  for (const [id, v] of Object.entries(shift.vans || {})) {
-    if (v) want(v.loc, 'vans/' + id + '/addr', 'vans/' + id + '/addrErr', v.addr || v.addrErr);
-  }
-  return jobs;
-}
-
-/** Google Geocoding API reverse-lookup URL. */
-function geocodeUrl(lat, lng, key) {
-  return 'https://maps.googleapis.com/maps/api/geocode/json?latlng=' + lat + ',' + lng + '&key=' + encodeURIComponent(key);
-}
-
-/** { addr } from a Geocoding API reply (the first result is Google's best match), or { err: <status> }. */
-function pickAddress(reply) {
-  const status = reply && typeof reply.status === 'string' ? reply.status : 'NO_REPLY';
-  const first = reply && Array.isArray(reply.results) ? reply.results[0] : null;
-  if (status === 'OK' && first && typeof first.formatted_address === 'string' && first.formatted_address) {
-    return { addr: first.formatted_address.slice(0, 300) };
-  }
-  return { err: status === 'OK' ? 'ZERO_RESULTS' : status.slice(0, 40) };
-}
-
 module.exports = {
   SWAP_REMINDER_EVERY_MS, SWAP_REMINDERS, CLOCK_URL, SWAP_URL,
-  bumpFrom, unassign, stillNeedsSwap, swapTimerFor, swapMessage, wantsPunchReminder,
-  addressJobs, geocodeUrl, pickAddress
+  bumpFrom, unassign, stillNeedsSwap, swapTimerFor, swapMessage, wantsPunchReminder
 };

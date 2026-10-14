@@ -17,3 +17,5 @@ jobs:
         run: node --test
       - name: Overtime rules (8 h a day, 40 h a week)
         run: node --test tests/overtime.test.mjs
+      - name: Punch addresses and van history
+        run: node --test tests/addresses.test.mjs

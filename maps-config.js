@@ -1,6 +1,6 @@
-// Google Maps key for the small map in the admin panel (Maps Embed API).
-// README "Punch locations" walks through making it. Restrict the key to the Maps Embed API
-// and to the website app.eandccourier.ca/* in Google Cloud console, because browsers can see it.
-// Left empty, the admin panel still shows each punch's address and coordinates, with an
-// "Open in Google Maps" link instead of the built-in map.
-export const MAPS_EMBED_KEY = "";
+// Google Maps browser key for the admin panel: the map in each punch's location window, and the
+// street address looked up (once) for each punch location. It's the same key RouteWatcher uses
+// (RouteWatcher/index.html), restricted in Google Cloud console to the E&C website, so it's safe in
+// page code. It needs the Maps JavaScript API and Geocoding API allowed, which it already has.
+// Left empty, the admin panel shows each punch's coordinates with an "Open in Google Maps" link instead.
+export const MAPS_KEY = "AIzaSyA6umETP8wBUEV41ugAtiNiChUeLmmwmZI";

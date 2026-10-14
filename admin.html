@@ -283,7 +283,7 @@
         .map-modal { width: min(720px, 100%); }
         .map-addr { font-weight: 600; font-size: 1.05rem; }
         .map-meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
-        .map-frame { display: block; width: 100%; height: min(420px, 55vh); border: 0; border-radius: 14px; background: var(--asphalt-3); margin-bottom: 10px; }
+        .map-frame { display: block; width: 100%; height: min(420px, 55vh); border: 0; border-radius: 14px; background: var(--asphalt-3); margin-bottom: 10px; overflow: hidden; }
         .map-nokey { color: var(--muted); font-size: 0.9rem; padding: 14px; border-radius: 12px; background: var(--asphalt-3); margin-bottom: 10px; }
         a.btn { text-decoration: none; }
 
@@ -656,8 +656,8 @@
             <p class="modal-sub" id="mapSub"></p>
             <p class="map-addr" id="mapAddr"></p>
             <p class="map-meta" id="mapMeta"></p>
-            <iframe class="map-frame" id="mapFrame" title="Map of where the punch happened" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
-            <p class="map-nokey" id="mapNoKey" hidden>The built-in map needs a Google Maps key in <code>maps-config.js</code> (README “Punch locations”). The link below opens the spot in Google Maps.</p>
+            <div class="map-frame" id="mapFrame" role="img" aria-label="Map of where the punch happened"></div>
+            <p class="map-nokey" id="mapNoKey" hidden>The map couldn't load here (Google Maps key in <code>maps-config.js</code>, see README “Punch locations”). The link below opens the spot in Google Maps.</p>
             <div class="modal-foot">
                 <a class="btn ghost" id="mapLink" target="_blank" rel="noopener">Open in Google Maps</a>
                 <span class="spacer"></span>
@@ -680,7 +680,7 @@
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
-            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink
+            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -689,8 +689,8 @@
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js");
         const { firebaseConfig } = await import("./firebase-config.js");
         const { setupPwa } = await import("./pwa.js");
-        let MAPS_EMBED_KEY = "";
-        try { ({ MAPS_EMBED_KEY } = await import("./maps-config.js")); } catch (e) { console.warn("maps-config.js not loaded:", e); }
+        let MAPS_KEY = "";
+        try { ({ MAPS_KEY } = await import("./maps-config.js")); } catch (e) { console.warn("maps-config.js not loaded:", e); }
 
         const $ = id => document.getElementById(id);
 
@@ -818,6 +818,7 @@
                 shiftUnsubs[k] = onValue(query(ref(db, P.shifts + "/" + k), orderByChild("in"), startAt(rangeStart)), s => {
                     shiftsByEk[k] = shiftList(s.val());
                     renderAll();
+                    fillAddresses();
                 }, err => toast("Couldn't load punches: " + errText(err), true));
             });
         }
@@ -1055,7 +1056,7 @@
         // ---------- Punch locations ----------
         const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>';
         const coordsText = loc => loc.lat.toFixed(5) + ", " + loc.lng.toFixed(5);
-        function placeText(loc, addr, addrErr) { return addr || (addrErr ? coordsText(loc) : "Finding address… (" + coordsText(loc) + ")"); }
+        function placeText(loc, addr, addrErr) { return addr || (addrErr || !MAPS_KEY || mapsFailed ? coordsText(loc) : "Finding address… (" + coordsText(loc) + ")"); }
 
         // The address under a punch time; tap it for the map. Punches from before locations were saved show nothing.
         function locLine(k, shiftId, which, loc, addr, addrErr) {
@@ -1086,6 +1087,94 @@
             return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: (v.how === "swap" ? "Van swap to " : "Picked van ") + v.vehicleName, at: v.at } : null;
         }
 
+        // ---------- Google Maps (the same browser key as RouteWatcher, maps-config.js) ----------
+        let mapsPromise = null, mapsFailed = false;
+        function loadMaps() {
+            if (!MAPS_KEY) return Promise.reject(new Error("No Google Maps key in maps-config.js"));
+            if (!mapsPromise) mapsPromise = new Promise((resolve, reject) => {
+                window.gm_authFailure = () => { mapsFailed = true; mapUnavailable(); }; // Google refused the key for this site
+                window.__tcMapsReady = () => resolve(window.google.maps);
+                const sc = document.createElement("script");
+                sc.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(MAPS_KEY) + "&loading=async&callback=__tcMapsReady";
+                sc.async = true;
+                sc.onerror = () => { mapsPromise = null; reject(new Error("Couldn't load Google Maps")); };
+                document.head.appendChild(sc);
+            });
+            return mapsPromise;
+        }
+
+        function mapUnavailable() {
+            $("mapFrame").hidden = true;
+            $("mapNoKey").hidden = false;
+        }
+
+        async function showOnMap(loc) {
+            try {
+                const maps = await loadMaps();
+                if (mapsFailed) { mapUnavailable(); return; }
+                const center = { lat: loc.lat, lng: loc.lng };
+                const map = new maps.Map($("mapFrame"), { center: center, zoom: 17, mapTypeControl: false, streetViewControl: false, fullscreenControl: true });
+                // Drawn as a shape (no marker image to download), in the clock's yellow
+                new maps.Marker({ position: center, map: map, title: "Where the punch happened",
+                    icon: { path: maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#ffcc00", fillOpacity: 1, strokeColor: "#111111", strokeWeight: 2 } });
+                if (loc.acc) new maps.Circle({ map: map, center: center, radius: loc.acc, strokeColor: "#ffcc00", strokeOpacity: 0.7, strokeWeight: 1,
+                    fillColor: "#ffcc00", fillOpacity: 0.12, clickable: false });
+            } catch (err) {
+                console.warn("Map not shown:", err);
+                mapUnavailable();
+            }
+        }
+
+        // Street addresses: each saved location is looked up once with Google's geocoder, the first time the
+        // admin panel loads it, and saved on the shift (so the timesheet, CSV and later visits just read it).
+        const addrTried = new Set();
+        let addrRunning = false;
+        async function fillAddresses() {
+            if (addrRunning || !MAPS_KEY || mapsFailed) return;
+            const todo = [];
+            for (const [k, list] of Object.entries(shiftsByEk)) {
+                for (const s of list) for (const j of addressJobs(s)) {
+                    const key = k + "/" + s.id + "/" + j.addrPath;
+                    if (!addrTried.has(key)) todo.push(Object.assign({ k: k, id: s.id, key: key }, j));
+                }
+            }
+            if (!todo.length) return;
+            addrRunning = true;
+            try {
+                const maps = await loadMaps();
+                const geocoder = new maps.Geocoder();
+                for (const j of todo) {
+                    if (mapsFailed) break;
+                    addrTried.add(j.key);
+                    let found;
+                    try {
+                        const r = await geocoder.geocode({ location: { lat: j.lat, lng: j.lng } });
+                        const first = r && r.results && r.results[0];
+                        found = first && first.formatted_address ? { addr: first.formatted_address.slice(0, 300) } : { err: "ZERO_RESULTS" };
+                    } catch (e) {
+                        const code = String((e && e.code) || "");
+                        if (code !== "ZERO_RESULTS") { console.warn("Address lookup failed:", e); continue; } // try again next visit
+                        found = { err: "ZERO_RESULTS" };
+                    }
+                    // Only into a shift that still exists and still has that location
+                    await runTransaction(ref(db, P.shifts + "/" + j.k + "/" + j.id), cur => {
+                        if (cur === null) return null;
+                        if (!addressJobs(cur).some(x => x.addrPath === j.addrPath && x.lat === j.lat && x.lng === j.lng)) return;
+                        let o = cur;
+                        const parts = (found.addr ? j.addrPath : j.errPath).split("/");
+                        parts.slice(0, -1).forEach(p => { o = o[p] = o[p] || {}; });
+                        o[parts[parts.length - 1]] = found.addr || found.err;
+                        return cur;
+                    }).catch(err => console.warn("Address not saved:", err));
+                    await new Promise(r => setTimeout(r, 150)); // well under Google's request rate limit
+                }
+            } catch (err) {
+                console.warn("Addresses not looked up:", err);
+            } finally {
+                addrRunning = false;
+            }
+        }
+
         function openMap(key) {
             const [k, shiftId, which] = key.split("|");
             const s = findShift(k, shiftId), emp = employees[k];
@@ -1093,14 +1182,13 @@
             if (!p || !hasCoords(p.loc)) { toast("That location isn't available any more.", true); return; }
             $("mapTitle").textContent = p.label;
             $("mapSub").textContent = displayName(emp, emp && emp.email) + " · " + fmtKey(dayKey(p.at)) + ", " + fmtTime(p.at);
-            $("mapAddr").textContent = p.addr || (p.addrErr ? "No street address found" : "Finding the address…");
+            $("mapAddr").textContent = p.addr || (p.addrErr ? "No street address found" : !MAPS_KEY || mapsFailed ? "Street address not available" : "Finding the address…");
             $("mapMeta").textContent = coordsText(p.loc) + (p.loc.acc ? " · accurate to about " + p.loc.acc + " m" : "");
             $("mapLink").href = mapsLink(p.loc);
-            const frame = $("mapFrame");
-            frame.hidden = !MAPS_EMBED_KEY;
-            $("mapNoKey").hidden = !!MAPS_EMBED_KEY;
-            if (MAPS_EMBED_KEY) frame.src = "https://www.google.com/maps/embed/v1/place?key=" + encodeURIComponent(MAPS_EMBED_KEY) +
-                "&q=" + p.loc.lat + "," + p.loc.lng + "&zoom=17";
+            $("mapNoKey").hidden = true;
+            $("mapFrame").hidden = false;
+            $("mapFrame").innerHTML = "";
+            showOnMap(p.loc);
             openModal("mapModal");
         }
 
@@ -1169,10 +1257,7 @@
             m.classList.add("show");
             setTimeout(() => { const f = m.querySelector("input:not([type=checkbox]):not([disabled]), select"); if (f) f.focus(); }, 60);
         }
-        function closeModal(id) {
-            $(id).classList.remove("show");
-            if (id === "mapModal") $("mapFrame").removeAttribute("src");
-        }
+        function closeModal(id) { $(id).classList.remove("show"); }
         document.querySelectorAll(".modal-backdrop").forEach(m => {
             m.addEventListener("mousedown", e => { if (e.target === m) closeModal(m.id); });
             m.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => closeModal(m.id)));

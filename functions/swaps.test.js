@@ -86,33 +86,3 @@ test('punch-in reminder is skipped only when the driver turned it off', () => {
   assert.strictEqual(S.wantsPunchReminder({ punchReminder: true }), true);
   assert.strictEqual(S.wantsPunchReminder({ punchReminder: false }), false);
 });
-
-test('address lookups: punch in, punch out and van swaps that have a location but no address yet', () => {
-  const shift = {
-    inLoc: { lat: 49.84, lng: -99.95, acc: 8 }, inAddr: '123 Main St',
-    outLoc: { lat: 49.85, lng: -99.96, acc: 12 },
-    vans: {
-      a: { at: 1, vehicleId: 'g7', loc: { lat: 49.8, lng: -99.9 } },
-      b: { at: 2, vehicleId: 'g3', loc: { err: 'denied' } },
-      c: { at: 3, vehicleId: 'g4', loc: { lat: 49.7, lng: -99.8 }, addrErr: 'ZERO_RESULTS' },
-      d: { at: 4, how: 'taken' }
-    }
-  };
-  assert.deepStrictEqual(S.addressJobs(shift), [
-    { lat: 49.85, lng: -99.96, addrPath: 'outAddr', errPath: 'outAddrErr' },
-    { lat: 49.8, lng: -99.9, addrPath: 'vans/a/addr', errPath: 'vans/a/addrErr' }
-  ]);
-  assert.deepStrictEqual(S.addressJobs({ in: 1, inLoc: { err: 'timeout' } }), []);
-  assert.deepStrictEqual(S.addressJobs({ inLoc: { lat: 91, lng: 0 } }), []); // not a real place
-  assert.deepStrictEqual(S.addressJobs(null), []);
-});
-
-test('reading the Geocoding API reply', () => {
-  assert.deepStrictEqual(S.pickAddress({ status: 'OK', results: [{ formatted_address: '1010 Princess Ave, Brandon, MB R7A 0P4, Canada' }, { formatted_address: 'Brandon, MB' }] }),
-    { addr: '1010 Princess Ave, Brandon, MB R7A 0P4, Canada' });
-  assert.deepStrictEqual(S.pickAddress({ status: 'ZERO_RESULTS', results: [] }), { err: 'ZERO_RESULTS' });
-  assert.deepStrictEqual(S.pickAddress({ status: 'REQUEST_DENIED', error_message: 'API key not valid' }), { err: 'REQUEST_DENIED' });
-  assert.deepStrictEqual(S.pickAddress({ status: 'OK', results: [] }), { err: 'ZERO_RESULTS' });
-  assert.deepStrictEqual(S.pickAddress(null), { err: 'NO_REPLY' });
-  assert.strictEqual(S.geocodeUrl(49.84, -99.95, 'k&y'), 'https://maps.googleapis.com/maps/api/geocode/json?latlng=49.84,-99.95&key=k%26y');
-});

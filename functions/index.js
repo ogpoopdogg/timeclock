@@ -23,11 +23,6 @@
    - timeclockVanSwapReminder is that timer: if they still haven't picked a van,
      it reminds them and sets the next one (3 reminders at most).
 
-   Punch addresses:
-   - timeclockShiftAddresses runs whenever a shift is written, and looks up the
-     street address (Google Geocoding API) for each new punch or van-swap location.
-     Needs the MAPS_GEOCODING_KEY secret (README "Punch locations").
-
    This is its own Firebase "codebase" (see ../firebase.json), so deploying it
    never touches the dispatch app's functions in the same project.
    Memory is set explicitly (with the default 1 vCPU) so running costs are
@@ -37,7 +32,6 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onValueWritten } = require('firebase-functions/v2/database');
 const { onTaskDispatched } = require('firebase-functions/v2/tasks');
-const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const { getFunctions } = require('firebase-admin/functions');
@@ -52,7 +46,6 @@ const MEMORY = '256MiB';
 const REMINDER_FUNCTION = 'timeclockPunchReminder';
 const SWAP_REMINDER_FUNCTION = 'timeclockVanSwapReminder';
 const CLOCK_URL = S.CLOCK_URL;
-const MAPS_KEY = defineSecret('MAPS_GEOCODING_KEY');
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KEEP_SENT_DAYS = 30;
 
@@ -267,44 +260,3 @@ exports.timeclockVanSwapReminder = onTaskDispatched(
     if (n < S.SWAP_REMINDERS) await setSwapTimer(ek, shiftId, takenAt, n + 1);
   }
 );
-
-// ---------- Punch addresses ----------
-
-async function lookUpAddress(lat, lng) {
-  try {
-    const res = await fetch(S.geocodeUrl(lat, lng, MAPS_KEY.value()), { signal: AbortSignal.timeout(10000) });
-    return S.pickAddress(await res.json());
-  } catch (err) {
-    logger.warn('Address lookup failed', { message: err && err.message });
-    return { err: 'LOOKUP_FAILED' };
-  }
-}
-
-// A punch or van change saved a location: add its street address to the shift
-exports.timeclockShiftAddresses = onValueWritten(
-  { ref: '/timeclock/shifts/{ek}/{shiftId}', region: REGION, memory: MEMORY, secrets: [MAPS_KEY] },
-  async (event) => {
-    const jobs = S.addressJobs(event.data.after.val());
-    if (!jobs.length) return;
-    const found = await Promise.all(jobs.map((j) => lookUpAddress(j.lat, j.lng)));
-    // Written in one transaction so a shift deleted meanwhile isn't brought back as a stub
-    await event.data.after.ref.transaction((cur) => {
-      if (cur === null) return null;
-      const still = new Set(S.addressJobs(cur).map((j) => j.addrPath + '|' + j.lat + '|' + j.lng));
-      jobs.forEach((j, i) => {
-        if (!still.has(j.addrPath + '|' + j.lat + '|' + j.lng)) return;
-        setPath(cur, found[i].addr ? j.addrPath : j.errPath, found[i].addr || found[i].err);
-      });
-      return cur;
-    });
-    logger.info('Punch addresses', { ek: event.params.ek, shiftId: event.params.shiftId, looked: jobs.length,
-      failed: found.filter((f) => f.err).map((f) => f.err) });
-  }
-);
-
-function setPath(obj, path, value) {
-  const parts = path.split('/');
-  let o = obj;
-  for (const p of parts.slice(0, -1)) o = o[p] = o[p] || {};
-  o[parts[parts.length - 1]] = value;
-}

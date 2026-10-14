@@ -7,7 +7,7 @@
 //                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint }
 //       vehicleId/vehicleName/nickname   the van the driver has now
 //       inLoc / outLoc                   where the phone was at the punch: { lat, lng, acc, at } or { err }
-//       inAddr / outAddr                 the street address for it, added by the server (functions/)
+//       inAddr / outAddr                 the street address for it, added by the admin panel (Google geocoder)
 //       vans/{id}                        every van change in the shift: { at, vehicleId, vehicleName, how, by, loc, addr }
 //                                        how: "pick" | "swap" | "taken" (another driver took it; written by the server)
 //       swapHint                         set by the server when another driver takes this driver's van:
@@ -267,6 +267,22 @@ export const LOCATION_ERRORS = {
     timeout: "no location fix within 10 seconds",
     unsupported: "the browser can't share location"
 };
+
+// Locations in a shift that still need a street address: [{ lat, lng, addrPath, errPath }] (paths relative to
+// the shift). The admin panel looks them up with Google's geocoder and saves them (see admin.html).
+export function addressJobs(shift) {
+    if (!shift) return [];
+    const jobs = [];
+    const want = (loc, addrPath, errPath, done) => {
+        if (hasCoords(loc) && Math.abs(loc.lat) <= 90 && Math.abs(loc.lng) <= 180 && !done) jobs.push({ lat: loc.lat, lng: loc.lng, addrPath: addrPath, errPath: errPath });
+    };
+    want(shift.inLoc, "inAddr", "inAddrErr", shift.inAddr || shift.inAddrErr);
+    want(shift.outLoc, "outAddr", "outAddrErr", shift.outAddr || shift.outAddrErr);
+    for (const [id, v] of Object.entries(shift.vans || {})) {
+        if (v) want(v.loc, "vans/" + id + "/addr", "vans/" + id + "/addrErr", v.addr || v.addrErr);
+    }
+    return jobs;
+}
 
 // Google Maps link that works without a key (Maps URLs)
 export function mapsLink(loc) { return "https://www.google.com/maps/search/?api=1&query=" + loc.lat + "%2C" + loc.lng; }

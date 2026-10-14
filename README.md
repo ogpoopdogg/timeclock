@@ -25,7 +25,7 @@ rules** actually stop an employee from changing their own punches.
 - An employee on the clock can take a van another driver has (**Van swap**), but only
   for their own open shift. Only the driver holding a van can release it.
 - Each punch and van swap can save where the phone was, once, within 5 minutes of the
-  punch. Only the server writes the street address.
+  punch. Only the admin panel writes the street address.
 - Each employee can read and change only their own punch-in reminder setting
   (`timeclock/prefs`).
 
@@ -157,36 +157,27 @@ setting is under **Settings → Privacy & Security → Location Services**, for 
 websites or the home-screen app.
 
 **Admin:** each punch time in **Timesheets** has its street address underneath. Tap the
-address for a window with a Google map pinned to the spot, the coordinates, the
-accuracy, and an **Open in Google Maps** link. The CSV export has **In location** and
-**Out location** columns. Older punches (from before this was added) and punches the
-admin added by hand have no location.
+address for a window with a Google map pinned to the spot, with a circle showing the
+accuracy, the coordinates, and an **Open in Google Maps** link. The CSV export has **In
+location** and **Out location** columns. Older punches (from before this was added) and
+punches the admin added by hand have no location.
 
-### 1. Turn on two Google Maps APIs and make two keys
+### Where the addresses and map come from
 
-Google Cloud console (<https://console.cloud.google.com>), project
-**eandccourier-36fcc**:
+The admin panel uses the **Google Maps key RouteWatcher already uses**, which is copied into
+`maps-config.js`. It's a browser key, restricted to the E&C website, and it already
+allows the Maps JavaScript API and Google's geocoder. No new key or Google Cloud setup is
+needed.
 
-1. **APIs & Services → Library**: enable **Geocoding API** and **Maps Embed API**.
-   Google Maps Platform needs a billing account on the project.
-2. **APIs & Services → Credentials → Create credentials → API key**, twice:
-   - **Server key** (street addresses). Under *API restrictions*, choose *Restrict key*
-     and tick only **Geocoding API**. Leave *Application restrictions* as *None*
-     (the function calls Google from Google's servers). Then save it as a function
-     secret in Cloud Shell:
-     ```sh
-     npx firebase-tools functions:secrets:set MAPS_GEOCODING_KEY --project eandccourier-36fcc
-     ```
-     and paste the key when asked. It is never stored in this repo.
-   - **Browser key** (the map in the admin panel). Under *Application restrictions*
-     choose *Websites* and add `app.eandccourier.ca/*`. Under *API restrictions*,
-     tick only **Maps Embed API**. Paste it into `maps-config.js` and commit. Browsers
-     can see this key, which is why it's restricted to your site and that one API.
-3. Deploy the functions again (*Reminders when the app is closed → 3*), and merge
-   the updated `database.rules.json`.
-
-Until step 1 is done, locations are still saved and the admin sees the coordinates
-with an *Open in Google Maps* link, just without the street address or built-in map.
+- **Addresses** are looked up in the admin panel, not on the server. Google refuses
+  website-restricted keys for server requests. When Timesheets or the Live board loads
+  punches, any location without an address is looked up once, with Google's geocoder,
+  and saved on the shift. Every later visit, and the CSV, just reads the saved address.
+  So a punch shows "Finding address…" only until the admin panel has been opened once
+  after it.
+- **The map** in the location window is drawn with the same Maps JavaScript API.
+- If RouteWatcher's key is ever changed or restricted further, update `maps-config.js`.
+  Until then the admin panel shows coordinates and the Google Maps link instead.
 
 ### Cost
 
@@ -195,15 +186,13 @@ so **check them** at <https://developers.google.com/maps/billing-and-pricing/pri
 before you rely on them:
 
 - Since March 2025, Google gives each Maps "Essentials" product a monthly number of free
-  requests instead of the old $200 credit. Geocoding is reported as **10,000 free
-  requests a month**, then about $5 per 1,000.
-- The Maps Embed API is reported as **free with no usage limit**.
-
-This app makes one Geocoding request per location saved: punch in, punch out and each
-van pick or swap. For example, 10 drivers × 22 days × 3 locations a day (in, out, one
-pick) = **660 a month**, well under 10,000. `timeclockShiftAddresses` also runs on each
-shift write (about 10 per shift). Most of those runs find nothing to look up and finish
-in a few milliseconds.
+  requests instead of the old $200 credit. Geocoding and Dynamic Maps (map loads) are
+  reported at **10,000 free a month each**.
+- This app makes one address lookup per location saved: punch in, punch out and each
+  van pick or swap. For example, 10 drivers × 22 days × 3 locations a day = **660 a
+  month**. A map load happens only when the admin opens a punch's location window.
+- These requests count toward the same key and Google Cloud project as RouteWatcher's
+  maps.
 
 ## Reminders when the app is closed
 
@@ -222,8 +211,6 @@ of checking all day:
 - `timeclockTestPush` powers the **Send test** button.
 - `timeclockVanTaken` and `timeclockVanSwapReminder` handle van swaps (see
   *How it works → Van swap*). They use the same Cloud Tasks timers.
-- `timeclockShiftAddresses` looks up street addresses for punch locations (see
-  *Punch locations* below).
 
 Each person gets at most one reminder per day. If a schedule is changed after the
 reminder time has already passed, the reminder is sent right away, unless it's more
@@ -263,10 +250,6 @@ cd timeclock/functions && npm install && cd ..
 npx firebase-tools login --no-localhost
 npx firebase-tools deploy --only functions:timeclock --project eandccourier-36fcc
 ```
-
-Before the first deploy that includes `timeclockShiftAddresses`, set up the Google key it
-uses (*Punch locations → 1* below). If the secret doesn't exist yet, the deploy stops
-and asks for its value.
 
 `firebase.json` puts these functions in their own *codebase* called `timeclock`, and
 the command above deploys only that codebase. The dispatch app's functions
