@@ -1,8 +1,8 @@
 {
   "rules": {
     "timeclock": {
-      ".read": "auth != null && auth.token.email.toLowerCase() === 'justin@ec.com'",
-      ".write": "auth != null && auth.token.email.toLowerCase() === 'justin@ec.com'",
+      ".read": "auth != null && (auth.token.email.toLowerCase() === 'justin@ec.com' || auth.token.email.toLowerCase() === 'desirae@ec.com' || auth.token.email.toLowerCase() === 'celeste@ec.com')",
+      ".write": "auth != null && (auth.token.email.toLowerCase() === 'justin@ec.com' || auth.token.email.toLowerCase() === 'desirae@ec.com' || auth.token.email.toLowerCase() === 'celeste@ec.com')",
 
       "settings": {
         ".read": "auth != null"
@@ -118,12 +118,12 @@
     "developer": {
       "dispatch_dashboard": {
         "drivers": {
-          ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+          ".read": "auth != null && ((auth.token.email.toLowerCase() === 'justin@ec.com' || auth.token.email.toLowerCase() === 'desirae@ec.com' || auth.token.email.toLowerCase() === 'celeste@ec.com') || root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists())"
         },
         "driver_nicknames": {
-          ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+          ".read": "auth != null && ((auth.token.email.toLowerCase() === 'justin@ec.com' || auth.token.email.toLowerCase() === 'desirae@ec.com' || auth.token.email.toLowerCase() === 'celeste@ec.com') || root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
           "$gpsId": {
-            ".write": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).child('active').val() !== false && (!newData.exists() || (newData.isString() && newData.val().length <= 24))"
+            ".write": "auth != null && ((auth.token.email.toLowerCase() === 'justin@ec.com' || auth.token.email.toLowerCase() === 'desirae@ec.com' || auth.token.email.toLowerCase() === 'celeste@ec.com') || (root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).child('active').val() !== false)) && (!newData.exists() || (newData.isString() && newData.val().length <= 24))"
           }
         }
       }
