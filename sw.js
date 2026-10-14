@@ -10,7 +10,7 @@
 const CACHE = "tc-offline-v2";
 const SHELL = [
     "./", "index.html", "admin.html", "tc-core.js", "pwa.js", "firebase-config.js", "push-config.js", "maps-config.js",
-    "clock.webmanifest", "admin.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png", "Time.ico"
+    "clock.webmanifest", "admin.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png", "favicon.ico"
 ];
 
 self.addEventListener("install", event => {
