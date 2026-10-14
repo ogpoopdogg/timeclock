@@ -19,7 +19,7 @@
           ".indexOn": ["in"],
           ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
           "$shiftId": {
-            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && newData.child('in').val() <= now && newData.child('in').val() > now - 60000 && !newData.child('out').exists() && !newData.child('edited').exists() && !newData.child('vehicleId').exists() && !newData.child('inLoc').exists() && !newData.child('inAddr').exists() && !newData.child('vans').exists() && !newData.child('swapHint').exists()",
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && newData.child('in').val() <= now && newData.child('in').val() > now - 60000 && !newData.child('out').exists() && !newData.child('edited').exists() && !newData.child('vehicleId').exists() && !newData.child('inLoc').exists() && !newData.child('inAddr').exists() && !newData.child('vans').exists() && !newData.child('swapHint').exists() && !newData.child('shop').exists()",
             "out": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.exists() && newData.val() <= now && newData.val() > now - 60000"
             },
@@ -31,6 +31,13 @@
             },
             "nickname": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.parent().child('out').exists()"
+            },
+            "shop": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.parent().child('out').exists()",
+              ".validate": "newData.val() === true"
+            },
+            "swapHint": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !newData.exists()"
             },
             "inLoc": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().child('in').val() > now - 300000",
@@ -54,12 +61,12 @@
             },
             "vans": {
               "$vid": {
-                ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().parent().child('in').exists() && !data.parent().parent().child('out').exists() && newData.child('at').val() <= now && newData.child('at').val() > now - 60000 && newData.child('vehicleId').isString() && newData.child('vehicleName').isString() && (newData.child('how').val() === 'pick' || newData.child('how').val() === 'swap')",
+                ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().parent().child('in').exists() && !data.parent().parent().child('out').exists() && newData.child('at').val() <= now && newData.child('at').val() > now - 60000 && ((newData.child('vehicleId').isString() && newData.child('vehicleName').isString() && (newData.child('how').val() === 'pick' || newData.child('how').val() === 'swap')) || (newData.child('how').val() === 'shop' && !newData.child('vehicleId').exists() && !newData.child('vehicleName').exists()))",
                 ".validate": "newData.hasChildren(['at', 'how'])",
                 "at": { ".validate": "newData.isNumber()" },
                 "vehicleId": { ".validate": "newData.isString() && newData.val().length <= 128" },
                 "vehicleName": { ".validate": "newData.isString() && newData.val().length <= 60" },
-                "how": { ".validate": "newData.val() === 'pick' || newData.val() === 'swap' || newData.val() === 'taken'" },
+                "how": { ".validate": "newData.val() === 'pick' || newData.val() === 'swap' || newData.val() === 'taken' || newData.val() === 'shop'" },
                 "by": { ".validate": "newData.isString() && newData.val().length <= 60" },
                 "takenId": { ".validate": "newData.isString() && newData.val().length <= 128" },
                 "takenName": { ".validate": "newData.isString() && newData.val().length <= 60" },

@@ -30,6 +30,8 @@ rules** actually stop an employee from changing their own punches.
   pick shows up in RouteWatcher.
 - An employee on the clock can take a van another driver has (**Van swap**), but only
   for their own open shift. Only the driver holding a van can release it.
+- An employee on the clock can mark their own open shift as **Shop** (working in the
+  shop, not driving).
 - Each punch and van swap can save where the phone was, once, within 5 minutes of the
   punch. Only the admin panel writes the street address.
 - Each employee can read and change only their own punch-in reminder setting
@@ -67,7 +69,10 @@ Hours are split into **regular** and **overtime**, with each hour counted only o
 - **Weekly:** regular hours add up through the week in time order. Once they pass 40,
   any further hours are overtime. Daily overtime hours don't count toward the 40.
 
-The week starts on the day set in **Settings → Work week starts on**. A shift counts
+The week starts on the day set in **Settings → Work week starts on**. Pay weeks run
+**Friday to Thursday**, so set it to **Friday** (it is the default when the setting has
+never been saved). Timesheets, the CSV export, the employees' "My week" and the weekly
+40 hours all follow it. A shift counts
 on the day it started, as for regular hours. For example, five 9-hour days give 40
 regular + 5 overtime, and six 8-hour days give 40 regular + 8 overtime. Where the split
 shows:
@@ -114,6 +119,11 @@ open (or the next check) picks it up.
   Settings, not the nickname. Units another driver has taken are greyed out. Picking
   one sets the shared nickname at `developer/dispatch_dashboard/driver_nicknames/{gpsId}`
   to the driver's first name. RouteWatcher and DriverMap read nicknames from that path.
+- **Shop.** The first tile in the vehicle list is **Shop**, for employees working in the
+  shop instead of driving. It is saved on the shift (`shop: true`), and if they had a van
+  it is released. They can switch between Shop and a van any time while on the clock.
+  The admin live board and timesheet show a **Shop** tag, the CSV's GPS column says
+  *Shop*, and the admin can set or remove Shop when editing a punch.
 - **Van swap.** While on the clock, the big **Van swap** button under the punch ring
   opens the van list. Vans other drivers have can be picked too. The app asks "Van 7 is
   assigned to Matt. Take it?", then:
@@ -129,7 +139,7 @@ open (or the next check) picks it up.
     and the admin live board shows **Needs van swap**.
   - The app can't tell which van a driver is sitting in. It only knows what drivers pick.
     That's why the bumped driver is asked rather than moved automatically.
-- **Van history.** Every van pick, swap and "taken by" is saved on the shift with its time
+- **Van history.** Every van pick, swap, move to the shop and "taken by" is saved on the shift with its time
   (and location). The admin timesheet shows the whole list, and the CSV has a
   **Van changes** column.
 - **Punch out** frees the GPS and removes the nickname the driver gave it (only if
