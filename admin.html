@@ -571,9 +571,8 @@
                         <input class="input" id="sReminder" type="number" min="0" max="240" step="1" inputmode="numeric">
                     </div>
                     <div class="field">
-                        <label for="sWeekStart">Work week starts on</label>
-                        <select class="select" id="sWeekStart"></select>
-                        <p class="hint" id="sWeekHint" style="margin:6px 0 0"></p>
+                        <label>Pay week</label>
+                        <p class="hint" style="margin:0">Friday to Thursday, every week. Timesheets, the CSV and weekly overtime use it.</p>
                     </div>
                     <button type="submit" class="btn primary">Save settings</button>
                 </form>
@@ -1619,22 +1618,13 @@
 
         // ---------- Settings ----------
         $("tzName").textContent = TZ;
-        $("sWeekStart").innerHTML = DOW_LONG.map((d, i) => '<option value="' + i + '">' + d + "</option>").join("");
         function fillSettingsForm() {
             if (document.activeElement && $("settingsForm").contains(document.activeElement)) return;
             $("sReminder").value = settings.reminderMinutes;
-            $("sWeekStart").value = String(settings.weekStart);
-            weekHint();
         }
-        // Friday → "Weeks run Friday to Thursday."
-        function weekHint() {
-            const d = Number($("sWeekStart").value) || 0;
-            $("sWeekHint").textContent = "Weeks run " + DOW_LONG[d] + " to " + DOW_LONG[(d + 6) % 7] + ". Timesheets, the CSV and weekly overtime use this.";
-        }
-        $("sWeekStart").addEventListener("change", weekHint);
         $("settingsForm").addEventListener("submit", async e => {
             e.preventDefault();
-            const next = settingsWithDefaults({ reminderMinutes: $("sReminder").value, weekStart: $("sWeekStart").value });
+            const next = settingsWithDefaults({ reminderMinutes: $("sReminder").value });
             try {
                 await set(ref(db, P.settings), next);
                 viewWeek = weekStartKey(dayKey(now()), next.weekStart);
