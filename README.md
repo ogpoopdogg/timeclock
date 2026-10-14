@@ -69,10 +69,10 @@ Hours are split into **regular** and **overtime**, with each hour counted only o
 - **Weekly:** regular hours add up through the week in time order. Once they pass 40,
   any further hours are overtime. Daily overtime hours don't count toward the 40.
 
-The week starts on the day set in **Settings → Work week starts on**. Pay weeks run
-**Friday to Thursday**, so set it to **Friday** (it is the default when the setting has
-never been saved). Timesheets, the CSV export, the employees' "My week" and the weekly
-40 hours all follow it. A shift counts
+Weeks always run **Friday to Thursday** (payday is Friday; `PAY_WEEK_START` in
+`tc-core.js`). A `weekStart` saved in `timeclock/settings` by an older version is
+ignored. Timesheets, the CSV export, the employees' "My week" and the weekly 40 hours
+all use it. A shift counts
 on the day it started, as for regular hours. For example, five 9-hour days give 40
 regular + 5 overtime, and six 8-hour days give 40 regular + 8 overtime. Where the split
 shows:

@@ -52,7 +52,8 @@ export const P = {
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
 
-export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: 5 }; // pay weeks run Friday to Thursday
+export const PAY_WEEK_START = 5; // pay weeks always run Friday to Thursday (payday is Friday)
+export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: PAY_WEEK_START };
 export const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DOW_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -61,7 +62,7 @@ export const NICKNAME_MAX = 24; // RouteWatcher's nickname input allows 24 chara
 export function settingsWithDefaults(v) {
     const s = Object.assign({}, DEFAULT_SETTINGS, v || {});
     s.reminderMinutes = clampInt(s.reminderMinutes, 0, 240, DEFAULT_SETTINGS.reminderMinutes);
-    s.weekStart = clampInt(s.weekStart, 0, 6, DEFAULT_SETTINGS.weekStart);
+    s.weekStart = PAY_WEEK_START; // fixed, whatever an older saved setting says
     return s;
 }
 
