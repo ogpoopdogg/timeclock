@@ -3,13 +3,15 @@
 // Database layout (Firebase Realtime Database, project eandccourier-36fcc):
 //   timeclock/settings                 { reminderMinutes, weekStart }
 //   timeclock/employees/{ek}           { email, name, active, schedule: { sun..sat: { start, end } } }
-//   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, src, edited,
+//   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, shop, src, edited,
 //                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint }
 //       vehicleId/vehicleName/nickname   the van the driver has now
+//       shop                             true while they're working in the shop instead of driving
 //       inLoc / outLoc                   where the phone was at the punch: { lat, lng, acc, at } or { err }
 //       inAddr / outAddr                 the street address for it, added by the admin panel (Google geocoder)
 //       vans/{id}                        every van change in the shift: { at, vehicleId, vehicleName, how, by, loc, addr }
-//                                        how: "pick" | "swap" | "taken" (another driver took it; written by the server)
+//                                        how: "pick" | "swap" | "shop" (moved to the shop, no vehicle)
+//                                           | "taken" (another driver took it; written by the server)
 //       swapHint                         set by the server when another driver takes this driver's van:
 //                                        { at, by, vehicleId, vehicleName, suggestId, suggestName }
 //   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at, fromId, fromName }
@@ -50,7 +52,7 @@ export const P = {
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
 
-export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: 1 };
+export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: 5 }; // pay weeks run Friday to Thursday
 export const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DOW_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

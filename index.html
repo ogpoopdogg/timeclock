@@ -526,6 +526,7 @@
             animation: shimmer 0.9s linear infinite;
         }
         .gps.flash-taken { animation: shake 0.45s var(--ease-out); }
+        .gps.shop { --gps-color: #9fb3c8; }
 
         .sheet-msg { min-height: 1.4em; color: var(--red); font-size: 0.92rem; margin-top: 12px; }
 
@@ -889,10 +890,11 @@
             if (open) {
                 const lost = lostVan(open);
                 const has = !!open.vehicleId && !lost;
+                const shop = atShop(open);
                 pill.classList.toggle("alert", !!lost);
                 $("vpLabel").textContent = lost ? (lost.by ? lost.by + " took van " + lost.vehicleName : "Van " + lost.vehicleName + " was taken")
-                    : has ? "Your van" : "No van selected";
-                $("vpName").textContent = lost ? "Pick your van" : has ? (open.vehicleName || "—") : "Tap to pick one";
+                    : has ? "Your van" : shop ? "Working in the" : "No van selected";
+                $("vpName").textContent = lost ? "Pick your van" : has ? (open.vehicleName || "—") : shop ? "Shop" : "Tap to pick one";
                 $("swapBtnText").textContent = has || lost ? "Van swap" : "Pick van";
                 showSwapBanner(open, lost);
             }
@@ -1126,6 +1128,9 @@
 
         // ---------- Vehicle picker ----------
         let sheetOpen = false, gpsUnits = [], gpsError = "", picking = null;
+        const SHOP = Symbol("shop"); // picking the Shop tile
+        // Working in the shop, not driving (the Shop tile in the vehicle picker)
+        function atShop(open) { return !!(open && open.shop && !open.vehicleId); }
 
         async function loadGps() {
             try {
@@ -1179,18 +1184,24 @@
             const grid = $("gpsGrid");
             const lost = lostVan(open);
             const has = !!open.vehicleId && !lost;
+            const shop = atShop(open);
             $("sheetTitle").textContent = has || lost ? "Van swap" : "Pick your vehicle";
-            $("sheetSub").textContent = lost ? (lost.by ? lost.by + " took van " + lost.vehicleName + ". " : "") + "Tap the van you're in now."
-                : has ? "Tap the van you're in now. If another driver has it, they'll be unassigned and asked to pick theirs."
-                : "Please choose the vehicle you're driving today.";
-            $("sheetSkip").textContent = has ? "Keep van " + open.vehicleName : lost ? "Close" : "Not driving today";
-            if (gpsError) { grid.innerHTML = ""; $("sheetMsg").textContent = gpsError; return; }
-            if (!gpsUnits.length) { grid.innerHTML = '<p class="empty">No GPS units are set up in RouteWatcher yet.</p>'; return; }
+            $("sheetSub").textContent = lost ? (lost.by ? lost.by + " took van " + lost.vehicleName + ". " : "") + "Tap the van you're in now, or Shop."
+                : has ? "Tap the van you're in now, or Shop if you're working in the shop. If another driver has the van, they'll be unassigned and asked to pick theirs."
+                : shop ? "You're working in the shop. If you're driving now, tap your van."
+                : "Please choose the vehicle you're driving today, or Shop if you're working in the shop.";
+            $("sheetSkip").textContent = has ? "Keep van " + open.vehicleName : shop ? "Stay in the shop" : lost ? "Close" : "Not driving today";
+            const shopTile = '<button type="button" class="gps shop' + (shop ? " mine" : "") + (picking === SHOP ? " picking" : "") + '" data-shop="1"' +
+                ' style="--i:0" aria-label="Shop, ' + (shop ? "you're working here" : "not driving") + '">' +
+                '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 17h10"/></svg></span>' +
+                '<span class="gps-name">Shop</span><span class="gps-state">' + (shop ? "You're here" : "Not driving") + "</span></button>";
+            if (gpsError) { grid.innerHTML = shopTile; $("sheetMsg").textContent = gpsError; return; }
+            if (!gpsUnits.length) { grid.innerHTML = shopTile + '<p class="empty">No GPS units are set up in RouteWatcher yet.</p>'; return; }
             const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gps : null;
             // The van the other driver left behind is most likely the one this driver is in now
             const suggestId = lost && lost.suggestId && !claims[lost.suggestId] ? lost.suggestId : null;
             const list = suggestId ? gpsUnits.filter(g => g.id === suggestId).concat(gpsUnits.filter(g => g.id !== suggestId)) : gpsUnits;
-            grid.innerHTML = list.map((g, i) => {
+            grid.innerHTML = shopTile + list.map((g, i) => {
                 const c = claims[g.id];
                 const mine = c && c.ek === ek && !lost;
                 const taken = c && c.ek !== ek;
@@ -1199,7 +1210,7 @@
                     : suggest ? "Likely yours" + (lost.by ? " · " + lost.by + "'s old van" : "") : "Available";
                 return '<button type="button" class="gps' + (mine ? " mine" : "") + (taken ? " taken" : "") + (suggest ? " suggest" : "") +
                     (picking === g.id ? " picking" : "") + '" data-gps="' + esc(g.id) + '"' +
-                    ' style="--i:' + i + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
+                    ' style="--i:' + (i + 1) + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
                     '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></span>' +
                     '<span class="gps-name">' + esc(g.name) + '</span><span class="gps-state">' + esc(state) + "</span></button>";
             }).join("");
@@ -1209,6 +1220,7 @@
         $("gpsGrid").addEventListener("click", e => {
             const btn = e.target.closest(".gps");
             if (!btn || btn.disabled || picking) return;
+            if (btn.dataset.shop) { pickShop(btn); return; }
             const g = gpsUnits.find(u => u.id === btn.dataset.gps);
             if (g) pickVehicle(g, btn);
         });
@@ -1246,7 +1258,7 @@
                     $("sheetMsg").textContent = "Someone else just took vehicle " + g.name + ". Pick again.";
                     return;
                 }
-                await update(ref(db, P.shifts + "/" + ek + "/" + open.id), { vehicleId: g.id, vehicleName: g.name, nickname: nick });
+                await update(ref(db, P.shifts + "/" + ek + "/" + open.id), { vehicleId: g.id, vehicleName: g.name, nickname: nick, shop: null });
                 const entry = push(ref(db, P.shifts + "/" + ek + "/" + open.id + "/vans"));
                 await set(entry, { at: serverTimestamp(), vehicleId: g.id, vehicleName: g.name, how: prevId || lost ? "swap" : "pick" })
                     .catch(err => console.warn("Van history not saved:", err));
@@ -1264,6 +1276,37 @@
                 picking = null;
                 renderSheet();
                 $("sheetMsg").textContent = "Couldn't take vehicle " + g.name + ": " + errText(err);
+            }
+        }
+
+        // Working in the shop: gives up the van (if any) and records the change in the van history
+        async function pickShop(btn) {
+            const open = current();
+            if (!open) return;
+            if (atShop(open)) { closeSheet(); return; }
+            const lost = lostVan(open);
+            picking = SHOP;
+            btn.classList.add("picking");
+            $("sheetMsg").textContent = "";
+            const where = readLocation();
+            const prevId = open.vehicleId && !lost ? open.vehicleId : null;
+            const prevName = open.vehicleName;
+            const shiftPath = P.shifts + "/" + ek + "/" + open.id;
+            try {
+                const change = { shop: true, vehicleId: null, vehicleName: null, nickname: null };
+                if (open.swapHint) change.swapHint = null; // no van swap needed (stops the reminders)
+                await update(ref(db, shiftPath), change);
+                const entry = push(ref(db, shiftPath + "/vans"));
+                await set(entry, { at: serverTimestamp(), how: "shop" }).catch(err => console.warn("Van history not saved:", err));
+                saveLocation(shiftPath + "/vans/" + entry.key + "/loc", where);
+                if (prevId) await releaseVehicle(prevId, open.nickname).catch(err => console.warn("Vehicle release:", err));
+                picking = null;
+                closeSheet();
+                toast((prevId ? "Van " + prevName + " released. " : "") + "You're working in the shop.");
+            } catch (err) {
+                picking = null;
+                renderSheet();
+                $("sheetMsg").textContent = "Couldn't switch to Shop: " + errText(err);
             }
         }
 

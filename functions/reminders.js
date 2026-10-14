@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const TZ = 'America/Winnipeg';
 const DOW_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: 1 };
+const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: 5 };
 // Stop trying this long after the reminder was due
 // (e.g. a schedule edited late in the day: don't remind someone at 3 PM about 8 AM)
 const LATE_WINDOW_MS = 2 * 60 * 60 * 1000;

@@ -195,6 +195,7 @@
         .tag.live { color: var(--green); background: rgba(53, 208, 127, 0.1); }
         .tag.warn { color: var(--red); background: rgba(255, 107, 94, 0.1); }
         .tag.ot { color: var(--orange); background: rgba(255, 159, 67, 0.12); }
+        .tag.shop { color: #9fb3c8; background: rgba(159, 179, 200, 0.12); }
         .kpi-sub { font-size: 0.85rem; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
         .kpi-sub.has { color: var(--orange); }
         .tag.off { color: var(--dim); }
@@ -572,6 +573,7 @@
                     <div class="field">
                         <label for="sWeekStart">Work week starts on</label>
                         <select class="select" id="sWeekStart"></select>
+                        <p class="hint" id="sWeekHint" style="margin:6px 0 0"></p>
                     </div>
                     <button type="submit" class="btn primary">Save settings</button>
                 </form>
@@ -917,6 +919,7 @@
                     detail = "Since " + esc(fmtTime(st.open.in)) + (dayKey(st.open.in) !== today ? " on " + esc(fmtKey(dayKey(st.open.in))) : "");
                     foot = '<span class="elapsed" data-since="' + st.open.in + '">' + esc(fmtClockDur(t - st.open.in)) + "</span>" +
                         (st.open.vehicleName ? '<span class="tag gps">GPS ' + esc(st.open.vehicleName) + "</span>"
+                            : st.open.shop ? '<span class="tag shop">Shop</span>'
                             : st.open.swapHint ? '<span class="tag warn" title="' + esc((st.open.swapHint.by || "Another driver") + " took van " + (st.open.swapHint.vehicleName || "")) + '">Needs van swap</span>'
                             : '<span class="tag">No vehicle</span>') +
                         '<button type="button" class="btn sm" data-punchout="' + esc(e.ek) + '" data-id="' + esc(st.open.id) + '">Punch out</button>';
@@ -974,7 +977,7 @@
                 if (!s || !confirm("Punch " + displayName(emp, emp && emp.email) + " out now?")) return;
                 out.disabled = true;
                 try {
-                    await saveShift(k, s, { in: s.in, out: now(), vehicleId: s.vehicleId || null }, "Punched out by admin", "punch-out");
+                    await saveShift(k, s, { in: s.in, out: now(), vehicleId: s.vehicleId || null, shop: !!s.shop }, "Punched out by admin", "punch-out");
                     toast(displayName(emp, emp.email) + " punched out.");
                 } catch (err) { toast("Couldn't punch out: " + errText(err), true); out.disabled = false; }
                 return;
@@ -1070,21 +1073,24 @@
         // Every van in the shift, in order, with where each change happened
         function vanCell(k, s) {
             const list = vanHistory(s);
-            if (!list.length) return s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>" : '<span class="muted">—</span>';
+            if (!list.length) return s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>"
+                : s.shop ? '<span class="tag shop">Shop</span>' : '<span class="muted">—</span>';
             return '<div class="vans">' + list.map(v => {
                 if (v.how === "taken") return '<div class="van-step taken"><span class="tag warn">' + esc(v.takenName || "Van") + " taken</span>" +
                     '<span class="muted">' + esc(fmtTime(v.at)) + (v.by ? " · by " + esc(v.by) : "") + "</span></div>";
+                if (v.how === "shop") return '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">' + esc(fmtTime(v.at)) + "</span>" +
+                    locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
                 return '<div class="van-step">' + (v.how === "swap" ? '<span class="arrow" aria-label="swapped to">⇄</span>' : "") +
                     '<span class="tag gps">' + esc(v.vehicleName) + '</span><span class="muted">' + esc(fmtTime(v.at)) + "</span>" +
                     locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
-            }).join("") + "</div>";
+            }).join("") + (s.shop && list[list.length - 1].how !== "shop" ? '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">set by admin</span></div>' : "") + "</div>";
         }
 
         function placeFor(s, which) {
             if (which === "in") return { loc: s.inLoc, addr: s.inAddr, addrErr: s.inAddrErr, label: "Punch in", at: s.in };
             if (which === "out") return { loc: s.outLoc, addr: s.outAddr, addrErr: s.outAddrErr, label: "Punch out", at: s.out };
             const v = s.vans && s.vans[which.slice(4)];
-            return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: (v.how === "swap" ? "Van swap to " : "Picked van ") + v.vehicleName, at: v.at } : null;
+            return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: v.how === "shop" ? "Moved to the shop" : (v.how === "swap" ? "Van swap to " : "Picked van ") + v.vehicleName, at: v.at } : null;
         }
 
         // ---------- Google Maps (the same browser key as RouteWatcher, maps-config.js) ----------
@@ -1215,6 +1221,7 @@
             const place = (loc, addr) => !loc ? "" : !hasCoords(loc) ? "No location (" + (LOCATION_ERRORS[loc.err] || "not recorded") + ")"
                 : (addr ? addr + " " : "") + "(" + coordsText(loc) + ")";
             const vans = s => vanHistory(s).map(v => v.how === "taken" ? (v.takenName || "van") + " taken by " + (v.by || "another driver") + " " + fmtTime(v.at)
+                : v.how === "shop" ? "Shop " + fmtTime(v.at) + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")
                 : v.vehicleName + " " + fmtTime(v.at) + (v.how === "swap" ? " (swap)" : "") + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")).join("; ");
             empList().filter(e => filter === "all" || e.ek === filter).forEach(e => {
                 const { byDay, byShift, total, regular, overtime } = weekTotals(shiftsOf(e.ek), days, t);
@@ -1223,7 +1230,7 @@
                 list.forEach(s => rows.push([displayName(e, e.email), e.email, dayKey(s.in), fmtTime(s.in),
                     typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
                     fmtHours(shiftMs(s, t)), fmtHours(byShift[s.id].regular), fmtHours(byShift[s.id].overtime),
-                    s.vehicleName || "", s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
+                    s.vehicleName || (s.shop ? "Shop" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
                     place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]));
                 rows.push([displayName(e, e.email), e.email, "WEEK TOTAL", "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", "", "", "", ""]);
             });
@@ -1241,6 +1248,7 @@
 
         // ---------- Shift modal (edit / add) ----------
         let smCtx = null; // { ek, shift }
+        const SHOP_OPTION = "_shop"; // the Shop choice in the vehicle list (not a GPS)
         function gpsOptions(selectedId) {
             const known = gpsUnits.map(g => {
                 const c = claims[g.id];
@@ -1249,7 +1257,7 @@
             });
             const extra = selectedId && !gpsUnits.some(g => g.id === selectedId) && smCtx && smCtx.shift
                 ? ['<option value="' + esc(selectedId) + '">GPS ' + esc(smCtx.shift.vehicleName || selectedId) + " (no longer in RouteWatcher)</option>"] : [];
-            return '<option value="">No vehicle</option>' + extra.concat(known).join("");
+            return '<option value="">No vehicle</option><option value="' + SHOP_OPTION + '">Shop (not driving)</option>' + extra.concat(known).join("");
         }
 
         function openModal(id) {
@@ -1287,7 +1295,7 @@
             $("smOutDate").value = shift && hasOut ? dayKey(shift.out) : $("smInDate").value;
             $("smOutTime").value = shift && hasOut ? hhmmOf(shift.out) : "16:30";
             $("smGps").innerHTML = gpsOptions(shift && shift.vehicleId);
-            $("smGps").value = shift && shift.vehicleId ? shift.vehicleId : "";
+            $("smGps").value = shift && shift.vehicleId ? shift.vehicleId : shift && shift.shop ? SHOP_OPTION : "";
             $("smNote").value = "";
             $("smMsg").textContent = "";
             $("smDelete").hidden = !shift;
@@ -1320,7 +1328,8 @@
             }
             if (inTs > now() + 60000) return { error: "Punch in can't be in the future." };
             if (outTs && outTs > now() + 60000) return { error: "Punch out can't be in the future. Tick “Still on the clock” instead." };
-            return { in: inTs, out: outTs, vehicleId: $("smGps").value || null };
+            const pick = $("smGps").value;
+            return { in: inTs, out: outTs, vehicleId: pick && pick !== SHOP_OPTION ? pick : null, shop: pick === SHOP_OPTION };
         }
 
         function updateCalc() {
@@ -1378,6 +1387,7 @@
                 vehicleId: r.vehicleId || null,
                 vehicleName: r.vehicleId ? (gps ? gps.name : (before && before.vehicleName) || null) : null,
                 nickname: r.vehicleId ? ((before && before.vehicleId === r.vehicleId && before.nickname) || nick) : null,
+                shop: !r.vehicleId && r.shop ? true : null,
                 src: before ? (before.src || "clock") : "admin",
                 edited: { by: user.email, at: serverTimestamp(), note: note || "" }
             };
@@ -1385,7 +1395,7 @@
             const keep = (key, when) => { if (before && before[key] !== undefined && when !== false) data[key] = before[key]; };
             ["inLoc", "inAddr", "inAddrErr", "vans"].forEach(key => keep(key));
             ["outLoc", "outAddr", "outAddrErr"].forEach(key => keep(key, !!data.out));
-            keep("swapHint", !data.out && !data.vehicleId);
+            keep("swapHint", !data.out && !data.vehicleId && !data.shop);
             await set(ref(db, P.shifts + "/" + k + "/" + id), data);
             // Free the old GPS if the vehicle changed or the shift is now closed
             if (before && before.vehicleId && (before.vehicleId !== data.vehicleId || data.out)) await releaseClaim(before.vehicleId, id);
@@ -1416,7 +1426,7 @@
         function strip(s) {
             if (!s) return null;
             const o = {};
-            ["in", "out", "vehicleId", "vehicleName", "src"].forEach(k => { if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
+            ["in", "out", "vehicleId", "vehicleName", "shop", "src"].forEach(k => { if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
             return o;
         }
         function logAudit(k, shiftId, action, before, after, note) {
@@ -1614,7 +1624,14 @@
             if (document.activeElement && $("settingsForm").contains(document.activeElement)) return;
             $("sReminder").value = settings.reminderMinutes;
             $("sWeekStart").value = String(settings.weekStart);
+            weekHint();
         }
+        // Friday → "Weeks run Friday to Thursday."
+        function weekHint() {
+            const d = Number($("sWeekStart").value) || 0;
+            $("sWeekHint").textContent = "Weeks run " + DOW_LONG[d] + " to " + DOW_LONG[(d + 6) % 7] + ". Timesheets, the CSV and weekly overtime use this.";
+        }
+        $("sWeekStart").addEventListener("change", weekHint);
         $("settingsForm").addEventListener("submit", async e => {
             e.preventDefault();
             const next = settingsWithDefaults({ reminderMinutes: $("sReminder").value, weekStart: $("sWeekStart").value });
