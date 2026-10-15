@@ -63,19 +63,16 @@ the home-screen icon. iOS only allows web notifications for home-screen web apps
 
 ## Overtime
 
-Hours are split into **regular** and **overtime**, with each hour counted only once:
-
-- **Daily:** within a day, the first 8 hours worked are regular and the rest is overtime.
-- **Weekly:** regular hours add up through the week in time order. Once they pass 40,
-  any further hours are overtime. Daily overtime hours don't count toward the 40.
+Hours are split into **regular** and **overtime** by day only: within a day, the first
+8 hours worked are regular and the rest is overtime. There is **no weekly overtime**;
+a week's regular and overtime are just its days added up, however many hours that is.
 
 Weeks always run **Friday to Thursday** (payday is Friday; `PAY_WEEK_START` in
 `tc-core.js`). A `weekStart` saved in `timeclock/settings` by an older version is
-ignored. Timesheets, the CSV export, the employees' "My week" and the weekly 40 hours
-all use it. A shift counts
-on the day it started, as for regular hours. For example, five 9-hour days give 40
-regular + 5 overtime, and six 8-hour days give 40 regular + 8 overtime. Where the split
-shows:
+ignored. Timesheets, the CSV export and the employees' "My week" all use it. A shift
+counts on the day it started, and all shifts started on the same day count toward that
+day's 8 hours. For example, five 9-hour days give 40 regular + 5 overtime, and six
+8-hour days give 48 regular + 0 overtime. Where the split shows:
 
 - **Employees:** a Regular / Overtime split under the week total, an orange overtime
   part on each day's bar, and an OT tag on each punch with overtime.
@@ -83,7 +80,7 @@ shows:
   of "Hours this week" on the live board, and **Regular** and **Overtime** columns in
   the CSV export.
 
-The thresholds are `DAILY_OT_MS` and `WEEKLY_OT_MS` in `tc-core.js`.
+The threshold is `DAILY_OT_MS` in `tc-core.js`.
 `tests/overtime.test.mjs` checks the rules.
 
 ## Installing the app, and how updates reach it

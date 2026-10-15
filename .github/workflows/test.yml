@@ -15,7 +15,7 @@ jobs:
       - name: Unit tests (punch-in reminders, van swaps, punch addresses)
         working-directory: functions
         run: node --test
-      - name: Overtime rules (8 h a day, 40 h a week)
+      - name: Overtime rules (after 8 h a day, no weekly overtime)
         run: node --test tests/overtime.test.mjs
       - name: Punch addresses and van history
         run: node --test tests/addresses.test.mjs
