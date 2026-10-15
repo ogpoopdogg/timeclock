@@ -37,26 +37,28 @@ test('five 9-hour days = 40 regular + 5 OT (daily OT not counted toward 40)', ()
   const r = sum(days.slice(0, 5).map(k => shift(k, '08:00', 9)));
   assert.deepStrictEqual([r.total, r.reg, r.ot], [45, 40, 5]);
 });
-test('six 8-hour days = 40 regular + 8 weekly OT (all of Saturday)', () => {
-  const list = days.slice(0, 6).map(k => shift(k, '08:00', 8));
-  const r = sum(list);
-  assert.deepStrictEqual([r.total, r.reg, r.ot], [48, 40, 8]);
-  assert.strictEqual(h(r.r.byDay[days[5]].overtime), 8);
+test('no weekly overtime: six 8-hour days = 48 regular + 0 OT', () => {
+  const r = sum(days.slice(0, 6).map(k => shift(k, '08:00', 8)));
+  assert.deepStrictEqual([r.total, r.reg, r.ot], [48, 48, 0]);
+  assert.strictEqual(h(r.r.byDay[days[5]].overtime), 0);
 });
-test('mixed: 10,10,10,10,6 = 38 regular (8+8+8+8+6) + 8 daily OT, under 40 regular so no weekly OT', () => {
+test('mixed: 10,10,10,10,6 = 38 regular (8+8+8+8+6) + 8 daily OT', () => {
   const r = sum([10, 10, 10, 10, 6].map((x, i) => shift(days[i], '07:00', x)));
   assert.deepStrictEqual([r.total, r.reg, r.ot], [46, 38, 8]);
 });
-test('weekly OT kicks in mid-shift: 4×10 h then 9 h Friday = 40 reg + 8 daily OT + 1 weekly OT', () => {
+test('only daily OT past 40 h: 4×10 h then 9 h = 40 reg + 9 daily OT', () => {
   const r = sum([10, 10, 10, 10, 9].map((x, i) => shift(days[i], '07:00', x)));
-  // Mon–Thu: 8 reg + 2 OT each (32 reg, 8 OT). Fri 9 h: 8 within the day, but only 8 more regular fit (32→40) -> 8 reg, 1 daily OT
+  // Mon–Thu: 8 reg + 2 OT each; the 5th day: 8 reg + 1 OT
   assert.deepStrictEqual([r.total, r.reg, r.ot], [49, 40, 9]);
 });
-test('weekly cap reached part-way through a day: 7×7 h', () => {
+test('no weekly overtime: 7×7 h = 49 regular + 0 OT', () => {
   const r = sum(days.map(k => shift(k, '08:00', 7)));
-  // 49 h, never over 8 in a day; regular stops at 40 during Sunday -> 9 h OT
-  assert.deepStrictEqual([r.total, r.reg, r.ot], [49, 40, 9]);
-  assert.deepStrictEqual([h(r.r.byDay[days[5]].overtime), h(r.r.byDay[days[6]].overtime)], [2, 7]);
+  assert.deepStrictEqual([r.total, r.reg, r.ot], [49, 49, 0]);
+});
+test('long week of daily OT: 7×10 h = 56 regular + 14 OT', () => {
+  const r = sum(days.map(k => shift(k, '07:00', 10)));
+  assert.deepStrictEqual([r.total, r.reg, r.ot], [70, 56, 14]);
+  days.forEach(k => assert.deepStrictEqual([h(r.r.byDay[k].regular), h(r.r.byDay[k].overtime)], [8, 2]));
 });
 test('shifts outside the week are ignored; open shift counts up to now', () => {
   const now = at(days[0], '18:00');
