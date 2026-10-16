@@ -19,7 +19,8 @@
           ".indexOn": ["in"],
           ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
           "$shiftId": {
-            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && newData.child('in').val() <= now && newData.child('in').val() > now - 60000 && !newData.child('out').exists() && !newData.child('edited').exists() && !newData.child('vehicleId').exists() && !newData.child('inLoc').exists() && !newData.child('inAddr').exists() && !newData.child('vans').exists() && !newData.child('swapHint').exists() && !newData.child('shop').exists()",
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && root.child('timeclock/employees').child($ek).child('removed').val() !== true && newData.child('in').val() <= now && newData.child('in').val() > now - 60000 && !newData.child('out').exists() && !newData.child('edited').exists() && !newData.child('vehicleId').exists() && !newData.child('inLoc').exists() && !newData.child('inAddr').exists() && !newData.child('vans').exists() && !newData.child('swapHint').exists() && !newData.child('shop').exists() && (!newData.child('src').exists() || newData.child('src').val() === 'clock') && (!root.child('timeclock/open').child($ek).exists() || !root.child('timeclock/shifts').child($ek).child(root.child('timeclock/open').child($ek).val() + '').child('in').exists() || root.child('timeclock/shifts').child($ek).child(root.child('timeclock/open').child($ek).val() + '').child('out').exists()) && newData.parent().parent().parent().child('open').child($ek).val() === $shiftId && (!newData.child('tap').exists() || (newData.child('tap').val() <= now + 60000 && newData.child('tap').val() > now - 604800000))",
+            "tap": { ".validate": "newData.isNumber()" },
             "out": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.exists() && newData.val() <= now && newData.val() > now - 60000"
             },
@@ -35,6 +36,10 @@
             "shop": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !data.parent().child('out').exists()",
               ".validate": "newData.val() === true"
+            },
+            "outTap": {
+              ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && !data.exists() && data.parent().child('out').val() > now - 300000 && newData.val() <= now + 60000 && newData.val() > now - 604800000",
+              ".validate": "newData.isNumber()"
             },
             "swapHint": {
               ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && data.parent().exists() && !newData.exists()"
@@ -66,7 +71,7 @@
                 "at": { ".validate": "newData.isNumber()" },
                 "vehicleId": { ".validate": "newData.isString() && newData.val().length <= 128" },
                 "vehicleName": { ".validate": "newData.isString() && newData.val().length <= 60" },
-                "how": { ".validate": "newData.val() === 'pick' || newData.val() === 'swap' || newData.val() === 'taken' || newData.val() === 'shop'" },
+                "how": { ".validate": "newData.val() === 'pick' || newData.val() === 'swap' || newData.val() === 'taken' || newData.val() === 'shop' || newData.val() === 'admin'" },
                 "by": { ".validate": "newData.isString() && newData.val().length <= 60" },
                 "takenId": { ".validate": "newData.isString() && newData.val().length <= 128" },
                 "takenName": { ".validate": "newData.isString() && newData.val().length <= 60" },
@@ -112,6 +117,77 @@
           "punchReminder": { ".validate": "newData.isBoolean()" },
           "$other": { ".validate": false }
         }
+      },
+
+      "open": {
+        "$ek": {
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
+          ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && root.child('timeclock/employees').child($ek).child('removed').val() !== true && newData.isString() && newData.parent().parent().child('shifts').child($ek).child(newData.val()).child('in').exists() && !newData.parent().parent().child('shifts').child($ek).child(newData.val()).child('out').exists() && (!root.child('timeclock/open').child($ek).exists() || !root.child('timeclock/shifts').child($ek).child(root.child('timeclock/open').child($ek).val() + '').child('in').exists() || root.child('timeclock/shifts').child($ek).child(root.child('timeclock/open').child($ek).val() + '').child('out').exists())"
+        }
+      },
+
+      "requests": {
+        "$ek": {
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
+          "$id": {
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && ((!data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && root.child('timeclock/employees').child($ek).child('removed').val() !== true && newData.child('status').val() === 'open' && !newData.child('reply').exists() && !newData.child('by').exists() && !newData.child('doneAt').exists()) || (!newData.exists() && data.child('status').val() === 'open'))",
+            ".validate": "newData.hasChildren(['at', 'kind', 'day', 'status'])",
+            "at": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
+            "kind": { ".validate": "newData.val() === 'in' || newData.val() === 'out' || newData.val() === 'both' || newData.val() === 'wrong' || newData.val() === 'other'" },
+            "day": { ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)" },
+            "inTime": { ".validate": "newData.isString() && newData.val().matches(/^\\d{2}:\\d{2}$/)" },
+            "outTime": { ".validate": "newData.isString() && newData.val().matches(/^\\d{2}:\\d{2}$/)" },
+            "shiftId": { ".validate": "newData.isString() && newData.val().length <= 64" },
+            "note": { ".validate": "newData.isString() && newData.val().length <= 500" },
+            "status": { ".validate": "newData.val() === 'open' || newData.val() === 'done' || newData.val() === 'declined'" },
+            "reply": { ".validate": "newData.isString() && newData.val().length <= 300" },
+            "by": { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "doneAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        }
+      },
+
+      "timeoff": {
+        "$ek": {
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
+          "$id": {
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && ((!data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && root.child('timeclock/employees').child($ek).child('removed').val() !== true && newData.child('status').val() === 'pending' && !newData.child('reply').exists() && !newData.child('by').exists() && !newData.child('doneAt').exists()) || (!newData.exists() && data.child('status').val() === 'pending'))",
+            ".validate": "newData.hasChildren(['at', 'from', 'to', 'status']) && newData.child('from').val() <= newData.child('to').val()",
+            "at": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
+            "from": { ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)" },
+            "to": { ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)" },
+            "note": { ".validate": "newData.isString() && newData.val().length <= 500" },
+            "status": { ".validate": "newData.val() === 'pending' || newData.val() === 'approved' || newData.val() === 'declined'" },
+            "reply": { ".validate": "newData.isString() && newData.val().length <= 300" },
+            "by": { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "doneAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        }
+      },
+
+      "van_reports": {
+        "$id": {
+          ".write": "auth != null && !data.exists() && newData.child('ek').val() === auth.token.email.toLowerCase().replace('.', ',') && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).child('active').val() !== false && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).child('removed').val() !== true && newData.child('status').val() === 'open' && !newData.child('fixNote').exists() && !newData.child('by').exists() && !newData.child('doneAt').exists()",
+          ".validate": "newData.hasChildren(['at', 'ek', 'vehicleId', 'text', 'status'])",
+          "at": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
+          "ek": { ".validate": "newData.isString() && newData.val().length <= 128" },
+          "name": { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "vehicleId": { ".validate": "newData.isString() && newData.val().length <= 128" },
+          "vehicleName": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "shiftId": { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000" },
+          "status": { ".validate": "newData.val() === 'open' || newData.val() === 'fixed'" },
+          "fixNote": { ".validate": "newData.isString() && newData.val().length <= 300" },
+          "by": { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "doneAt": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      },
+
+      "audit": {
+        ".indexOn": ["ek"]
       },
 
       "vehicle_claims": {

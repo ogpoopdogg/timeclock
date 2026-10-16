@@ -14,7 +14,8 @@
      schedule or the reminder delay changes during the day. A timer whose time
      no longer matches the current schedule does nothing when it fires.
    - timeclockTestPush powers the "Send test" button.
-   A driver who turned the punch-in reminder off (timeclock/prefs/<ek>) isn't sent it.
+   A driver who turned the punch-in reminder off (timeclock/prefs/<ek>) isn't sent it, and nobody is
+   reminded on a day of approved time off (timeclock/timeoff/<ek>).
 
    Van swaps (see swaps.js):
    - timeclockVanTaken runs when a van changes hands in timeclock/vehicle_claims.
@@ -83,8 +84,8 @@ async function sendTo(ek, { title, body, tag, url }) {
 }
 
 /** Sets today's one-shot timer for one employee, if they have a reminder to come. */
-async function planEmployee(ek, emp, settings, now) {
-  const plan = R.planFor(now, settings, emp);
+async function planEmployee(ek, emp, settings, now, timeoff) {
+  const plan = R.planFor(now, settings, emp, timeoff);
   if (!plan) return 'none today';
   const timer = R.timerFor(ek, plan, now);
   try {
@@ -101,14 +102,16 @@ async function planEmployee(ek, emp, settings, now) {
 
 async function planEveryone(now) {
   const db = admin.database();
-  const [settingsSnap, employeesSnap] = await Promise.all([
+  const [settingsSnap, employeesSnap, timeoffSnap] = await Promise.all([
     db.ref('timeclock/settings').once('value'),
-    db.ref('timeclock/employees').once('value')
+    db.ref('timeclock/employees').once('value'),
+    db.ref('timeclock/timeoff').once('value')
   ]);
   const settings = settingsSnap.val();
+  const timeoff = timeoffSnap.val() || {};
   const results = {};
   for (const [ek, emp] of Object.entries(employeesSnap.val() || {})) {
-    results[ek] = await planEmployee(ek, emp, settings, now);
+    results[ek] = await planEmployee(ek, emp, settings, now, timeoff[ek]);
   }
   logger.info('Punch-in reminder timers', results);
 }
@@ -135,12 +138,14 @@ exports.timeclockPunchReminder = onTaskDispatched(
     if (typeof ek !== 'string' || typeof day !== 'string' || typeof dueAt !== 'number') return;
     const db = admin.database();
     const now = Date.now();
-    const [settingsSnap, empSnap] = await Promise.all([
+    const [settingsSnap, empSnap, timeoffSnap] = await Promise.all([
       db.ref('timeclock/settings').once('value'),
-      db.ref(`timeclock/employees/${ek}`).once('value')
+      db.ref(`timeclock/employees/${ek}`).once('value'),
+      db.ref(`timeclock/timeoff/${ek}`).once('value')
     ]);
     const emp = empSnap.val();
-    const plan = R.planFor(now, settingsSnap.val(), emp);
+    // Time off approved after the timer was set makes the plan disappear, so the timer does nothing
+    const plan = R.planFor(now, settingsSnap.val(), emp, timeoffSnap.val());
     if (!R.isCurrent(plan, { day, dueAt })) {
       logger.info('Reminder timer no longer matches the schedule; skipped', { ek, day, dueAt });
       return;
@@ -174,8 +179,11 @@ exports.timeclockReplanEmployee = onValueWritten(
   async (event) => {
     const emp = event.data.after.val();
     if (!emp) return;
-    const settings = (await admin.database().ref('timeclock/settings').once('value')).val();
-    const result = await planEmployee(event.params.ek, emp, settings, Date.now());
+    const [settingsSnap, timeoffSnap] = await Promise.all([
+      admin.database().ref('timeclock/settings').once('value'),
+      admin.database().ref(`timeclock/timeoff/${event.params.ek}`).once('value')
+    ]);
+    const result = await planEmployee(event.params.ek, emp, settingsSnap.val(), Date.now(), timeoffSnap.val());
     logger.info('Reminder timer after schedule change', { ek: event.params.ek, result });
   }
 );

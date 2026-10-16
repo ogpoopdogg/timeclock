@@ -19,3 +19,12 @@ jobs:
         run: node --test tests/overtime.test.mjs
       - name: Punch addresses and van history
         run: node --test tests/addresses.test.mjs
+      - name: Shared helpers for the new features (van hours, late punches, shop distance, time off)
+        run: node --test tests/features.test.mjs
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Database rules (Realtime Database emulator)
+        working-directory: tests/rules
+        run: npm ci && npm test
