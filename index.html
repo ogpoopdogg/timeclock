@@ -1042,7 +1042,7 @@
             $("weekPrev").disabled = addDaysKey(viewWeek, -7) < dayKey(t - HISTORY_MAX_DAYS * 86400000);
             $("weekTotal").innerHTML = esc(fmtHours(total)) + "<small>hrs</small>";
             const count = days.reduce((n, k) => n + byDay[k].shifts.length, 0);
-            $("weekTotalSub").textContent = fmtDur(total) + " · " + count + (count === 1 ? " shift" : " shifts");
+            $("weekTotalSub").textContent = fmtDur(total) + " · " + count + (count === 1 ? " shift" : " shifts") + (count ? " · counted in 15-min blocks" : "");
             $("weekRegular").textContent = fmtHours(regular);
             $("weekOvertime").textContent = fmtHours(overtime);
             $("weekOtBox").classList.toggle("has", overtime > 0);

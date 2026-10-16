@@ -110,6 +110,16 @@ day's 8 hours. For example, five 9-hour days give 40 regular + 5 overtime, and s
   the CSV export.
 
 The threshold is `DAILY_OT_MS` in `tc-core.js`.
+
+### 15-minute blocks
+
+Hours are counted in 15-minute blocks. Each punch in and punch out counts as the nearest
+quarter hour: 7 minutes or less past a quarter rounds down, 8 or more rounds up. For
+example, a punch out at 5:01 or 5:07 counts as 5:00, and 5:08, 5:14 or 5:17 count as
+5:15. Seconds are ignored. The saved punch times don't change. Every total uses the
+counted times: timesheets, the CSV, overtime, the Reports hours and overtime, and the employees' My week. The
+admin timesheet shows *Counts as 5:15 PM* under any punch that was rounded, and the CSV
+has **Counted in** and **Counted out** columns. The rule is `roundPunch` in `tc-core.js`.
 `tests/overtime.test.mjs` checks the rules.
 
 ## Installing the app, and how updates reach it
