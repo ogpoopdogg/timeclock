@@ -2,7 +2,9 @@
 //
 // Database layout (Firebase Realtime Database, project eandccourier-36fcc):
 //   timeclock/settings                 { reminderMinutes, weekStart }
-//   timeclock/employees/{ek}           { email, name, active, schedule: { sun..sat: { start, end } } }
+//   timeclock/employees/{ek}           { email, name, active, removed, schedule: { sun..sat: { start, end } } }
+//       removed                          true once the admin removes them: they can't punch in and are hidden from the
+//                                        live board, but their punches still show on timesheets and exports
 //   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, shop, src, edited,
 //                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint }
 //       vehicleId/vehicleName/nickname   the van the driver has now
@@ -12,6 +14,10 @@
 //       vans/{id}                        every van change in the shift: { at, vehicleId, vehicleName, how, by, loc, addr }
 //                                        how: "pick" | "swap" | "shop" (moved to the shop, no vehicle)
 //                                           | "taken" (another driver took it; written by the server)
+//                                           | "admin" (changed by an admin: the van, or none when vehicleId is missing)
+//       tap / outTap                     the phone's time when the punch button was pressed (server-corrected). The
+//                                        punch itself is the server's time when it arrived, so a punch sent late
+//                                        (no signal) shows both; see sentLate()
 //       swapHint                         set by the server when another driver takes this driver's van:
 //                                        { at, by, vehicleId, vehicleName, suggestId, suggestName }
 //   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at, fromId, fromName }
@@ -20,6 +26,13 @@
 //   timeclock/push_tokens/{ek}/{key}   { token, at, device }  phones that get closed-app reminders
 //   timeclock/push_tests/{ek}          written to ask the server for a test notification
 //   timeclock/reminders_sent/{day}/{ek} written by the server (functions/) once a reminder is handled
+//   timeclock/open/{ek}                the id of the employee's newest shift, written with each punch in, so the
+//                                        database rules can refuse a second open shift
+//   timeclock/requests/{ek}/{id}       "Fix my punch" requests: { at, kind, day, inTime, outTime, shiftId, note,
+//                                        status: "open" | "done" | "declined", reply, by, doneAt }
+//   timeclock/timeoff/{ek}/{id}        time-off requests: { at, from, to, note, status: "pending" | "approved" | "declined", reply, by, doneAt }
+//   timeclock/van_reports/{id}         problems drivers report with a van: { at, ek, name, vehicleId, vehicleName, shiftId,
+//                                        text, status: "open" | "fixed", fixNote, by, doneAt }
 // {ek} is the employee's email in lower case with "." replaced by "," (keys can't contain ".").
 //
 // GPS units and their nicknames are the ones RouteWatcher uses:
@@ -48,12 +61,16 @@ export const P = {
     pushTokens: "timeclock/push_tokens",
     pushTests: "timeclock/push_tests",
     prefs: "timeclock/prefs",
+    open: "timeclock/open",
+    requests: "timeclock/requests",
+    timeoff: "timeclock/timeoff",
+    vanReports: "timeclock/van_reports",
     gps: "developer/dispatch_dashboard/drivers",
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
 
 export const PAY_WEEK_START = 5; // pay weeks always run Friday to Thursday (payday is Friday)
-export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: PAY_WEEK_START };
+export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: PAY_WEEK_START, shopRadius: 500 };
 export const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DOW_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -63,6 +80,13 @@ export function settingsWithDefaults(v) {
     const s = Object.assign({}, DEFAULT_SETTINGS, v || {});
     s.reminderMinutes = clampInt(s.reminderMinutes, 0, 240, DEFAULT_SETTINGS.reminderMinutes);
     s.weekStart = PAY_WEEK_START; // fixed, whatever an older saved setting says
+    s.shopRadius = clampInt(s.shopRadius, 50, 50000, DEFAULT_SETTINGS.shopRadius);
+    // Where the shop is, for flagging punches made far from it (Settings → Shop location). Both or neither.
+    const lat = Number(s.shopLat), lng = Number(s.shopLng);
+    if (s.shopLat === undefined || s.shopLat === null || s.shopLat === "" || !isFinite(lat) || Math.abs(lat) > 90 ||
+        s.shopLng === undefined || s.shopLng === null || s.shopLng === "" || !isFinite(lng) || Math.abs(lng) > 180) {
+        delete s.shopLat; delete s.shopLng;
+    } else { s.shopLat = lat; s.shopLng = lng; }
     return s;
 }
 
@@ -219,6 +243,56 @@ export function scheduleFor(emp, key) {
     return day && day.start ? day : null;
 }
 
+// ---------- Time off ----------
+// Requests as a list, newest first: [{ id, from, to, note, status, ... }]
+export function timeOffList(obj) {
+    return Object.entries(obj || {})
+        .filter(([, t]) => t && typeof t.from === "string" && typeof t.to === "string")
+        .map(([id, t]) => Object.assign({ id: id }, t))
+        .sort((a, b) => (b.from < a.from ? -1 : b.from > a.from ? 1 : (b.at || 0) - (a.at || 0)));
+}
+// The approved time off that covers this day (a "YYYY-MM-DD" key), or null
+export function timeOffOn(obj, key) {
+    return timeOffList(obj).find(t => t.status === "approved" && t.from <= key && key <= t.to) || null;
+}
+// Their schedule for the day, unless they have approved time off then
+export function workdayFor(emp, key, timeoff) {
+    return timeOffOn(timeoff, key) ? null : scheduleFor(emp, key);
+}
+
+// ---------- Punches sent late ----------
+// A punch made with no signal reaches the server later; the shift then also has the time the button was pressed.
+export const SENT_LATE_MS = 2 * 60000;
+// { in, out }: the pressed time of each punch that arrived more than 2 minutes late (or null)
+export function sentLate(s) {
+    const late = (at, tap) => typeof at === "number" && typeof tap === "number" && at - tap > SENT_LATE_MS ? tap : null;
+    return { in: late(s && s.in, s && s.tap), out: late(s && s.out, s && s.outTap) };
+}
+
+// ---------- Distances ----------
+// Metres between two { lat, lng } points (haversine)
+export function distanceM(a, b) {
+    const R = 6371000, rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+export function fmtDistance(m) { return m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(m < 10000 ? 1 : 0) + " km"; }
+// How far a punch location is from the shop, when it's past the allowed radius; null otherwise (or no shop set)
+export function farFromShop(loc, settings) {
+    if (!hasCoords(loc) || !settings || typeof settings.shopLat !== "number") return null;
+    const d = distanceM(loc, { lat: settings.shopLat, lng: settings.shopLng });
+    return d > settings.shopRadius ? d : null;
+}
+
+// ---------- Date ranges ----------
+// Every day key from `from` to `to`, inclusive
+export function rangeDays(from, to) {
+    const out = [];
+    for (let k = from; k <= to && out.length < 1000; k = addDaysKey(k, 1)) out.push(k);
+    return out;
+}
+
 // ---------- GPS units (from RouteWatcher) ----------
 export function gpsList(drivers) {
     return Object.entries(drivers || {})
@@ -233,6 +307,35 @@ export function vanHistory(shift) {
         .filter(([, v]) => v && typeof v.at === "number")
         .map(([id, v]) => Object.assign({ id: id }, v))
         .sort((a, b) => a.at - b.at);
+}
+
+// Time spent in each van during one shift: [{ vehicleId, vehicleName, ms }]. Built from the van history: each van
+// counts from when it was picked until the next change. An admin change made after the shift ended corrects the
+// whole shift, so its van gets all of it. Shifts with no history count the shift's van for the whole shift.
+export function vanTime(shift, now) {
+    if (!shift || typeof shift.in !== "number") return [];
+    const end = typeof shift.out === "number" ? shift.out : now;
+    const list = vanHistory(shift);
+    const fix = list.filter(v => v.how === "admin" && v.at >= end).pop();
+    const whole = (id, name) => id ? [{ vehicleId: id, vehicleName: name || id, ms: Math.max(0, end - shift.in) }] : [];
+    if (fix) return whole(fix.vehicleId, fix.vehicleName);
+    if (!list.length) return whole(shift.vehicleId, shift.vehicleName);
+    const out = {};
+    let cur = null, from = shift.in;
+    const close = (to) => {
+        if (cur && cur.vehicleId && to > from) {
+            const o = out[cur.vehicleId] || (out[cur.vehicleId] = { vehicleId: cur.vehicleId, vehicleName: cur.vehicleName || cur.vehicleId, ms: 0 });
+            o.ms += to - from;
+        }
+    };
+    for (const v of list) {
+        const at = Math.min(Math.max(v.at, shift.in), end);
+        close(at);
+        from = at;
+        cur = v.how === "taken" || v.how === "shop" || !v.vehicleId ? null : v;
+    }
+    close(end);
+    return Object.values(out);
 }
 
 // ---------- Location ----------

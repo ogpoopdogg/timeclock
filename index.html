@@ -530,6 +530,52 @@
 
         .sheet-msg { min-height: 1.4em; color: var(--red); font-size: 0.92rem; margin-top: 12px; }
 
+        /* ---------- No signal / punches waiting to be sent ---------- */
+        .net-bar {
+            position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); z-index: 65;
+            width: min(560px, calc(100vw - 24px)); transform: translate(-50%, 0);
+            display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px;
+            background: rgba(48, 34, 10, 0.95); color: var(--text); font-size: 0.92rem;
+            box-shadow: 0 0 0 1px rgba(255, 159, 67, 0.6), 0 18px 40px rgba(0, 0, 0, 0.55);
+        }
+        .net-bar[hidden] { display: none; }
+        .net-bar svg { width: 20px; height: 20px; flex: none; color: var(--orange); }
+        .net-bar.sending svg { color: var(--yellow); animation: spin 1s linear infinite; }
+        body.net-shown .toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 86px); }
+
+        /* ---------- Last pay week, requests ---------- */
+        .pay-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .pay-row .split-box strong { font-size: 1.35rem; }
+        .pay-sub { color: var(--dim); font-size: 0.85rem; margin-top: 10px; }
+        .req-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .req-btns .chip-btn { height: 44px; justify-content: center; font-size: 0.98rem; color: var(--text); }
+        .req-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+        .req-list:empty { display: none; }
+        .req {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
+            padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line); font-size: 0.9rem;
+        }
+        .req-what { font-weight: 600; }
+        .req-detail { grid-column: 1 / -1; color: var(--muted); font-size: 0.85rem; }
+        .req-reply { grid-column: 1 / -1; color: var(--text); font-size: 0.85rem; }
+        .req-state { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); color: var(--muted); }
+        .req-state.ok { background: rgba(53, 208, 127, 0.14); color: var(--green); }
+        .req-state.no { background: rgba(255, 107, 94, 0.14); color: var(--red); }
+        .req-cancel { border: 0; background: none; color: var(--dim); font: inherit; font-size: 0.82rem; text-decoration: underline; cursor: pointer; justify-self: start; }
+        .van-report-link {
+            display: block; margin: 10px auto 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.9rem;
+            text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+        }
+        .van-report-link:hover { color: var(--yellow); }
+
+        /* ---------- Form sheet (fix a punch, time off, van check) ---------- */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+        .form-grid .full { grid-column: 1 / -1; }
+        .form-grid select.input { appearance: none; -webkit-appearance: none; }
+        .textarea { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; line-height: 1.4; }
+        .form-hint { color: var(--dim); font-size: 0.85rem; margin: -8px 0 14px; }
+        .sheet-foot .primary-btn { flex: 1; height: 46px; margin: 0; font-size: 1.1rem; }
+
         /* ---------- Responsive ---------- */
         @media (max-width: 900px) {
             .layout { grid-template-columns: 1fr; }
@@ -632,6 +678,7 @@
                         <span id="swapBtnText">Van swap</span>
                     </button>
                 </div>
+                <button type="button" class="van-report-link" id="vanReportBtn" hidden>Something wrong with this van? Report it</button>
             </section>
 
             <aside class="side">
@@ -655,6 +702,19 @@
                     <div class="days" id="days"></div>
                 </section>
 
+                <section class="card" aria-labelledby="payTitle">
+                    <div class="card-head" style="margin-bottom:12px">
+                        <h2 class="card-title" id="payTitle">Last pay week</h2>
+                        <span class="week-label" id="payLabel"></span>
+                    </div>
+                    <div class="pay-row">
+                        <div class="split-box"><span>Total</span><strong id="payTotal">0.00</strong></div>
+                        <div class="split-box"><span>Regular</span><strong id="payRegular">0.00</strong></div>
+                        <div class="split-box ot" id="payOtBox"><span>Overtime</span><strong id="payOvertime">0.00</strong></div>
+                    </div>
+                    <p class="pay-sub" id="paySub"></p>
+                </section>
+
                 <section class="card" aria-labelledby="remindTitle">
                     <h2 class="card-title" id="remindTitle" style="margin-bottom:12px">Reminders</h2>
                     <div class="remind-row">
@@ -669,9 +729,18 @@
                     </div>
                 </section>
 
+                <section class="card" aria-labelledby="reqTitle">
+                    <h2 class="card-title" id="reqTitle" style="margin-bottom:12px">Requests</h2>
+                    <div class="req-btns">
+                        <button type="button" class="chip-btn" id="fixPunchBtn">Fix a punch</button>
+                        <button type="button" class="chip-btn" id="timeOffBtn">Time off</button>
+                    </div>
+                    <div class="req-list" id="reqList"></div>
+                </section>
+
                 <p class="lock-note">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-                    <span>Punch times are recorded by the server clock. Only your administrator can change a time — ask them if you missed a punch.</span>
+                    <span>Punch times are recorded by the server clock. Only your administrator can change a time. If you missed a punch, tap Fix a punch.</span>
                 </p>
             </aside>
         </div>
@@ -715,6 +784,26 @@
         </div>
     </section>
 
+    <div class="sheet-backdrop" id="formBackdrop"></div>
+    <form class="sheet" id="formSheet" role="dialog" aria-modal="true" aria-labelledby="formTitle" aria-hidden="true" novalidate>
+        <div class="sheet-grab" aria-hidden="true"></div>
+        <div class="sheet-head">
+            <h2 id="formTitle"></h2>
+            <p id="formSub"></p>
+        </div>
+        <div class="sheet-body" id="formBody"></div>
+        <p class="sheet-msg" id="formMsg" role="alert" style="padding:0 22px"></p>
+        <div class="sheet-foot">
+            <button type="button" class="chip-btn" id="formCancel">Cancel</button>
+            <button type="submit" class="primary-btn" id="formSubmit">Send</button>
+        </div>
+    </form>
+
+    <div class="net-bar" id="netBar" role="status" aria-live="polite" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.6a10 10 0 0 1 14 0"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
+        <span id="netText"></span>
+    </div>
+
     <script type="module">
         let core;
         try {
@@ -728,7 +817,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
-            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords
+            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, timeOffList, timeOffOn, workdayFor
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
@@ -742,12 +831,16 @@
 
         const $ = id => document.getElementById(id);
         const HOLD_MS = 1500;               // how long the button must be held
-        const HISTORY_DAYS = 120;           // how far back "My week" can go
+        const HISTORY_DAYS = 120;           // punches loaded at first; going back further in "My week" loads more
+        const HISTORY_MAX_DAYS = 3 * 366;   // how far back "My week" can go
+        const SEND_WAIT_MS = 4000;          // a punch not confirmed by then is treated as saved on this phone
         const ICON = "icon-192.png";
 
         // ---------- State ----------
         let user = null, ek = null, emp = null, settings = settingsWithDefaults(null);
-        let shifts = [], claims = {}, serverOffset = 0;
+        let shifts = [], rawShifts = [], claims = {}, serverOffset = 0;
+        let requests = {}, timeoff = {};       // the driver's own "Fix a punch" and time-off requests
+        let shiftsSince = 0, shiftsUnsub = null;
         let prefs = null, prefsLoaded = false;   // timeclock/prefs/{ek}: the driver's saved reminder choice
         let locSaving = 0;                  // locations still being written (don't reload the app meanwhile)
         let swapLink = new URLSearchParams(location.search).has("swap"); // opened from a "van swap" notification
@@ -808,11 +901,13 @@
 
         onAuthStateChanged(auth, u => {
             stopListening();
-            user = u; emp = null; shifts = []; claims = {}; empLoaded = shiftsLoaded = false;
+            user = u; emp = null; shifts = []; rawShifts = []; claims = {}; empLoaded = shiftsLoaded = false;
+            requests = {}; timeoff = {}; online = true; netSeenAt = 0;
             prefs = null; prefsLoaded = false;
             pushState = "off"; pushFor = null; pushKey = null;
             closeSheet(true);
-            if (!u) { ek = null; show("signinScreen"); return; }
+            closeForm(true);
+            if (!u) { ek = null; renderNet(); show("signinScreen"); return; }
             ek = emailKey(u.email);
             show("bootScreen");
 
@@ -826,18 +921,32 @@
                 empLoaded = true; emp = null;
                 showNotice("Can't open the time clock", "Your account couldn't read the time clock (" + errText(err) + ") Ask your administrator to check the database rules.");
             });
-            const since = Date.now() - HISTORY_DAYS * 86400000;
-            listen(query(ref(db, P.shifts + "/" + ek), orderByChild("in"), startAt(since)), s => {
-                shifts = shiftList(s.val());
-                shiftsLoaded = true;
-                route();
-                if (sheetOpen) renderSheet();
-            }, err => { shiftsLoaded = true; toast("Couldn't load your punches: " + errText(err), true); route(); });
+            listen(ref(db, ".info/connected"), s => { setOnline(!!s.val()); });
+            shiftsSince = Date.now() - HISTORY_DAYS * 86400000;
+            listenShifts();
+            unsubs.push(() => { if (shiftsUnsub) { shiftsUnsub(); shiftsUnsub = null; } });
             listen(ref(db, P.claims), s => { claims = s.val() || {}; if (sheetOpen) renderSheet(); render(); }, () => {});
+            // Database rules not updated yet: these just stay empty
+            listen(ref(db, P.requests + "/" + ek), s => { requests = s.val() || {}; renderRequests(); }, () => {});
+            listen(ref(db, P.timeoff + "/" + ek), s => { timeoff = s.val() || {}; render(); scheduleReminder(); }, () => {});
             listen(ref(db, P.prefs + "/" + ek), s => { prefs = s.val() || {}; prefsLoaded = true; adoptOldReminder(); render(); scheduleReminder(); },
                 // Database rules not updated yet: behave as before (on when the phone allows notifications)
                 () => { prefs = { punchReminder: canNotify && Notification.permission === "granted" }; prefsLoaded = true; render(); });
         });
+
+        // The driver's punches from shiftsSince on (going back in "My week" moves it earlier)
+        function listenShifts() {
+            if (shiftsUnsub) shiftsUnsub();
+            const forEk = ek;
+            shiftsUnsub = onValue(query(ref(db, P.shifts + "/" + ek), orderByChild("in"), startAt(shiftsSince)), s => {
+                if (forEk !== ek) return;
+                rawShifts = shiftList(s.val());
+                refreshShifts();
+                shiftsLoaded = true;
+                route();
+                if (sheetOpen) renderSheet();
+            }, err => { shiftsLoaded = true; toast("Couldn't load your punches: " + errText(err), true); route(); });
+        }
 
         function showNotice(title, text) {
             $("noticeTitle").textContent = title;
@@ -847,6 +956,7 @@
 
         function route() {
             if (!user || !empLoaded) return;
+            if (emp && emp.removed) emp = null; // removed by the admin: same as never added
             if (!emp || emp.active === false) {
                 showNotice(emp ? "Your time clock is turned off" : "Not set up yet",
                     (emp ? "Your account is inactive on the time clock. " : (user.email + " isn't on the time clock yet. ")) +
@@ -862,6 +972,7 @@
             scheduleReminder();
             if (pushFor !== ek) { pushFor = ek; setupPush(); }
             if (swapLink) openSwapFromNotification();
+            flushPending();
         }
 
         // ---------- Rendering ----------
@@ -898,10 +1009,13 @@
                 $("swapBtnText").textContent = has || lost ? "Van swap" : "Pick van";
                 showSwapBanner(open, lost);
             }
+            $("vanReportBtn").hidden = !(open && open.vehicleId && !lostVan(open));
 
             tickClock();
             renderWeek();
+            renderPayWeek();
             renderReminderCard();
+            renderRequests();
         }
 
         function tickClock() {
@@ -925,7 +1039,7 @@
             const thisWeek = weekStartKey(today, settings.weekStart);
             $("weekLabel").textContent = viewWeek === thisWeek ? "This week" : fmtKey(days[0]) + " – " + fmtKey(days[6]);
             $("weekNext").disabled = viewWeek >= thisWeek;
-            $("weekPrev").disabled = addDaysKey(viewWeek, -7) < dayKey(Date.now() - HISTORY_DAYS * 86400000);
+            $("weekPrev").disabled = addDaysKey(viewWeek, -7) < dayKey(t - HISTORY_MAX_DAYS * 86400000);
             $("weekTotal").innerHTML = esc(fmtHours(total)) + "<small>hrs</small>";
             const count = days.reduce((n, k) => n + byDay[k].shifts.length, 0);
             $("weekTotalSub").textContent = fmtDur(total) + " · " + count + (count === 1 ? " shift" : " shifts");
@@ -945,9 +1059,10 @@
                 const row = daysEl.querySelector('[data-k="' + k + '"]');
                 const d = byDay[k];
                 const sched = scheduleFor(emp, k);
+                const off = sched && timeOffOn(timeoff, k);
                 row.classList.toggle("is-today", k === today);
                 row.querySelector(".day-name").innerHTML = esc(DOW_SHORT[new Date(k + "T12:00:00Z").getUTCDay()]) +
-                    "<small>" + esc(sched ? fmtHHMM(sched.start) : k.slice(5).replace("-", "/")) + "</small>";
+                    "<small>" + esc(off ? "Time off" : sched ? fmtHHMM(sched.start) : k.slice(5).replace("-", "/")) + "</small>";
                 const bar = row.querySelector(".day-bar i");
                 const live = d.shifts.some(s => typeof s.out !== "number");
                 bar.classList.toggle("live", live);
@@ -962,7 +1077,29 @@
             });
         }
 
-        $("weekPrev").addEventListener("click", () => { viewWeek = addDaysKey(viewWeek, -7); renderWeek(); });
+        $("weekPrev").addEventListener("click", () => {
+            viewWeek = addDaysKey(viewWeek, -7);
+            // Older than what's loaded: load from a month before this week
+            const from = keyToEpoch(viewWeek);
+            if (from < shiftsSince) { shiftsSince = keyToEpoch(addDaysKey(viewWeek, -28)); listenShifts(); }
+            renderWeek();
+        });
+
+        // The pay week before this one (Friday to Thursday): what the next pay is for
+        function renderPayWeek() {
+            const t = now();
+            const start = addDaysKey(weekStartKey(dayKey(t), settings.weekStart), -7);
+            const days = weekDays(start);
+            const { byDay, total, regular, overtime } = weekTotals(shifts, days, t);
+            const count = days.reduce((n, k) => n + byDay[k].shifts.length, 0);
+            $("payLabel").textContent = fmtKey(days[0]) + " – " + fmtKey(days[6]);
+            $("payTotal").textContent = fmtHours(total);
+            $("payRegular").textContent = fmtHours(regular);
+            $("payOvertime").textContent = fmtHours(overtime);
+            $("payOtBox").classList.toggle("has", overtime > 0);
+            $("paySub").textContent = count ? fmtDur(total) + " over " + count + (count === 1 ? " shift" : " shifts") + ". Go back in My week for older weeks."
+                : "No punches that week.";
+        }
         $("weekNext").addEventListener("click", () => { viewWeek = addDaysKey(viewWeek, 7); renderWeek(); });
 
         setInterval(() => {
@@ -1070,12 +1207,12 @@
             const open = current();
             const where = readLocation(); // asked for now, saved once the punch is in (a slow GPS fix never delays the punch)
             try {
-                if (open) { await punchOut(open); saveLocation(P.shifts + "/" + ek + "/" + open.id + "/outLoc", where); }
-                else saveLocation(P.shifts + "/" + ek + "/" + (await punchIn()) + "/inLoc", where);
+                let res;
+                if (open) { res = await punchOut(open); saveLocation(P.shifts + "/" + ek + "/" + open.id + "/outLoc", where); }
+                else { res = await punchIn(); saveLocation(P.shifts + "/" + ek + "/" + res.id + "/inLoc", where); }
                 if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
                 burst();
-                const after = current();
-                showSuccess(!open, after ? after.in : now());
+                showSuccess(!open, res.tap, !res.sent);
             } catch (err) {
                 $("punchMsg").textContent = (open ? "Punch out" : "Punch in") + " failed: " + errText(err);
                 punchEl.classList.remove("shake"); void punchEl.offsetWidth; punchEl.classList.add("shake");
@@ -1088,12 +1225,143 @@
             }
         }
 
+        // A punch is saved on the phone first (localStorage), then sent. With no signal it waits there, and is sent when
+        // the phone is back online, even if the app was closed meanwhile. The server stamps the punch when it arrives;
+        // the time the button was pressed goes with it (tap / outTap) so the admin sees a punch that arrived late.
         async function punchIn() {
             if (current()) throw new Error("You're already punched in.");
-            const r = push(ref(db, P.shifts + "/" + ek));
-            await set(r, { in: serverTimestamp(), src: "clock" });
+            const id = push(ref(db, P.shifts + "/" + ek)).key;
+            const tap = now();
+            addPending({ kind: "in", id: id, tap: tap });
+            const sent = await waitFor(deliver({ kind: "in", id: id, tap: tap }), SEND_WAIT_MS);
             hideBanner();
-            return r.key;
+            return { id: id, tap: tap, sent: sent };
+        }
+
+        const shiftPath = id => P.shifts + "/" + ek + "/" + id;
+        const isDenied = err => /PERMISSION_DENIED|permission[-_]denied/i.test(String((err && err.code) || "") + " " + String((err && err.message) || ""));
+        async function shiftHas(id, field) { try { return (await get(ref(db, shiftPath(id) + "/" + field))).exists(); } catch (e) { return false; } }
+
+        async function sendPunchIn(id, tap) {
+            const shift = { in: serverTimestamp(), src: "clock", tap: tap };
+            try {
+                // With timeclock/open, so the database can refuse a second open shift (another phone, say)
+                await update(ref(db), { [shiftPath(id)]: shift, [P.open + "/" + ek]: id });
+            } catch (err) {
+                if (!isDenied(err) || await shiftHas(id, "in")) { if (isDenied(err)) return; throw err; }
+                // Database rules from before timeclock/open: send the punch on its own
+                try { await set(ref(db, shiftPath(id)), shift); }
+                catch (err2) {
+                    if (await shiftHas(id, "in")) return;
+                    throw isDenied(err2) ? new Error("The punch in was refused. If you're on the clock on another phone, punch out there first.") : err2;
+                }
+            }
+        }
+
+        async function sendPunchOut(id, tap) {
+            try { await set(ref(db, shiftPath(id) + "/out"), serverTimestamp()); }
+            catch (err) { if (!(await shiftHas(id, "out"))) throw err; }
+            set(ref(db, shiftPath(id) + "/outTap"), tap).catch(err => console.warn("Punch-out phone time not saved:", err));
+        }
+
+        // Sends one saved punch; it leaves the phone's list once the server has it (or refused it).
+        // Punches go one at a time, in order, so a punch out never reaches the server before its punch in.
+        const inflight = new Map();
+        let sendChain = Promise.resolve();
+        function deliver(p) {
+            const key = p.kind + "|" + p.id;
+            if (inflight.has(key)) return inflight.get(key);
+            if (p.kind === "out") {
+                const pin = loadPending().find(x => x.kind === "in" && x.id === p.id);
+                if (pin) deliver(pin).catch(() => {});
+            }
+            const run = sendChain.catch(() => {}).then(() => p.kind === "in" ? sendPunchIn(p.id, p.tap) : sendPunchOut(p.id, p.tap));
+            sendChain = run;
+            const done = run.then(() => {
+                dropPending(p);
+                if (p.kind === "out" && p.vehicleId) releaseVehicle(p.vehicleId, p.nickname).catch(err => console.warn("Vehicle release:", err));
+            }, err => { dropPending(p); throw err; }).finally(() => inflight.delete(key));
+            inflight.set(key, done);
+            return done;
+        }
+
+        // true once the promise is done, false if it's still going after ms (no signal); a refusal still throws
+        function waitFor(promise, ms) {
+            return new Promise((resolve, reject) => {
+                let late = false;
+                const timer = setTimeout(() => { late = true; resolve(false); }, ms);
+                promise.then(() => { clearTimeout(timer); resolve(true); }, err => {
+                    clearTimeout(timer);
+                    if (!late) reject(err);
+                    else toast("Your saved punch couldn't be sent: " + errText(err), true);
+                });
+            });
+        }
+
+        // ---------- Punches saved on this phone, not yet confirmed by the server ----------
+        const pendingKey = () => "tc_pending_" + ek;
+        function loadPending() {
+            try { const v = JSON.parse(localStorage.getItem(pendingKey()) || "[]"); return Array.isArray(v) ? v.filter(x => x && x.id && typeof x.tap === "number") : []; }
+            catch (e) { return []; }
+        }
+        function savePending(list) {
+            try { if (list.length) localStorage.setItem(pendingKey(), JSON.stringify(list)); else localStorage.removeItem(pendingKey()); } catch (e) {}
+            refreshShifts();
+            renderNet();
+        }
+        const samePending = (a, b) => a.kind === b.kind && a.id === b.id;
+        function addPending(p) { savePending(loadPending().filter(x => !samePending(x, p)).concat([p])); }
+        function dropPending(p) { savePending(loadPending().filter(x => !samePending(x, p))); }
+
+        // Punches from the server, with the ones still on this phone added in
+        function refreshShifts() {
+            const list = rawShifts.map(s => Object.assign({}, s));
+            for (const p of (ek ? loadPending() : [])) {
+                const s = list.find(x => x.id === p.id);
+                if (p.kind === "in" && !s) list.push({ id: p.id, in: p.tap, tap: p.tap, src: "clock", pending: true });
+                else if (p.kind === "out" && s && typeof s.out !== "number") { s.out = p.tap; s.pending = true; }
+            }
+            shifts = list.sort((a, b) => a.in - b.in);
+            if (!$("clockScreen").hidden) render();
+        }
+
+        // Sends what's waiting, oldest first: after the app opens, and whenever the signal comes back
+        let flushing = false;
+        async function flushPending() {
+            if (flushing || !online || !ek || !shiftsLoaded) return;
+            const list = loadPending();
+            if (!list.length) return;
+            flushing = true;
+            renderNet();
+            try {
+                for (const p of list) {
+                    try { await deliver(p); }
+                    catch (err) { toast("A punch saved on this phone couldn't be sent: " + errText(err), true); }
+                }
+            } finally { flushing = false; renderNet(); }
+        }
+
+        // ---------- Signal ----------
+        let online = true, netSeenAt = 0, offlineTimer = null;
+        function setOnline(v) {
+            online = v;
+            clearTimeout(offlineTimer);
+            if (v) { netSeenAt = Date.now(); renderNet(); flushPending(); }
+            // Firebase reports "not connected" for a moment at start and on brief drops; only say so after a few seconds
+            else offlineTimer = setTimeout(renderNet, 3000);
+        }
+        function renderNet() {
+            const bar = $("netBar");
+            const pending = ek ? loadPending().length : 0;
+            const offline = !online && !!user;
+            let text = "";
+            if (offline && pending) text = "No signal. Your punch is saved on this phone and is sent when there's signal again. If you close the app first, it's sent the next time you open it.";
+            else if (offline) text = "No signal. You can still punch: it's saved on this phone and sent when you're back online.";
+            else if (pending && flushing) text = "Sending the punch saved on this phone…";
+            bar.hidden = !text;
+            bar.classList.toggle("sending", !offline && !!pending);
+            $("netText").textContent = text;
+            document.body.classList.toggle("net-shown", !!text);
         }
 
         // Saves where the phone was for a punch or van swap. The server adds the street address (functions/).
@@ -1105,16 +1373,19 @@
         }
 
         async function punchOut(open) {
-            await set(ref(db, P.shifts + "/" + ek + "/" + open.id + "/out"), serverTimestamp());
-            if (open.vehicleId) await releaseVehicle(open.vehicleId, open.nickname).catch(err => console.warn("Vehicle release:", err));
+            const tap = now();
+            const p = { kind: "out", id: open.id, tap: tap, vehicleId: open.vehicleId || null, nickname: open.nickname || null };
+            addPending(p);
+            return { id: open.id, tap: tap, sent: await waitFor(deliver(p), SEND_WAIT_MS) };
         }
 
-        function showSuccess(isIn, ts) {
+        function showSuccess(isIn, ts, saved) {
             const el = $("success");
             el.style.setProperty("--sc-rgb", isIn ? "53, 208, 127" : "255, 204, 0");
             $("scTitle").textContent = isIn ? "Punched in" : "Punched out";
-            $("scTime").textContent = fmtTime(isIn ? ts : now());
-            $("scSub").textContent = isIn ? "Drive Safe, " + firstName(emp, user.email) : "";
+            $("scTime").textContent = fmtTime(ts);
+            $("scSub").textContent = saved ? "No signal: saved on this phone, sent when you're back online."
+                : isIn ? "Drive Safe, " + firstName(emp, user.email) : "";
             el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
             afterPunchInPick = isIn;
             clearTimeout(showSuccess.t);
@@ -1272,6 +1543,7 @@
                 const msg = (prevId || lost ? "Van swap done. " : "") + "You are driving vehicle " + g.name + (holder ? ". " + holderName + " has been unassigned." : "");
                 if (nickOk) toast(msg);
                 else toast(msg + " Its RouteWatcher name couldn't be updated, so tell your administrator.", true);
+                setTimeout(() => openVanCheck(g.id, g.name, true), 450); // van check: anything wrong with it?
             } catch (err) {
                 picking = null;
                 renderSheet();
@@ -1321,9 +1593,188 @@
         }
 
         $("changeVehicleBtn").addEventListener("click", openSheet);
+        $("vanReportBtn").addEventListener("click", () => { const o = current(); if (o && o.vehicleId) openVanCheck(o.vehicleId, o.vehicleName || o.vehicleId, false); });
         $("sheetBackdrop").addEventListener("click", () => closeSheet());
         $("sheetSkip").addEventListener("click", () => closeSheet());
-        document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen) closeSheet(); });
+        document.addEventListener("keydown", e => {
+            if (e.key !== "Escape") return;
+            if (formOpen) closeForm(); else if (sheetOpen) closeSheet();
+        });
+
+        // ---------- Form sheet: Fix a punch, Time off, Van check ----------
+        let formOpen = false, formSubmit = null;
+        function openForm(o) {
+            formOpen = true;
+            formSubmit = o.onSubmit;
+            $("formTitle").textContent = o.title;
+            $("formSub").textContent = o.sub || "";
+            $("formBody").innerHTML = o.body;
+            $("formMsg").textContent = "";
+            $("formSubmit").textContent = o.submit || "Send";
+            $("formSubmit").disabled = false;
+            $("formCancel").textContent = o.cancel || "Cancel";
+            $("formBackdrop").classList.add("show");
+            const f = $("formSheet");
+            f.classList.add("show");
+            f.setAttribute("aria-hidden", "false");
+            if (o.afterOpen) o.afterOpen();
+        }
+        function closeForm(instant) {
+            formOpen = false;
+            formSubmit = null;
+            $("formBackdrop").classList.remove("show");
+            const f = $("formSheet");
+            f.classList.remove("show");
+            f.setAttribute("aria-hidden", "true");
+            if (!instant) punchBtn.focus({ preventScroll: true });
+        }
+        const formFail = text => { $("formMsg").textContent = text; return false; };
+        $("formCancel").addEventListener("click", () => closeForm());
+        $("formBackdrop").addEventListener("click", () => closeForm());
+        $("formSheet").addEventListener("submit", async e => {
+            e.preventDefault();
+            if (!formSubmit) return;
+            if (!online) { formFail("No signal. Try again when you're back online."); return; }
+            const btn = $("formSubmit");
+            btn.disabled = true;
+            $("formMsg").textContent = "";
+            try { if ((await formSubmit()) !== false) closeForm(); }
+            catch (err) { formFail("Couldn't send: " + errText(err)); }
+            btn.disabled = false;
+        });
+
+        // "Fix a punch": the driver asks the office to add or change a punch (admin panel → Inbox)
+        const FIX_KINDS = { in: "I missed my punch in", out: "I missed my punch out", both: "I missed a whole shift", wrong: "A punch time is wrong", other: "Something else" };
+        const fixNeeds = kind => ({ in: kind === "in" || kind === "both" || kind === "wrong", out: kind === "out" || kind === "both" || kind === "wrong" });
+        function openFixPunch() {
+            const today = dayKey(now()), open = current();
+            const kind = open && dayKey(open.in) !== today ? "out" : "in"; // still on the clock from an earlier day: likely a missed punch out
+            openForm({
+                title: "Fix a punch",
+                sub: "Tell the office what to change. You'll see their answer here under Requests.",
+                body: '<div class="form-grid">' +
+                    '<div class="full"><label class="field-label" for="fxKind">What happened</label><select class="input" id="fxKind">' +
+                    Object.entries(FIX_KINDS).map(([k, v]) => '<option value="' + k + '"' + (k === kind ? " selected" : "") + ">" + esc(v) + "</option>").join("") + "</select></div>" +
+                    '<div class="full"><label class="field-label" for="fxDay">Day</label><input class="input" id="fxDay" type="date" max="' + today + '" value="' +
+                    (kind === "out" ? dayKey(open.in) : today) + '"></div>' +
+                    '<div id="fxInWrap"><label class="field-label" for="fxIn">Punch in time</label><input class="input" id="fxIn" type="time"></div>' +
+                    '<div id="fxOutWrap"><label class="field-label" for="fxOut">Punch out time</label><input class="input" id="fxOut" type="time"></div>' +
+                    '<div class="full"><label class="field-label" for="fxNote">Details</label><textarea class="input textarea" id="fxNote" maxlength="500" placeholder="e.g. My phone died, I started at 7:30"></textarea></div></div>',
+                onSubmit: sendFixPunch,
+                afterOpen: syncFixFields
+            });
+        }
+        function syncFixFields() {
+            const need = fixNeeds($("fxKind").value);
+            $("fxInWrap").hidden = !need.in;
+            $("fxOutWrap").hidden = !need.out;
+            $("fxInWrap").querySelector("label").textContent = $("fxKind").value === "wrong" ? "Right punch in time" : "Punch in time";
+            $("fxOutWrap").querySelector("label").textContent = $("fxKind").value === "wrong" ? "Right punch out time" : "Punch out time";
+        }
+        $("formBody").addEventListener("change", e => { if (e.target.id === "fxKind") syncFixFields(); });
+
+        async function sendFixPunch() {
+            const kind = $("fxKind").value, day = $("fxDay").value, note = $("fxNote").value.trim();
+            const need = fixNeeds(kind), inTime = need.in ? $("fxIn").value : "", outTime = need.out ? $("fxOut").value : "";
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return formFail("Pick the day.");
+            if (day > dayKey(now())) return formFail("That day hasn't happened yet.");
+            if (kind === "in" && !inTime) return formFail("Enter the time you started.");
+            if (kind === "out" && !outTime) return formFail("Enter the time you finished.");
+            if (kind === "both" && (!inTime || !outTime)) return formFail("Enter the time you started and the time you finished.");
+            if (kind === "wrong" && !inTime && !outTime) return formFail("Enter the right time.");
+            if (kind === "other" && !note) return formFail("Tell the office what needs fixing.");
+            // The shift it's about, when there is one that day
+            const onDay = shifts.filter(x => !x.pending && dayKey(x.in) === day);
+            const shift = kind === "out" ? (onDay.filter(x => typeof x.out !== "number").pop() || onDay[onDay.length - 1])
+                : kind === "wrong" || kind === "in" ? onDay[0] : null;
+            const req = { at: serverTimestamp(), kind: kind, day: day, note: note, status: "open" };
+            if (inTime) req.inTime = inTime;
+            if (outTime) req.outTime = outTime;
+            if (shift) req.shiftId = shift.id;
+            await set(push(ref(db, P.requests + "/" + ek)), req);
+            toast("Sent to the office. You'll see their answer under Requests.");
+        }
+
+        // Time off: approved days drop off the schedule and the punch-in reminder
+        function openTimeOff() {
+            const tomorrow = addDaysKey(dayKey(now()), 1), today = dayKey(now());
+            openForm({
+                title: "Time off",
+                sub: "Ask for a day or more off. Once the office approves it, you won't get punch-in reminders those days.",
+                body: '<div class="form-grid">' +
+                    '<div><label class="field-label" for="toFrom">First day off</label><input class="input" id="toFrom" type="date" min="' + today + '" value="' + tomorrow + '"></div>' +
+                    '<div><label class="field-label" for="toTo">Last day off</label><input class="input" id="toTo" type="date" min="' + today + '" value="' + tomorrow + '"></div>' +
+                    '<div class="full"><label class="field-label" for="toNote">Reason (optional)</label><textarea class="input textarea" id="toNote" maxlength="500" placeholder="e.g. Appointment"></textarea></div></div>',
+                submit: "Ask for time off",
+                onSubmit: sendTimeOff
+            });
+        }
+        $("formBody").addEventListener("input", e => {
+            if (e.target.id === "toFrom" && $("toTo").value < e.target.value) $("toTo").value = e.target.value;
+        });
+        async function sendTimeOff() {
+            const from = $("toFrom").value, to = $("toTo").value, note = $("toNote").value.trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return formFail("Pick the first and last day off.");
+            if (to < from) return formFail("The last day can't be before the first day.");
+            if (from < dayKey(now())) return formFail("Pick today or a later day.");
+            if (to > addDaysKey(from, 60)) return formFail("Ask for 60 days or fewer at a time.");
+            await set(push(ref(db, P.timeoff + "/" + ek)), { at: serverTimestamp(), from: from, to: to, note: note, status: "pending" });
+            toast("Sent to the office. You'll see their answer under Requests.");
+        }
+
+        // Van check: after picking a van (and from the link under the van), the driver can report what's wrong with it
+        function openVanCheck(vehicleId, vehicleName, afterPick) {
+            openForm({
+                title: "Van check · " + vehicleName,
+                sub: afterPick ? "Anything wrong with this van that needs attention? If it's all good, tap All good."
+                    : "What's wrong with this van? The office sees your report.",
+                body: '<label class="field-label" for="vcText">What needs attention</label>' +
+                    '<textarea class="input textarea" id="vcText" maxlength="1000" placeholder="e.g. Check engine light is on, back door sticks"></textarea>',
+                submit: "Send report",
+                cancel: afterPick ? "All good" : "Cancel",
+                onSubmit: () => sendVanReport(vehicleId, vehicleName)
+            });
+        }
+        async function sendVanReport(vehicleId, vehicleName) {
+            const text = $("vcText").value.trim();
+            if (!text) return formFail("Write what's wrong, or tap " + $("formCancel").textContent + ".");
+            const open = current();
+            await set(push(ref(db, P.vanReports)), { at: serverTimestamp(), ek: ek, name: displayName(emp, user.email), vehicleId: vehicleId,
+                vehicleName: String(vehicleName).slice(0, 60), shiftId: open && !open.pending ? open.id : null, text: text, status: "open" });
+            toast("Thanks. The office has your report on van " + vehicleName + ".");
+        }
+
+        // The driver's requests and the office's answers
+        function renderRequests() {
+            const el = $("reqList");
+            if (!user || !emp) return;
+            const items = [];
+            for (const [id, r] of Object.entries(requests || {})) if (r && r.kind) items.push({ type: "fix", id: id, r: r });
+            for (const t of timeOffList(timeoff)) items.push({ type: "off", id: t.id, r: t });
+            items.sort((a, b) => (b.r.at || 0) - (a.r.at || 0));
+            const html = items.slice(0, 6).map(it => {
+                const r = it.r;
+                const what = it.type === "fix" ? FIX_KINDS[r.kind] || "Fix a punch" : "Time off";
+                const detail = it.type === "fix"
+                    ? fmtKey(r.day) + (r.inTime ? " · in " + fmtHHMM(r.inTime) : "") + (r.outTime ? " · out " + fmtHHMM(r.outTime) : "") + (r.note ? " · " + r.note : "")
+                    : (r.from === r.to ? fmtKey(r.from) : fmtKey(r.from) + " – " + fmtKey(r.to)) + (r.note ? " · " + r.note : "");
+                const st = r.status === "done" ? ["Fixed", "ok"] : r.status === "approved" ? ["Approved", "ok"] : r.status === "declined" ? ["Declined", "no"] : ["Waiting", ""];
+                const waiting = r.status === "open" || r.status === "pending";
+                return '<div class="req"><span class="req-what">' + esc(what) + '</span><span class="req-state ' + st[1] + '">' + st[0] + "</span>" +
+                    '<span class="req-detail">' + esc(detail) + "</span>" + (r.reply ? '<span class="req-reply">Office: ' + esc(r.reply) + "</span>" : "") +
+                    (waiting ? '<button type="button" class="req-cancel" data-cancel="' + it.type + "|" + esc(it.id) + '">Cancel request</button>' : "") + "</div>";
+            }).join("");
+            if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+        }
+        $("reqList").addEventListener("click", async e => {
+            const b = e.target.closest("[data-cancel]");
+            if (!b || !confirm("Cancel this request?")) return;
+            const [type, id] = b.dataset.cancel.split("|");
+            try { await remove(ref(db, (type === "fix" ? P.requests : P.timeoff) + "/" + ek + "/" + id)); toast("Request cancelled."); }
+            catch (err) { toast("Couldn't cancel: " + errText(err), true); }
+        });
+        $("fixPunchBtn").addEventListener("click", openFixPunch);
+        $("timeOffBtn").addEventListener("click", openTimeOff);
 
         // ---------- Van taken by another driver ----------
         let swapBannerFor = null, swapBannerDismissed = null;
@@ -1356,7 +1807,7 @@
         setupPwa({
             installButton: $("installBtn"),
             toast: toast,
-            isBusy: () => holding || busy || sheetOpen || !!picking || locSaving > 0 || $("success").classList.contains("show")
+            isBusy: () => holding || busy || sheetOpen || formOpen || !!picking || locSaving > 0 || flushing || $("success").classList.contains("show")
         }).registration.then(r => { swReg = r; });
         const canNotify = "Notification" in window;
         const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1365,7 +1816,7 @@
         function reminderInfo() {
             if (!emp) return null;
             const today = dayKey(now());
-            const sched = scheduleFor(emp, today);
+            const sched = workdayFor(emp, today, timeoff); // not on approved time off
             if (!sched) return null;
             return { today: today, start: sched.start, at: keyToEpoch(today, sched.start) + settings.reminderMinutes * 60000 };
         }

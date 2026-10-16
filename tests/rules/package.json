@@ -1,0 +1,14 @@
+{
+  "name": "ec-timeclock-rules-tests",
+  "private": true,
+  "description": "Checks database.rules.json against the Firebase Realtime Database emulator",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only database --project demo-timeclock \"node --test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.0.0",
+    "firebase-tools": "15.34.0"
+  }
+}

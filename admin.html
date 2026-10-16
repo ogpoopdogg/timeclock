@@ -408,9 +408,73 @@
         .toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform 0.5s var(--ease-spring); }
         .toast.warn { box-shadow: 0 0 0 1px rgba(255, 107, 94, 0.6), 0 18px 40px rgba(0, 0, 0, 0.55); }
 
+        /* ---------- Inbox ---------- */
+        .inbox-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+        .inbox-col h3 { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .inbox-col h3 .tab-count { background: rgba(255, 204, 0, 0.16); color: var(--yellow); }
+        .inbox-list { display: flex; flex-direction: column; gap: 10px; }
+        .inbox-item {
+            padding: 14px; border-radius: 14px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
+            animation: panelIn 0.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms);
+        }
+        .inbox-item.done { opacity: 0.6; }
+        .inbox-item .ii-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+        .inbox-item .ii-who { font-weight: 600; }
+        .inbox-item .ii-when { color: var(--dim); font-size: 0.8rem; white-space: nowrap; }
+        .inbox-item .ii-what { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; margin-top: 2px; }
+        .inbox-item .ii-detail { color: var(--muted); font-size: 0.9rem; margin-top: 2px; }
+        .inbox-item .ii-note { margin-top: 6px; font-size: 0.92rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .inbox-item .ii-reply { margin-top: 6px; color: var(--muted); font-size: 0.85rem; font-style: italic; }
+        .inbox-item .ii-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .inbox-empty { padding: 18px; border-radius: 14px; color: var(--dim); background: rgba(255, 255, 255, 0.02); box-shadow: inset 0 0 0 1px var(--line); font-size: 0.92rem; }
+
+        /* ---------- Punch flags: sent late (no signal), far from the shop ---------- */
+        .tag.late { color: var(--orange); background: rgba(255, 159, 67, 0.12); }
+        .far { display: inline-flex; margin-top: 3px; padding: 1px 7px; border-radius: 6px; font-size: 0.75rem; color: var(--red); background: rgba(255, 107, 94, 0.1); white-space: nowrap; }
+        .late-box { padding: 10px 12px; border-radius: 10px; margin: 0 0 12px; font-size: 0.9rem; color: var(--text); background: rgba(255, 159, 67, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 159, 67, 0.4); }
+        .late-box .copy-link { margin-left: 6px; }
+
+        /* ---------- Change log controls ---------- */
+        .log-tools { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .log-tools .select { flex: 1; min-width: 0; }
+        .log-more { margin-top: 10px; width: 100%; }
+
+        /* ---------- Reports ---------- */
+        .report-card { padding: 20px; border-radius: 18px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 18px; }
+        .report-card h3 { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; line-height: 1.1; }
+        .report-card .hint { color: var(--muted); font-size: 0.92rem; margin: 2px 0 16px; }
+        .ot-scroll { overflow-x: auto; }
+        table.ot-table { border-collapse: separate; border-spacing: 2px; font-variant-numeric: tabular-nums; min-width: 100%; }
+        .ot-table th { font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.04em; color: var(--muted); padding: 4px 6px; text-align: center; white-space: nowrap; }
+        .ot-table th.name, .ot-table td.name { text-align: left; padding-right: 14px; white-space: nowrap; }
+        .ot-table td { padding: 0; text-align: center; font-size: 0.88rem; }
+        .ot-table td.name { font-weight: 600; font-size: 0.95rem; }
+        .ot-cell { display: block; min-width: 54px; padding: 8px 6px; border-radius: 6px; color: var(--text); background: rgba(255, 255, 255, 0.03); }
+        .ot-cell.zero { color: var(--dim); }
+        .ot-table td.total { font-weight: 700; padding: 0 8px; white-space: nowrap; }
+        .ot-table td.total small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+        .ot-legend { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.8rem; margin-top: 12px; }
+        .ot-legend .ramp { width: 120px; height: 10px; border-radius: 4px; background: linear-gradient(90deg, rgba(255, 159, 67, 0.08), rgba(255, 159, 67, 0.85)); }
+        .van-bars { display: flex; flex-direction: column; gap: 10px; }
+        .van-bar { display: grid; grid-template-columns: 110px minmax(0, 1fr) 92px; gap: 12px; align-items: center; }
+        .van-bar .vb-name { font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .van-bar .vb-track { height: 14px; border-radius: 4px; background: rgba(255, 255, 255, 0.04); overflow: hidden; }
+        .van-bar .vb-fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--yellow); }
+        .van-bar .vb-val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .van-bar .vb-val small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+        .report-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .viz-tip {
+            position: fixed; z-index: 110; pointer-events: none; padding: 8px 10px; border-radius: 10px; font-size: 0.85rem; max-width: 260px;
+            background: rgba(20, 23, 25, 0.97); box-shadow: 0 0 0 1px var(--shoulder), 0 12px 30px rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.12s;
+        }
+        .viz-tip.show { opacity: 1; }
+        .viz-tip strong { display: block; }
+
         /* ---------- Responsive ---------- */
         @media (max-width: 960px) {
             .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .inbox-grid { grid-template-columns: 1fr; }
+            .van-bar { grid-template-columns: 80px minmax(0, 1fr) 80px; }
             .settings-grid { grid-template-columns: 1fr; }
             .emp-row { grid-template-columns: auto minmax(0, 1fr) auto; }
             .emp-row .sched-chips { grid-column: 1 / -1; order: 5; }
@@ -485,6 +549,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                 <span class="tab-text">Live</span><span class="tab-count" id="liveCount">0</span>
             </button>
+            <button type="button" class="tab" role="tab" data-tab="inbox" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg>
+                <span class="tab-text">Inbox</span><span class="tab-count" id="inboxCount" hidden>0</span>
+            </button>
             <button type="button" class="tab" role="tab" data-tab="sheets" aria-selected="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
                 <span class="tab-text">Timesheets</span>
@@ -496,6 +564,10 @@
             <button type="button" class="tab" role="tab" data-tab="vehicles" aria-selected="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
                 <span class="tab-text">Vehicles</span>
+            </button>
+            <button type="button" class="tab" role="tab" data-tab="reports" aria-selected="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17V11M13 17V7M18 17v-4"/></svg>
+                <span class="tab-text">Reports</span>
             </button>
             <button type="button" class="tab" role="tab" data-tab="settings" aria-selected="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -518,6 +590,18 @@
             <div class="board" id="board"></div>
         </section>
 
+        <!-- Inbox -->
+        <section class="panel" id="panel-inbox" role="tabpanel" hidden>
+            <div class="panel-head">
+                <div><h1 class="panel-title">Inbox</h1><p class="panel-sub">Punch fixes and time off drivers asked for, and problems they reported with vans.</p></div>
+                <div class="panel-actions"><label class="switch"><input type="checkbox" id="inboxHandled"><span class="track"></span>Show handled</label></div>
+            </div>
+            <div class="inbox-grid">
+                <div class="inbox-col"><h3>Punch fixes <span class="tab-count" id="ibFixCount">0</span></h3><div class="inbox-list" id="ibFixes"></div></div>
+                <div class="inbox-col"><h3>Time off <span class="tab-count" id="ibOffCount">0</span></h3><div class="inbox-list" id="ibOff"></div></div>
+                <div class="inbox-col"><h3>Van problems <span class="tab-count" id="ibVanCount">0</span></h3><div class="inbox-list" id="ibVans"></div></div>
+            </div>
+        </section>
         <!-- Timesheets -->
         <section class="panel" id="panel-sheets" role="tabpanel" hidden>
             <div class="panel-head">
@@ -545,7 +629,7 @@
         <section class="panel" id="panel-people" role="tabpanel" hidden>
             <div class="panel-head">
                 <div><h1 class="panel-title">Employees</h1><p class="panel-sub">Who can use the time clock, and when they're scheduled to start.</p></div>
-                <div class="panel-actions"><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
+                <div class="panel-actions"><button type="button" class="btn ghost" id="showRemovedBtn" hidden>Show removed</button><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
             </div>
             <div class="emp-list" id="empList"></div>
         </section>
@@ -559,6 +643,21 @@
             <div class="gps-grid" id="gpsGrid"></div>
         </section>
 
+        <!-- Reports -->
+        <section class="panel" id="panel-reports" role="tabpanel" hidden>
+            <div class="panel-head">
+                <div><h1 class="panel-title">Reports</h1><p class="panel-sub" id="repSub">Overtime by person and hours per van, by pay week (Friday to Thursday).</p></div>
+                <div class="panel-actions">
+                    <select class="select" id="repRange" aria-label="Report period">
+                        <option value="4">Last 4 pay weeks</option>
+                        <option value="8" selected>Last 8 pay weeks</option>
+                        <option value="13">Last 13 pay weeks</option>
+                        <option value="26">Last 26 pay weeks</option>
+                    </select>
+                </div>
+            </div>
+            <div id="reports"></div>
+        </section>
         <!-- Settings -->
         <section class="panel" id="panel-settings" role="tabpanel" hidden>
             <div class="panel-head"><div><h1 class="panel-title">Settings</h1><p class="panel-sub">Applies to every employee.</p></div></div>
@@ -578,9 +677,26 @@
                 </form>
                 <div class="card">
                     <h3>Change log</h3>
-                    <p class="hint">The 30 most recent admin changes to punches.</p>
+                    <p class="hint">Every admin change to punches and employees, newest first.</p>
+                    <div class="log-tools"><select class="select" id="auditFilter" aria-label="Show changes for"></select></div>
                     <div class="log" id="auditLog"></div>
+                    <button type="button" class="btn ghost sm log-more" id="auditMore" hidden>Show older changes</button>
                 </div>
+                <form class="card" id="shopForm">
+                    <h3>Shop location</h3>
+                    <p class="hint">Punches made farther than this from the shop are flagged on the timesheet. Leave it empty to turn the flag off.</p>
+                    <div class="modal-grid">
+                        <div class="field"><label for="shLat">Latitude</label><input class="input" id="shLat" inputmode="decimal" placeholder="49.8485"></div>
+                        <div class="field"><label for="shLng">Longitude</label><input class="input" id="shLng" inputmode="decimal" placeholder="-99.9501"></div>
+                        <div class="field full"><label for="shRadius">Flag punches farther than (metres)</label><input class="input" id="shRadius" type="number" min="50" max="50000" step="10" inputmode="numeric"></div>
+                    </div>
+                    <p class="hint" style="margin-top:-4px">Tip: in Google Maps, right-click the shop and click the numbers at the top to copy them, then paste here as latitude, longitude.</p>
+                    <div class="modal-foot" style="justify-content:flex-start">
+                        <button type="submit" class="btn primary">Save shop location</button>
+                        <button type="button" class="btn" id="shHere">Use where I am now</button>
+                        <button type="button" class="btn ghost" id="shClear">Clear</button>
+                    </div>
+                </form>
             </div>
         </section>
     </main>
@@ -611,6 +727,7 @@
                     <textarea class="textarea" id="smNote" maxlength="300" placeholder="e.g. Forgot to punch out, confirmed with driver"></textarea>
                 </div>
             </div>
+            <p class="late-box" id="smLate" hidden></p>
             <p class="calc" id="smCalc"></p>
             <p class="modal-msg" id="smMsg" role="alert"></p>
             <div class="modal-foot">
@@ -631,6 +748,11 @@
                 <div class="field"><label for="emName">Name</label><input class="input" id="emName" maxlength="60" placeholder="Matt Smith" autocomplete="off"></div>
                 <div class="field"><label for="emEmail">Sign-in email</label><input class="input" id="emEmail" type="email" placeholder="matt@ec.com" autocapitalize="off" spellcheck="false" autocomplete="off"></div>
                 <div class="field full"><label class="switch"><input type="checkbox" id="emActive" checked><span class="track"></span>Active (can punch in)</label></div>
+                <div class="field full" id="emReplaceField">
+                    <label for="emReplace">Takes the place of (optional)</label>
+                    <select class="select" id="emReplace"></select>
+                    <p class="hint" style="margin:0;color:var(--muted);font-size:0.85rem">For a new sign-in for someone already here (for example, a forgotten password): their punches, requests and schedule move to this sign-in.</p>
+                </div>
             </div>
             <div class="label" style="margin:4px 0 8px">Weekly schedule · start times</div>
             <div class="sched-editor" id="schedEditor"></div>
@@ -650,6 +772,35 @@
         </form>
     </div>
 
+    <!-- Export -->
+    <div class="modal-backdrop" id="exportModal">
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="exTitle" id="exportForm" novalidate>
+            <h2 id="exTitle">Export CSV</h2>
+            <p class="modal-sub" id="exSub"></p>
+            <div class="modal-grid">
+                <div class="field"><label for="exFrom">From</label><input class="input" id="exFrom" type="date" required></div>
+                <div class="field"><label for="exTo">To</label><input class="input" id="exTo" type="date" required></div>
+                <div class="field full">
+                    <label for="exKind">What to include</label>
+                    <select class="select" id="exKind">
+                        <option value="detail">Every punch, with a total for each pay week</option>
+                        <option value="summary">One line per employee (totals only)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-foot" style="justify-content:flex-start;margin:-4px 0 12px">
+                <button type="button" class="btn sm ghost" data-ex-range="week">This pay week</button>
+                <button type="button" class="btn sm ghost" data-ex-range="last">Last pay week</button>
+                <button type="button" class="btn sm ghost" data-ex-range="month">This month</button>
+                <button type="button" class="btn sm ghost" data-ex-range="lastmonth">Last month</button>
+            </div>
+            <p class="modal-msg" id="exMsg" role="alert"></p>
+            <div class="modal-foot">
+                <button type="button" class="btn ghost" data-close>Cancel</button>
+                <button type="submit" class="btn primary" id="exGo">Download CSV</button>
+            </div>
+        </form>
+    </div>
     <!-- Punch location -->
     <div class="modal-backdrop" id="mapModal">
         <div class="modal map-modal" role="dialog" aria-modal="true" aria-labelledby="mapTitle">
@@ -668,6 +819,7 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="viz-tip" id="vizTip" role="tooltip"></div>
 
     <script type="module">
         let core;
@@ -681,12 +833,13 @@
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
-            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs
+            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
+            timeOffList, timeOffOn, workdayFor, sentLate, farFromShop, fmtDistance, rangeDays, vanTime
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
-        const { ref, onValue, get, set, update, push, remove, query, orderByChild, startAt, limitToLast, runTransaction, serverTimestamp } =
+        const { ref, onValue, get, set, update, push, remove, query, orderByChild, startAt, endAt, equalTo, limitToLast, runTransaction, serverTimestamp } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js");
         const { firebaseConfig } = await import("./firebase-config.js");
         const { setupPwa } = await import("./pwa.js");
@@ -698,6 +851,9 @@
         // ---------- State ----------
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
         let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, audit = [], pushTokens = {}, prefs = {};
+        let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
+        let requestsAll = {}, timeoffAll = {}, vanReports = {}; // the Inbox: punch fixes, time off, van problems
+        let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
         let viewWeek = null, rangeStart = null;
         let unsubs = [], shiftUnsubs = {};
         let activeTab = "live";
@@ -760,6 +916,7 @@
             stopAll();
             user = u;
             employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = []; pushTokens = {}; prefs = {};
+            requestsAll = {}; timeoffAll = {}; vanReports = {}; settingsRaw = {}; reportCache = null;
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
                 $("gateSub").textContent = "Only the time clock administrator can open this panel.";
@@ -780,6 +937,7 @@
             sub(ref(db, ".info/serverTimeOffset"), s => { serverOffset = Number(s.val()) || 0; });
             sub(ref(db, P.settings), s => {
                 const first = !s.exists();
+                settingsRaw = s.val() || {};
                 settings = settingsWithDefaults(s.val());
                 if (first) set(ref(db, P.settings), settings).catch(() => {});
                 fillSettingsForm();
@@ -790,10 +948,11 @@
             sub(ref(db, P.pushTokens), s => { pushTokens = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.prefs), s => { prefs = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
-            sub(query(ref(db, P.audit), limitToLast(30)), s => {
-                audit = Object.values(s.val() || {}).sort((a, b) => (b.at || 0) - (a.at || 0));
-                renderAudit();
-            });
+            sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
+            sub(ref(db, P.timeoff), s => { timeoffAll = s.val() || {}; renderInboxCount(); renderAll(); });
+            sub(query(ref(db, P.vanReports), limitToLast(300)), s => { vanReports = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
+            listenAudit();
+            unsubs.push(() => { if (auditUnsub) { auditUnsub(); auditUnsub = null; } });
             loadGps();
             renderAll();
         });
@@ -847,7 +1006,7 @@
         function selectTab(name) {
             activeTab = name;
             tabs.forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
-            ["live", "sheets", "people", "vehicles", "settings"].forEach(p => { $("panel-" + p).hidden = p !== name; });
+            ["live", "inbox", "sheets", "people", "vehicles", "reports", "settings"].forEach(p => { $("panel-" + p).hidden = p !== name; });
             moveInk();
             renderAll();
             try { history.replaceState(null, "", "#" + name); } catch (e) {}
@@ -864,10 +1023,13 @@
         if (tabs.some(b => b.dataset.tab === initialTab)) activeTab = initialTab;
 
         // ---------- Helpers ----------
+        // Everyone on record, removed people included (their punches still count on timesheets and exports)
         function empList() {
-            return Object.entries(employees).map(([k, e]) => Object.assign({ ek: k }, e))
-                .sort((a, b) => (a.active === false) - (b.active === false) || displayName(a, a.email).localeCompare(displayName(b, b.email)));
+            return Object.entries(employees).filter(([, e]) => e && typeof e === "object").map(([k, e]) => Object.assign({ ek: k }, e))
+                .sort((a, b) => !!a.removed - !!b.removed || (a.active === false) - (b.active === false) || displayName(a, a.email).localeCompare(displayName(b, b.email)));
         }
+        const workingList = () => empList().filter(e => e.active !== false && !e.removed); // can punch in
+        const empName = k => { const e = employees[k]; return e ? displayName(e, e.email) : String(k || "").replace(/,/g, ".").split("@")[0]; };
         function shiftsOf(k) { return shiftsByEk[k] || []; }
         function findShift(k, id) { return shiftsOf(k).find(s => s.id === id) || null; }
 
@@ -877,9 +1039,11 @@
             const onCount = empList().filter(e => openShift(shiftsOf(e.ek))).length;
             $("liveCount").textContent = onCount;
             if (activeTab === "live") renderLive();
+            else if (activeTab === "inbox") renderInbox();
             else if (activeTab === "sheets") renderSheets();
             else if (activeTab === "people") renderPeople();
             else if (activeTab === "vehicles") renderVehicles();
+            else if (activeTab === "reports") renderReports();
         }
 
         // ---------- Live ----------
@@ -890,6 +1054,7 @@
             const sched = scheduleFor(e, today);
             if (open) return { kind: "in", open: open, todays: todays, sched: sched };
             if (todays.length) return { kind: "done", todays: todays, sched: sched };
+            if (sched && timeOffOn(timeoffAll[e.ek], today)) return { kind: "timeoff", sched: null, todays: todays };
             if (!sched) return { kind: "off", sched: null, todays: todays };
             const startTs = keyToEpoch(today, sched.start);
             if (t >= startTs + settings.reminderMinutes * 60000) return { kind: "late", sched: sched, startTs: startTs, todays: todays };
@@ -900,7 +1065,7 @@
         function renderLive() {
             const t = now(), today = dayKey(t);
             const days = weekDays(weekStartKey(today, settings.weekStart));
-            const people = empList().filter(e => e.active !== false);
+            const people = workingList();
             let on = 0, late = 0, todayMs = 0, weekMs = 0, weekOt = 0;
             const cards = people.map((e, i) => {
                 const st = liveStatus(e, t, today);
@@ -936,6 +1101,10 @@
                     state = '<div class="person-state">Done for today</div>';
                     detail = esc(fmtDur(dayMs)) + " worked";
                     foot = '<span class="tag">' + st.todays.length + (st.todays.length === 1 ? " shift" : " shifts") + "</span>";
+                } else if (st.kind === "timeoff") {
+                    state = '<div class="person-state" style="color:var(--dim)">Time off today</div>';
+                    detail = "Approved time off";
+                    foot = '<span class="tag off">Time off</span>';
                 } else if (st.kind === "sched") {
                     state = '<div class="person-state">Not in yet</div>';
                     detail = "Starts " + esc(fmtHHMM(st.sched.start));
@@ -976,7 +1145,7 @@
                 if (!s || !confirm("Punch " + displayName(emp, emp && emp.email) + " out now?")) return;
                 out.disabled = true;
                 try {
-                    await saveShift(k, s, { in: s.in, out: now(), vehicleId: s.vehicleId || null, shop: !!s.shop }, "Punched out by admin", "punch-out");
+                    await saveShift(k, s, { in: s.in, out: now(), vehicleId: s.vehicleId || null, shop: !!s.shop && !s.vehicleId }, "Punched out by admin", "punch-out");
                     toast(displayName(emp, emp.email) + " punched out.");
                 } catch (err) { toast("Couldn't punch out: " + errText(err), true); out.disabled = false; }
                 return;
@@ -989,8 +1158,8 @@
         function renderEmpFilter() {
             const sel = $("empFilter");
             const cur = sel.value || "all";
-            const opts = '<option value="all">All employees</option>' + empList().map(e =>
-                '<option value="' + esc(e.ek) + '">' + esc(displayName(e, e.email)) + (e.active === false ? " (inactive)" : "") + "</option>").join("");
+            const opts = '<option value="all">All employees</option>' + empList().filter(e => !e.removed || shiftsOf(e.ek).length || e.ek === cur).map(e =>
+                '<option value="' + esc(e.ek) + '">' + esc(displayName(e, e.email)) + (e.removed ? " (removed)" : e.active === false ? " (inactive)" : "") + "</option>").join("");
             if (sel.dataset.html !== opts) { sel.innerHTML = opts; sel.dataset.html = opts; }
             sel.value = Array.from(sel.options).some(o => o.value === cur) ? cur : "all";
         }
@@ -1004,7 +1173,7 @@
             $("wkNext").disabled = viewWeek >= thisWeek;
             $("wkToday").hidden = viewWeek === thisWeek;
             const filter = $("empFilter").value;
-            const people = empList().filter(e => filter === "all" ? (e.active !== false || weekTotals(shiftsOf(e.ek), days, t).total > 0) : e.ek === filter);
+            const people = empList().filter(e => filter === "all" ? ((e.active !== false && !e.removed) || weekTotals(shiftsOf(e.ek), days, t).total > 0) : e.ek === filter);
             if (!people.length) {
                 $("sheets").innerHTML = '<div class="empty-state"><strong>No employees</strong>Add employees in the Employees tab.</div>';
                 return;
@@ -1024,6 +1193,9 @@
                     if (live) tags.push('<span class="tag live">On the clock</span>');
                     const split = byShift[s.id];
                     if (split && split.overtime >= 60000) tags.push('<span class="tag ot">OT ' + esc(fmtHours(split.overtime)) + "</span>");
+                    const late = sentLate(s);
+                    if (late.in) tags.push('<span class="tag late" title="No signal: the punch in reached the server at ' + esc(fmtTime(s.in)) + '">Punch in sent late · pressed ' + esc(fmtTime(late.in)) + "</span>");
+                    if (late.out) tags.push('<span class="tag late" title="No signal: the punch out reached the server at ' + esc(fmtTime(s.out)) + '">Punch out sent late · pressed ' + esc(fmtTime(late.out)) + "</span>");
                     if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
                     else if (s.edited) tags.push('<span class="tag edit" title="' + esc((s.edited.note || "") + " — " + (s.edited.by || "")) + '">Edited</span>');
                     if (s.edited && s.edited.note) tags.push('<span class="tag" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note.length > 34 ? s.edited.note.slice(0, 33) + "…" : s.edited.note) + "”</span>");
@@ -1039,7 +1211,7 @@
                 }).join("");
                 return '<article class="sheet-card" style="--i:' + i + '">' +
                     '<div class="sheet-card-head"><div class="avatar">' + esc(initials(name)) + '</div><div class="sheet-card-name">' +
-                    '<div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
+                    '<div class="person-name">' + esc(name) + (e.removed ? ' <span class="tag off">Removed</span>' : "") + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
                     '<button type="button" class="btn sm ghost" data-add-for="' + esc(e.ek) + '">+ Punch</button>' +
                     '<div class="sheet-card-total">' + esc(fmtHours(total)) + "<small>hours · " + esc(fmtDur(total)) + "</small>" +
                     '<span class="split">Reg ' + esc(fmtHours(regular)) + ' · <b>OT ' + esc(fmtHours(overtime)) + "</b></span></div></div>" +
@@ -1065,8 +1237,11 @@
             if (!loc) return "";
             if (!hasCoords(loc)) return '<div class="loc none" title="' + esc(LOCATION_ERRORS[loc.err] || loc.err || "") + '">No location · ' +
                 esc(LOCATION_ERRORS[loc.err] || "not recorded") + "</div>";
+            // Punch in / out made far from the shop (Settings → Shop location)
+            const far = which === "in" || which === "out" ? farFromShop(loc, settings) : null;
             return '<button type="button" class="loc" data-map="' + esc(k + "|" + shiftId + "|" + which) + '" title="Show on the map">' + PIN +
-                "<span>" + esc(placeText(loc, addr, addrErr)) + "</span></button>";
+                "<span>" + esc(placeText(loc, addr, addrErr)) + "</span></button>" +
+                (far ? '<span class="far" title="More than ' + esc(fmtDistance(settings.shopRadius)) + ' from the shop">Far from shop · ' + esc(fmtDistance(far)) + "</span>" : "");
         }
 
         // Every van in the shift, in order, with where each change happened
@@ -1077,8 +1252,11 @@
             return '<div class="vans">' + list.map(v => {
                 if (v.how === "taken") return '<div class="van-step taken"><span class="tag warn">' + esc(v.takenName || "Van") + " taken</span>" +
                     '<span class="muted">' + esc(fmtTime(v.at)) + (v.by ? " · by " + esc(v.by) : "") + "</span></div>";
-                if (v.how === "shop") return '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">' + esc(fmtTime(v.at)) + "</span>" +
+                const when = esc(fmtTime(v.at)) + (dayKey(v.at) !== dayKey(s.in) ? " " + esc(fmtKey(dayKey(v.at))) : "");
+                if (v.how === "shop") return '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">' + when + (v.by ? " · set by admin" : "") + "</span>" +
                     locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
+                if (v.how === "admin") return '<div class="van-step">' + (v.vehicleId ? '<span class="arrow" aria-label="changed to">⇄</span><span class="tag gps">' + esc(v.vehicleName || v.vehicleId) + "</span>"
+                    : '<span class="tag">No van</span>') + '<span class="muted">' + when + " · set by admin</span></div>";
                 return '<div class="van-step">' + (v.how === "swap" ? '<span class="arrow" aria-label="swapped to">⇄</span>' : "") +
                     '<span class="tag gps">' + esc(v.vehicleName) + '</span><span class="muted">' + esc(fmtTime(v.at)) + "</span>" +
                     locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
@@ -1188,7 +1366,8 @@
             $("mapTitle").textContent = p.label;
             $("mapSub").textContent = displayName(emp, emp && emp.email) + " · " + fmtKey(dayKey(p.at)) + ", " + fmtTime(p.at);
             $("mapAddr").textContent = p.addr || (p.addrErr ? "No street address found" : !MAPS_KEY || mapsFailed ? "Street address not available" : "Finding the address…");
-            $("mapMeta").textContent = coordsText(p.loc) + (p.loc.acc ? " · accurate to about " + p.loc.acc + " m" : "");
+            const far = which === "in" || which === "out" ? farFromShop(p.loc, settings) : null;
+            $("mapMeta").textContent = coordsText(p.loc) + (p.loc.acc ? " · accurate to about " + p.loc.acc + " m" : "") + (far ? " · " + fmtDistance(far) + " from the shop" : "");
             $("mapLink").href = mapsLink(p.loc);
             $("mapNoKey").hidden = true;
             $("mapFrame").hidden = false;
@@ -1212,38 +1391,111 @@
         $("wkToday").addEventListener("click", () => setWeek(weekStartKey(dayKey(now()), settings.weekStart)));
         document.querySelectorAll("[data-add-punch]").forEach(b => b.addEventListener("click", () => openShiftModal(null, null)));
 
+        // ---------- Export (any date range; every punch or one line per employee) ----------
+        function setExportRange(which) {
+            const today = dayKey(now()), thisWeek = weekStartKey(today, settings.weekStart);
+            let from = viewWeek, to = addDaysKey(viewWeek, 6);
+            if (which === "week") { from = thisWeek; to = addDaysKey(thisWeek, 6); }
+            else if (which === "last") { from = addDaysKey(thisWeek, -7); to = addDaysKey(thisWeek, -1); }
+            else if (which === "month") { from = today.slice(0, 8) + "01"; to = today; }
+            else if (which === "lastmonth") {
+                to = addDaysKey(today.slice(0, 8) + "01", -1);
+                from = to.slice(0, 8) + "01";
+            }
+            $("exFrom").value = from; $("exTo").value = to;
+        }
         $("exportBtn").addEventListener("click", () => {
-            const t = now(), days = weekDays(viewWeek);
             const filter = $("empFilter").value;
-            const rows = [["Employee", "Email", "Date", "In", "Out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note",
-                "In location", "Out location", "Van changes"]];
+            $("exSub").textContent = (filter === "all" ? "All employees" : empName(filter)) + ". Change who's included with the employee list on the Timesheets tab.";
+            setExportRange(null);
+            $("exKind").value = "detail";
+            $("exMsg").textContent = "";
+            openModal("exportModal");
+        });
+        document.querySelectorAll("[data-ex-range]").forEach(b => b.addEventListener("click", () => setExportRange(b.dataset.exRange)));
+
+        // Every employee's punches started between two days (removed employees included)
+        async function loadRange(fromKey, toKey, eks) {
+            const start = keyToEpoch(fromKey), end = keyToEpoch(addDaysKey(toKey, 1)) - 1;
+            const out = {};
+            await Promise.all(eks.map(async k => {
+                const snap = await get(query(ref(db, P.shifts + "/" + k), orderByChild("in"), startAt(start), endAt(end)));
+                out[k] = shiftList(snap.val());
+            }));
+            return out;
+        }
+
+        $("exportForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const from = $("exFrom").value, to = $("exTo").value, kind = $("exKind").value, msg = $("exMsg");
+            if (!from || !to) { msg.textContent = "Pick the first and last day."; return; }
+            if (to < from) { msg.textContent = "The last day can't be before the first day."; return; }
+            if (to > addDaysKey(from, 400)) { msg.textContent = "Pick 400 days or fewer."; return; }
+            const btn = $("exGo");
+            btn.disabled = true; msg.textContent = "";
+            try {
+                const filter = $("empFilter").value;
+                const people = empList().filter(p => filter === "all" || p.ek === filter);
+                const byEk = await loadRange(from, to, people.map(p => p.ek));
+                const csv = buildCsv(people, byEk, from, to, kind, now());
+                const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = (kind === "summary" ? "hours-summary-" : "timesheet-") + from + "-to-" + to + ".csv";
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+                closeModal("exportModal");
+            } catch (err) { msg.textContent = "Couldn't export: " + errText(err); }
+            btn.disabled = false;
+        });
+
+        function buildCsv(people, byEk, from, to, kind, t) {
+            const days = rangeDays(from, to);
             const place = (loc, addr) => !loc ? "" : !hasCoords(loc) ? "No location (" + (LOCATION_ERRORS[loc.err] || "not recorded") + ")"
                 : (addr ? addr + " " : "") + "(" + coordsText(loc) + ")";
             const vans = s => vanHistory(s).map(v => v.how === "taken" ? (v.takenName || "van") + " taken by " + (v.by || "another driver") + " " + fmtTime(v.at)
                 : v.how === "shop" ? "Shop " + fmtTime(v.at) + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")
+                : v.how === "admin" ? (v.vehicleId ? v.vehicleName || v.vehicleId : "No van") + " (set by admin " + fmtTime(v.at) + ")"
                 : v.vehicleName + " " + fmtTime(v.at) + (v.how === "swap" ? " (swap)" : "") + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")).join("; ");
-            empList().filter(e => filter === "all" || e.ek === filter).forEach(e => {
-                const { byDay, byShift, total, regular, overtime } = weekTotals(shiftsOf(e.ek), days, t);
-                const list = days.flatMap(k => byDay[k].shifts);
-                if (!list.length && filter === "all" && e.active === false) return;
-                list.forEach(s => rows.push([displayName(e, e.email), e.email, dayKey(s.in), fmtTime(s.in),
-                    typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
-                    fmtHours(shiftMs(s, t)), fmtHours(byShift[s.id].regular), fmtHours(byShift[s.id].overtime),
-                    s.vehicleName || (s.shop ? "Shop" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
-                    place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]));
-                rows.push([displayName(e, e.email), e.email, "WEEK TOTAL", "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", "", "", "", ""]);
+            const rows = kind === "summary"
+                ? [["Employee", "Email", "From", "To", "Shifts", "Hours", "Regular", "Overtime"]]
+                : [["Employee", "Email", "Date", "In", "Out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note",
+                    "In location", "Out location", "Van changes"]];
+            people.forEach(e => {
+                const list = byEk[e.ek] || [];
+                const { byDay, byShift, total, regular, overtime } = weekTotals(list, days, t);
+                const counted = days.flatMap(k => byDay[k].shifts);
+                if (!counted.length && (e.active === false || e.removed)) return; // nothing for an inactive or removed person
+                const name = displayName(e, e.email);
+                if (kind === "summary") {
+                    rows.push([name, e.email, from, to, counted.length, fmtHours(total), fmtHours(regular), fmtHours(overtime)]);
+                    return;
+                }
+                // Each pay week (Friday to Thursday) inside the range gets its own total line
+                let weekStart = null, wk = { ms: 0, reg: 0, ot: 0 };
+                const weekLine = () => rows.push([name, e.email, "PAY WEEK " + weekStart + " TOTAL", "", "", fmtHours(wk.ms), fmtHours(wk.reg), fmtHours(wk.ot), "", "", "", "", "", ""]);
+                days.forEach(k => {
+                    const ws = weekStartKey(k, settings.weekStart);
+                    if (weekStart !== null && ws !== weekStart && wk.ms) weekLine();
+                    if (ws !== weekStart) { weekStart = ws; wk = { ms: 0, reg: 0, ot: 0 }; }
+                    byDay[k].shifts.forEach(s => {
+                        const split = byShift[s.id];
+                        wk.ms += split.regular + split.overtime; wk.reg += split.regular; wk.ot += split.overtime;
+                        rows.push([name, e.email, dayKey(s.in), fmtTime(s.in),
+                            typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
+                            fmtHours(shiftMs(s, t)), fmtHours(split.regular), fmtHours(split.overtime),
+                            s.vehicleName || (s.shop ? "Shop" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
+                            place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]);
+                    });
+                });
+                if (wk.ms) weekLine();
+                rows.push([name, e.email, "TOTAL " + from + " to " + to, "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", "", "", "", ""]);
             });
-            const csv = rows.map(r => r.map(v => {
+            return rows.map(r => r.map(v => {
                 const s = String(v);
                 return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
             }).join(",")).join("\r\n");
-            const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "timesheet-" + days[0] + "-to-" + days[6] + ".csv";
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-        });
+        }
 
         // ---------- Shift modal (edit / add) ----------
         let smCtx = null; // { ek, shift }
@@ -1273,11 +1525,11 @@
             if (e.key === "Escape") document.querySelectorAll(".modal-backdrop.show").forEach(m => closeModal(m.id));
         });
 
-        function openShiftModal(ek, shiftId) {
-            const people = empList();
+        function openShiftModal(ek, shiftId, request) {
+            const people = empList().filter(p => !p.removed || p.ek === ek);
             if (!people.length) { toast("Add an employee first.", true); return; }
             const shift = ek && shiftId ? findShift(ek, shiftId) : null;
-            smCtx = { ek: ek || (people.find(p => p.active !== false) || people[0]).ek, shift: shift };
+            smCtx = { ek: ek || (people.find(p => p.active !== false && !p.removed) || people[0]).ek, shift: shift, request: request || null };
             $("smTitle").textContent = shift ? "Edit punch" : "Add punch";
             const emp = employees[smCtx.ek];
             $("smSub").textContent = shift ? displayName(emp, emp.email) + " · originally " + fmtKey(dayKey(shift.in)) + ", " + fmtTime(shift.in) +
@@ -1298,6 +1550,20 @@
             $("smNote").value = "";
             $("smMsg").textContent = "";
             $("smDelete").hidden = !shift;
+            // A punch that arrived late (no signal): offer the times the driver actually pressed
+            const late = shift ? sentLate(shift) : { in: null, out: null };
+            $("smLate").hidden = !late.in && !late.out;
+            if (late.in || late.out) {
+                $("smLate").innerHTML = "No signal when the driver punched, so the server got it late. The phone says " +
+                    [late.in ? "in at <strong>" + esc(fmtTime(late.in)) + "</strong>" : "", late.out ? "out at <strong>" + esc(fmtTime(late.out)) + "</strong>" : ""].filter(Boolean).join(" and ") +
+                    '.<button type="button" class="copy-link" id="smUseTap">Use the phone\'s time' + (late.in && late.out ? "s" : "") + "</button>";
+                $("smUseTap").addEventListener("click", () => {
+                    if (late.in) { $("smInDate").value = dayKey(late.in); $("smInTime").value = hhmmOf(late.in); }
+                    if (late.out) { $("smOutDate").value = dayKey(late.out); $("smOutTime").value = hhmmOf(late.out); }
+                    if (!$("smNote").value) $("smNote").value = "Used the time pressed on the phone (no signal)";
+                    updateCalc();
+                });
+            }
             syncOutFields();
             openModal("shiftModal");
         }
@@ -1348,7 +1614,12 @@
             const btn = $("smSave");
             btn.disabled = true;
             try {
-                await saveShift(k, smCtx.shift, r, $("smNote").value.trim(), smCtx.shift ? "edit" : "add");
+                if (!(await saveShift(k, smCtx.shift, r, $("smNote").value.trim(), smCtx.shift ? "edit" : "add"))) {
+                    $("smMsg").textContent = "Not saved. Pick another vehicle, or save again and move it.";
+                    btn.disabled = false;
+                    return;
+                }
+                if (smCtx.request) await finishRequest(smCtx.request, "done", "Fixed").catch(err => toast("Punch saved, but the request couldn't be marked fixed: " + errText(err), true));
                 closeModal("shiftModal");
                 toast(smCtx.shift ? "Punch updated." : "Punch added.");
                 if (activeTab === "sheets") {
@@ -1375,42 +1646,64 @@
 
         // Writes a shift as the admin. Keeps vehicle claims and RouteWatcher nicknames in step:
         // a closed shift frees its GPS; an open shift with a GPS holds it.
+        // Only the fields the admin changed are written, so a van pick or punch out the driver makes at the same moment
+        // isn't wiped out. A van change goes into the shift's van history. Returns false if nothing was saved
+        // (the admin chose not to take a GPS another driver has).
         async function saveShift(k, before, r, note, action) {
             const id = before ? before.id : push(ref(db, P.shifts + "/" + k)).key;
-            const gps = r.vehicleId ? gpsUnits.find(g => g.id === r.vehicleId) : null;
+            const base = P.shifts + "/" + k + "/" + id;
             const emp = employees[k];
             const nick = nicknameFor(emp, emp && emp.email);
-            const data = {
-                in: r.in,
-                out: r.out || null,
-                vehicleId: r.vehicleId || null,
-                vehicleName: r.vehicleId ? (gps ? gps.name : (before && before.vehicleName) || null) : null,
-                nickname: r.vehicleId ? ((before && before.vehicleId === r.vehicleId && before.nickname) || nick) : null,
-                shop: !r.vehicleId && r.shop ? true : null,
-                src: before ? (before.src || "clock") : "admin",
-                edited: { by: user.email, at: serverTimestamp(), note: note || "" }
-            };
-            // Keep where the driver punched and their van history. A reopened shift drops its punch-out location.
-            const keep = (key, when) => { if (before && before[key] !== undefined && when !== false) data[key] = before[key]; };
-            ["inLoc", "inAddr", "inAddrErr", "vans"].forEach(key => keep(key));
-            ["outLoc", "outAddr", "outAddrErr"].forEach(key => keep(key, !!data.out));
-            keep("swapHint", !data.out && !data.vehicleId && !data.shop);
-            await set(ref(db, P.shifts + "/" + k + "/" + id), data);
-            // Free the old GPS if the vehicle changed or the shift is now closed
-            if (before && before.vehicleId && (before.vehicleId !== data.vehicleId || data.out)) await releaseClaim(before.vehicleId, id);
-            // Claim the GPS for an open shift
-            if (!data.out && data.vehicleId) {
-                const c = claims[data.vehicleId];
-                if (c && c.shiftId !== id && !confirm("GPS " + data.vehicleName + " is in use by " + (c.nickname || c.name) + ". Move it to " + displayName(emp, emp.email) + "?")) {
-                    // leave the claim alone
-                } else {
-                    await set(ref(db, P.claims + "/" + data.vehicleId), { ek: k, email: emp.email, name: displayName(emp, emp.email), nickname: data.nickname,
-                        shiftId: id, vehicleName: data.vehicleName, at: now() });
-                    await set(ref(db, P.nicknames + "/" + data.vehicleId), data.nickname).catch(err => toast("GPS nickname not set: " + errText(err), true));
+            const gps = r.vehicleId ? gpsUnits.find(g => g.id === r.vehicleId) : null;
+            const vehicleId = r.vehicleId || null;
+            const vehicleName = vehicleId ? String(gps ? gps.name : (before && before.vehicleName) || vehicleId).slice(0, 60) : null;
+            const shop = !vehicleId && !!r.shop;
+            const nickname = vehicleId ? ((before && before.vehicleId === vehicleId && before.nickname) || nick) : null;
+
+            // Ask before anything is written: the GPS may belong to another driver right now
+            let takeClaim = false;
+            if (!r.out && vehicleId) {
+                const c = claims[vehicleId];
+                if (c && c.shiftId !== id && !confirm("GPS " + vehicleName + " is in use by " + (c.nickname || c.name) + ". Move it to " + displayName(emp, emp.email) + "?")) return false;
+                takeClaim = true;
+            }
+
+            const u = {};
+            const edited = { by: user.email, at: serverTimestamp(), note: note || "" };
+            let data;
+            if (!before) {
+                data = { in: r.in, out: r.out || null, vehicleId: vehicleId, vehicleName: vehicleName, nickname: nickname, shop: shop || null, src: "admin", edited: edited };
+                u[base] = data;
+            } else {
+                const put = (f, v) => { u[base + "/" + f] = v === undefined ? null : v; };
+                const beforeOut = typeof before.out === "number" ? before.out : null;
+                const vanChanged = (before.vehicleId || null) !== vehicleId || (!before.vehicleId && !!before.shop) !== shop;
+                if (before.in !== r.in) put("in", r.in);
+                if (beforeOut !== (r.out || null)) put("out", r.out || null);
+                if (vanChanged) {
+                    put("vehicleId", vehicleId); put("vehicleName", vehicleName); put("nickname", nickname); put("shop", shop || null);
+                    const entry = { at: serverTimestamp(), how: shop ? "shop" : "admin", by: String(user.email).slice(0, 60) };
+                    if (vehicleId) { entry.vehicleId = vehicleId; entry.vehicleName = vehicleName; }
+                    u[base + "/vans/" + push(ref(db, base + "/vans")).key] = entry;
                 }
+                if (!r.out && beforeOut !== null) ["outLoc", "outAddr", "outAddrErr", "outTap"].forEach(f => put(f, null)); // reopened
+                if (before.swapHint && (r.out || vehicleId || shop)) put("swapHint", null); // no van swap needed any more
+                put("edited", edited);
+                data = Object.assign({}, before, { in: r.in, out: r.out || null }, vanChanged ? { vehicleId: vehicleId, vehicleName: vehicleName, shop: shop || null } : {});
+            }
+            if (!r.out) u[P.open + "/" + k] = id; // their open shift (the rules allow one at a time)
+            await update(ref(db), u);
+            // Free the old GPS if the vehicle changed or the shift is now closed
+            if (before && before.vehicleId && (before.vehicleId !== vehicleId || r.out)) await releaseClaim(before.vehicleId, id);
+            // Claim the GPS for an open shift
+            if (takeClaim) {
+                await set(ref(db, P.claims + "/" + vehicleId), { ek: k, email: emp.email, name: displayName(emp, emp.email), nickname: nickname,
+                    shiftId: id, vehicleName: vehicleName, at: now() });
+                await set(ref(db, P.nicknames + "/" + vehicleId), nickname).catch(err => toast("GPS nickname not set: " + errText(err), true));
             }
             flashRow = k + "/" + id;
-            await logAudit(k, id, action, before, Object.assign({}, data, { edited: null }), note);
+            await logAudit(k, id, action, before, data, note);
+            return true;
         }
 
         async function releaseClaim(gpsId, shiftId) {
@@ -1432,20 +1725,266 @@
             return push(ref(db, P.audit), { at: serverTimestamp(), by: user.email, ek: k, shiftId: shiftId, action: action,
                 before: strip(before), after: strip(after), note: note || "" }).catch(err => console.warn("Audit not saved:", err));
         }
+        // Employee changes: added, edited (what changed), removed, took someone's place
+        function logEmpAudit(k, action, changes, extra) {
+            return push(ref(db, P.audit), Object.assign({ at: serverTimestamp(), by: user.email, ek: k, action: action, changes: changes || [] }, extra || {}))
+                .catch(err => console.warn("Audit not saved:", err));
+        }
+        const schedText = sc => [1, 2, 3, 4, 5, 6, 0].filter(d => sc && sc[DOW_KEYS[d]] && sc[DOW_KEYS[d]].start)
+            .map(d => DOW_SHORT[d] + " " + fmtHHMM(sc[DOW_KEYS[d]].start)).join(", ") || "no work days";
+        function empChanges(before, after) {
+            const out = [];
+            if ((before.name || "") !== (after.name || "")) out.push("Name: " + (before.name || "none") + " → " + (after.name || "none"));
+            if ((before.active !== false) !== (after.active !== false)) out.push(after.active !== false ? "Turned on (can punch in)" : "Turned off (can't punch in)");
+            if (schedText(before.schedule) !== schedText(after.schedule)) out.push("Schedule: " + schedText(before.schedule) + " → " + schedText(after.schedule));
+            return out;
+        }
+
+        // The change log: newest first, for everyone or one person, 30 more at a time
+        function listenAudit() {
+            if (auditUnsub) auditUnsub();
+            const q = auditFilter === "all" ? query(ref(db, P.audit), limitToLast(auditLimit))
+                : query(ref(db, P.audit), orderByChild("ek"), equalTo(auditFilter), limitToLast(auditLimit));
+            auditUnsub = onValue(q, s => {
+                const v = s.val() || {};
+                audit = Object.values(v).sort((a, b) => (b.at || 0) - (a.at || 0));
+                $("auditMore").hidden = Object.keys(v).length < auditLimit;
+                renderAudit();
+            }, err => toast("Couldn't load the change log: " + errText(err), true));
+        }
+        $("auditMore").addEventListener("click", () => { auditLimit += 30; listenAudit(); });
+        $("auditFilter").addEventListener("change", () => { auditFilter = $("auditFilter").value; auditLimit = 30; listenAudit(); });
+        function renderAuditFilter() {
+            const sel = $("auditFilter");
+            const opts = '<option value="all">Everyone</option>' + empList().map(e => '<option value="' + esc(e.ek) + '">' + esc(displayName(e, e.email)) +
+                (e.removed ? " (removed)" : "") + "</option>").join("");
+            if (sel.dataset.html !== opts) { sel.innerHTML = opts; sel.dataset.html = opts; }
+            sel.value = Array.from(sel.options).some(o => o.value === auditFilter) ? auditFilter : "all";
+        }
 
         function renderAudit() {
-            const verbs = { edit: "edited a punch for", add: "added a punch for", delete: "deleted a punch for", "punch-out": "punched out" };
+            renderAuditFilter();
+            const verbs = { edit: "edited a punch for", add: "added a punch for", delete: "deleted a punch for", "punch-out": "punched out",
+                "emp-add": "added employee", "emp-edit": "changed employee", "emp-remove": "removed employee", "emp-restore": "added back employee",
+                "emp-replace": "gave a new sign-in to" };
             const html = audit.map(a => {
-                const emp = employees[a.ek];
-                const who = emp ? displayName(emp, emp.email) : String(a.ek || "").replace(/,/g, ".");
+                const who = a.name || empName(a.ek);
                 const range = s => s ? fmtKey(dayKey(s.in)) + " " + fmtTime(s.in) + " → " + (s.out ? fmtTime(s.out) : "open") : "";
+                const detail = /^emp-/.test(a.action)
+                    ? (a.changes || []).map(c => '<div class="when">' + esc(c) + "</div>").join("") + (a.from ? '<div class="when">Took the place of ' + esc(a.from) + "</div>" : "")
+                    : '<div class="when">' + (a.before ? esc(range(a.before)) : "") + (a.before && a.after ? " ⟶ " : "") + (a.after ? esc(range(a.after)) : "") + "</div>";
                 return '<div class="log-item"><div class="when">' + esc(a.at ? fmtDate(a.at) + " · " + fmtTime(a.at) : "") + " · " + esc(a.by || "") + "</div>" +
-                    '<div class="what">' + esc(verbs[a.action] || a.action) + " <strong>" + esc(who) + "</strong></div>" +
-                    '<div class="when">' + (a.before ? esc(range(a.before)) : "") + (a.before && a.after ? " ⟶ " : "") + (a.after ? esc(range(a.after)) : "") + "</div>" +
+                    '<div class="what">' + esc(verbs[a.action] || a.action) + " <strong>" + esc(who) + "</strong></div>" + detail +
                     (a.note ? '<div class="why">“' + esc(a.note) + "”</div>" : "") + "</div>";
             }).join("");
             $("auditLog").innerHTML = html || '<p class="hint" style="margin:0">No changes yet.</p>';
         }
+
+        // ---------- Inbox: punch fixes, time off, van problems ----------
+        const FIX_KINDS = { in: "Missed punch in", out: "Missed punch out", both: "Missed a whole shift", wrong: "A punch time is wrong", other: "Something else" };
+        const ago = ts => ts ? fmtKey(dayKey(ts)) + ", " + fmtTime(ts) : "";
+        function inboxData() {
+            const fixes = [], offs = [], vans = [];
+            for (const [k, list] of Object.entries(requestsAll)) for (const [id, r] of Object.entries(list || {})) if (r && r.kind) fixes.push(Object.assign({ ek: k, id: id }, r));
+            for (const [k, list] of Object.entries(timeoffAll)) for (const t of timeOffList(list)) offs.push(Object.assign({ ek: k }, t));
+            for (const [id, r] of Object.entries(vanReports)) if (r && r.text) vans.push(Object.assign({ id: id }, r));
+            const byNew = (a, b) => (b.at || 0) - (a.at || 0);
+            return {
+                fixes: fixes.sort(byNew), offs: offs.sort((a, b) => a.from < b.from ? -1 : a.from > b.from ? 1 : 0), vans: vans.sort(byNew),
+                openFixes: fixes.filter(r => r.status === "open").length, openOffs: offs.filter(t => t.status === "pending").length,
+                openVans: vans.filter(r => r.status === "open").length
+            };
+        }
+        function renderInboxCount() {
+            const d = inboxData(), n = d.openFixes + d.openOffs + d.openVans;
+            $("inboxCount").hidden = !n;
+            $("inboxCount").textContent = n;
+            requestAnimationFrame(moveInk);
+        }
+        function renderInbox() {
+            const d = inboxData(), handled = $("inboxHandled").checked;
+            $("ibFixCount").textContent = d.openFixes; $("ibOffCount").textContent = d.openOffs; $("ibVanCount").textContent = d.openVans;
+            const reply = r => r.reply ? '<div class="ii-reply">' + esc((r.status === "declined" ? "Declined" : r.status === "fixed" ? "Fixed" : "Answer") + ": " + r.reply) + (r.by ? " · " + esc(r.by) : "") + "</div>" : "";
+            const fixes = d.fixes.filter(r => r.status === "open" || handled).map((r, i) => {
+                const done = r.status !== "open";
+                return '<div class="inbox-item' + (done ? " done" : "") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(r.ek)) + '</span><span class="ii-when">' + esc(ago(r.at)) + "</span></div>" +
+                    '<div class="ii-what">' + esc(FIX_KINDS[r.kind] || "Punch fix") + "</div>" +
+                    '<div class="ii-detail">' + esc(fmtKey(r.day || dayKey(r.at || now()), true)) + (r.inTime ? " · in " + esc(fmtHHMM(r.inTime)) : "") + (r.outTime ? " · out " + esc(fmtHHMM(r.outTime)) : "") + "</div>" +
+                    (r.note ? '<div class="ii-note">' + esc(r.note) + "</div>" : "") + reply(r) +
+                    (done ? "" : '<div class="ii-actions"><button type="button" class="btn sm primary" data-fix="' + esc(r.ek + "|" + r.id) + '">Fix it</button>' +
+                        '<button type="button" class="btn sm ghost" data-decline="fix|' + esc(r.ek + "|" + r.id) + '">Decline</button></div>') + "</div>";
+            });
+            const offs = d.offs.filter(t => t.status === "pending" || (handled && t.to >= addDaysKey(dayKey(now()), -60))).map((t, i) => {
+                const done = t.status !== "pending";
+                const days = rangeDays(t.from, t.to), emp = employees[t.ek];
+                const work = days.filter(k => scheduleFor(emp, k)).length;
+                return '<div class="inbox-item' + (done ? " done" : "") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(t.ek)) + '</span><span class="ii-when">asked ' + esc(ago(t.at)) + "</span></div>" +
+                    '<div class="ii-what">' + esc(t.from === t.to ? fmtKey(t.from, true) : fmtKey(t.from) + " – " + fmtKey(t.to)) + "</div>" +
+                    '<div class="ii-detail">' + days.length + (days.length === 1 ? " day" : " days") + " · " + (work ? (work === days.length && work > 1 ? "all" : work) + " of them a workday" + (work === 1 ? "" : "s") : "none of them workdays") + "</div>" +
+                    (t.note ? '<div class="ii-note">' + esc(t.note) + "</div>" : "") +
+                    (done ? '<div class="ii-reply">' + (t.status === "approved" ? "Approved" : "Declined") + (t.reply ? ": " + esc(t.reply) : "") + (t.by ? " · " + esc(t.by) : "") + "</div>"
+                        : '<div class="ii-actions"><button type="button" class="btn sm primary" data-approve="' + esc(t.ek + "|" + t.id) + '">Approve</button>' +
+                        '<button type="button" class="btn sm ghost" data-decline="off|' + esc(t.ek + "|" + t.id) + '">Decline</button></div>') + "</div>";
+            });
+            const vans = d.vans.filter(r => r.status === "open" || handled).map((r, i) => {
+                const done = r.status !== "open";
+                return '<div class="inbox-item' + (done ? " done" : "") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">Van ' + esc(r.vehicleName || r.vehicleId) + '</span><span class="ii-when">' + esc(ago(r.at)) + "</span></div>" +
+                    '<div class="ii-detail">Reported by ' + esc(r.name || empName(r.ek)) + "</div>" +
+                    '<div class="ii-note">' + esc(r.text) + "</div>" +
+                    (done ? '<div class="ii-reply">Fixed' + (r.fixNote ? ": " + esc(r.fixNote) : "") + (r.by ? " · " + esc(r.by) : "") + (r.doneAt ? " · " + esc(ago(r.doneAt)) : "") + "</div>"
+                        : '<div class="ii-actions"><button type="button" class="btn sm primary" data-vanfixed="' + esc(r.id) + '">Mark fixed</button></div>') + "</div>";
+            });
+            const empty = text => '<div class="inbox-empty">' + text + "</div>";
+            $("ibFixes").innerHTML = fixes.join("") || empty("No punch fixes waiting.");
+            $("ibOff").innerHTML = offs.join("") || empty("No time off waiting.");
+            $("ibVans").innerHTML = vans.join("") || empty("No van problems waiting.");
+        }
+        $("inboxHandled").addEventListener("change", renderInbox);
+
+        async function finishRequest(req, status, replyText) {
+            await update(ref(db, P.requests + "/" + req.ek + "/" + req.id), { status: status, reply: replyText || "", by: user.email, doneAt: serverTimestamp() });
+        }
+
+        // "Fix it": opens the punch window filled in from the driver's request; saving it marks the request fixed
+        function fixFromRequest(k, id) {
+            const r = requestsAll[k] && requestsAll[k][id];
+            if (!r) return;
+            if (!employees[k]) { toast("That employee isn't on the time clock any more.", true); return; }
+            const shift = r.shiftId ? findShift(k, r.shiftId) : null;
+            if (r.shiftId && !shift && r.kind !== "both") {
+                // Older than the punches loaded: load that week first
+                viewWeek = weekStartKey(r.day, settings.weekStart); syncShiftListeners();
+                toast("Loading that week's punches… tap Fix it again in a moment."); return;
+            }
+            const useShift = shift && r.kind !== "both";
+            openShiftModal(k, useShift ? shift.id : null, { ek: k, id: id });
+            if (!useShift) { $("smInDate").value = r.day; $("smOutDate").value = r.day; $("smOpen").checked = r.kind === "in"; }
+            if (r.inTime) { if (!useShift) $("smInDate").value = r.day; $("smInTime").value = r.inTime; }
+            if (r.outTime) {
+                $("smOpen").checked = false;
+                const inDate = $("smInDate").value, inTime = $("smInTime").value;
+                $("smOutDate").value = inTime && r.outTime < inTime ? addDaysKey(inDate, 1) : inDate; // finished after midnight
+                $("smOutTime").value = r.outTime;
+            }
+            $("smNote").value = ("Driver asked: " + (FIX_KINDS[r.kind] || "") + (r.note ? ". " + r.note : "")).slice(0, 300);
+            syncOutFields();
+        }
+
+        $("panel-inbox").addEventListener("click", async e => {
+            const fix = e.target.closest("[data-fix]");
+            if (fix) { const [k, id] = fix.dataset.fix.split("|"); fixFromRequest(k, id); return; }
+            const dec = e.target.closest("[data-decline]");
+            if (dec) {
+                const [type, k, id] = dec.dataset.decline.split("|");
+                const why = prompt("Decline this request? Add a short reason the driver will see (optional):", "");
+                if (why === null) return;
+                try {
+                    if (type === "fix") await finishRequest({ ek: k, id: id }, "declined", why.trim().slice(0, 300));
+                    else await update(ref(db, P.timeoff + "/" + k + "/" + id), { status: "declined", reply: why.trim().slice(0, 300), by: user.email, doneAt: serverTimestamp() });
+                    toast("Declined.");
+                } catch (err) { toast("Couldn't save: " + errText(err), true); }
+                return;
+            }
+            const ok = e.target.closest("[data-approve]");
+            if (ok) {
+                const [k, id] = ok.dataset.approve.split("|");
+                try { await update(ref(db, P.timeoff + "/" + k + "/" + id), { status: "approved", reply: "", by: user.email, doneAt: serverTimestamp() }); toast("Time off approved. They won't get punch-in reminders those days."); }
+                catch (err) { toast("Couldn't save: " + errText(err), true); }
+                return;
+            }
+            const vf = e.target.closest("[data-vanfixed]");
+            if (vf) {
+                const note = prompt("Mark this van problem fixed? Add a note (optional):", "");
+                if (note === null) return;
+                try { await update(ref(db, P.vanReports + "/" + vf.dataset.vanfixed), { status: "fixed", fixNote: note.trim().slice(0, 300), by: user.email, doneAt: serverTimestamp() }); toast("Marked fixed."); }
+                catch (err) { toast("Couldn't save: " + errText(err), true); }
+            }
+        });
+
+        // ---------- Reports: overtime by person, hours per van ----------
+        let reportCache = null, reportLoading = false;
+        async function renderReports() {
+            const weeks = parseInt($("repRange").value, 10) || 8;
+            const thisWeek = weekStartKey(dayKey(now()), settings.weekStart);
+            const from = addDaysKey(thisWeek, -7 * (weeks - 1)), to = addDaysKey(thisWeek, 6);
+            const key = from + "|" + Object.keys(employees).sort().join(",");
+            if (!reportCache || reportCache.key !== key) {
+                if (reportLoading) return;
+                reportLoading = true;
+                $("reports").innerHTML = '<div class="empty-state">Loading ' + weeks + " pay weeks of punches…</div>";
+                try { reportCache = { key: key, from: from, byEk: await loadRange(from, to, Object.keys(employees)) }; }
+                catch (err) { $("reports").innerHTML = '<div class="empty-state">Couldn\'t load punches: ' + esc(errText(err)) + "</div>"; reportLoading = false; return; }
+                reportLoading = false;
+                if (activeTab !== "reports") return;
+            }
+            drawReports(reportCache.byEk, from, weeks, now());
+        }
+        $("repRange").addEventListener("change", renderReports);
+
+        function drawReports(byEk, from, weeks, t) {
+            const starts = Array.from({ length: weeks }, (_, i) => addDaysKey(from, 7 * i));
+            // Overtime per person per pay week
+            const people = empList().map(e => {
+                const perWeek = starts.map(ws => weekTotals(byEk[e.ek] || [], weekDays(ws), t));
+                return { e: e, perWeek: perWeek, total: perWeek.reduce((n, w) => n + w.total, 0), ot: perWeek.reduce((n, w) => n + w.overtime, 0) };
+            }).filter(p => p.total > 0).sort((a, b) => b.ot - a.ot || b.total - a.total);
+            const maxOt = Math.max(3600000, ...people.flatMap(p => p.perWeek.map(w => w.overtime)));
+            const sumH = people.reduce((n, p) => n + p.total, 0), sumOt = people.reduce((n, p) => n + p.ot, 0);
+            const kpis = '<div class="report-kpis">' +
+                '<div class="kpi"><div class="kpi-label">Hours worked</div><div class="kpi-value">' + esc(fmtHours(sumH)) + "<small>h</small></div></div>" +
+                '<div class="kpi" style="--k:var(--orange)"><div class="kpi-label">Overtime</div><div class="kpi-value">' + esc(fmtHours(sumOt)) + "<small>h</small></div></div>" +
+                '<div class="kpi" style="--k:var(--orange)"><div class="kpi-label">Overtime share</div><div class="kpi-value">' + (sumH ? Math.round(sumOt / sumH * 100) : 0) + "<small>%</small></div></div></div>";
+            const head = "<tr><th class=\"name\">Employee</th>" + starts.map(ws => "<th>" + esc(fmtKey(ws).replace(/^\w+ /, "")) + "</th>").join("") + "<th>Total OT</th></tr>";
+            const rows = people.map(p => '<tr><td class="name">' + esc(displayName(p.e, p.e.email)) + (p.e.removed ? ' <span class="tag off">Removed</span>' : "") + "</td>" +
+                p.perWeek.map((w, i) => {
+                    const a = w.overtime / maxOt;
+                    const tip = displayName(p.e, p.e.email) + "|Week of " + fmtKey(starts[i]) + "|" + fmtHours(w.overtime) + " h overtime of " + fmtHours(w.total) + " h";
+                    return '<td><span class="ot-cell' + (w.overtime < 60000 ? " zero" : "") + '" data-tip="' + esc(tip) + '"' +
+                        (w.overtime >= 60000 ? ' style="background:rgba(255,159,67,' + (0.1 + a * 0.75).toFixed(3) + ')"' : "") + ">" + (w.overtime >= 60000 ? esc(fmtHours(w.overtime)) : "–") + "</span></td>";
+                }).join("") +
+                '<td class="total">' + esc(fmtHours(p.ot)) + " h<small>of " + esc(fmtHours(p.total)) + " h</small></td></tr>").join("");
+            const otCard = '<div class="report-card"><h3>Overtime by person</h3><p class="hint">Hours past 8 in a day, for each pay week (labelled by its Friday). Brighter orange means more overtime.</p>' +
+                (people.length ? '<div class="ot-scroll"><table class="ot-table"><thead>' + head + "</thead><tbody>" + rows + "</tbody></table></div>" +
+                    '<div class="ot-legend"><span>Less</span><span class="ramp"></span><span>More (' + esc(fmtHours(maxOt)) + " h)</span></div>"
+                    : '<p class="hint">No punches in this period.</p>') + "</div>";
+            // Hours per van, from each shift's van history
+            const vans = {};
+            for (const [k, list] of Object.entries(byEk)) for (const s of list) {
+                if (dayKey(s.in) < from) continue;
+                for (const v of vanTime(s, t)) {
+                    const o = vans[v.vehicleId] || (vans[v.vehicleId] = { id: v.vehicleId, name: v.vehicleName, ms: 0, drivers: new Set(), shifts: 0 });
+                    const g = gpsUnits.find(u => u.id === v.vehicleId);
+                    if (g) o.name = g.name;
+                    o.ms += v.ms; o.drivers.add(k); o.shifts++;
+                }
+            }
+            const vanList = Object.values(vans).filter(v => v.ms >= 60000).sort((a, b) => b.ms - a.ms);
+            const maxVan = Math.max(1, ...vanList.map(v => v.ms));
+            const vanCard = '<div class="report-card"><h3>Hours per van</h3><p class="hint">Time each van was assigned to a driver on the clock, from van picks, swaps and admin changes.</p>' +
+                (vanList.length ? '<div class="van-bars">' + vanList.map(v => {
+                    const tip = "Van " + v.name + "|" + fmtHours(v.ms) + " h|" + v.drivers.size + (v.drivers.size === 1 ? " driver" : " drivers") + " · " + v.shifts + (v.shifts === 1 ? " shift" : " shifts");
+                    return '<div class="van-bar" data-tip="' + esc(tip) + '"><span class="vb-name">' + esc(v.name) + '</span><span class="vb-track"><span class="vb-fill" style="display:block;width:' +
+                        (v.ms / maxVan * 100).toFixed(1) + '%"></span></span><span class="vb-val">' + esc(fmtHours(v.ms)) + " h<small>" + v.drivers.size + (v.drivers.size === 1 ? " driver" : " drivers") + "</small></span></div>";
+                }).join("") + "</div>" : '<p class="hint">No van time in this period.</p>') + "</div>";
+            $("repSub").textContent = "Pay weeks " + fmtKey(from) + " – " + fmtKey(addDaysKey(starts[starts.length - 1], 6)) + " (Friday to Thursday).";
+            $("reports").innerHTML = kpis + otCard + vanCard;
+        }
+
+        // Hover details for the report cells and bars
+        document.addEventListener("pointerover", e => {
+            const el = e.target.closest && e.target.closest("[data-tip]");
+            const tip = $("vizTip");
+            if (!el) { tip.classList.remove("show"); return; }
+            const [title, ...lines] = el.dataset.tip.split("|");
+            tip.innerHTML = "<strong>" + esc(title) + "</strong>" + lines.map(l => "<div>" + esc(l) + "</div>").join("");
+            tip.classList.add("show");
+        });
+        document.addEventListener("pointermove", e => {
+            const tip = $("vizTip");
+            if (!tip.classList.contains("show")) return;
+            const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8), y = Math.min(e.clientY + 14, window.innerHeight - tip.offsetHeight - 8);
+            tip.style.left = x + "px"; tip.style.top = y + "px";
+        });
 
         // ---------- Employees ----------
         function schedSummary(e) {
@@ -1466,19 +2005,25 @@
         }
 
         function renderPeople() {
-            const list = empList();
+            const all = empList();
+            const removedCount = all.filter(e => e.removed).length;
+            $("showRemovedBtn").hidden = !removedCount;
+            $("showRemovedBtn").textContent = showRemoved ? "Hide removed" : "Show removed (" + removedCount + ")";
+            const list = all.filter(e => showRemoved || !e.removed);
             $("empList").innerHTML = list.length ? list.map((e, i) => {
                 const name = displayName(e, e.email);
                 const open = openShift(shiftsOf(e.ek));
-                return '<div class="emp-row' + (e.active === false ? " inactive" : "") + '" style="--i:' + i + '">' +
+                return '<div class="emp-row' + (e.active === false || e.removed ? " inactive" : "") + '" style="--i:' + i + '">' +
                     '<div class="avatar">' + esc(initials(name)) + "</div>" +
                     '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
                     schedSummary(e) +
-                    '<div class="emp-status">' + (e.active === false ? '<span class="tag off">Inactive</span>' : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
-                    phoneTag(e.ek) + "</div>" +
-                    '<button type="button" class="btn sm" data-emp="' + esc(e.ek) + '">Edit</button></div>';
+                    '<div class="emp-status">' + (e.removed ? '<span class="tag off">Removed</span>' : e.active === false ? '<span class="tag off">Inactive</span>'
+                        : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
+                    (e.removed ? "" : phoneTag(e.ek)) + "</div>" +
+                    '<button type="button" class="btn sm" data-emp="' + esc(e.ek) + '">' + (e.removed ? "Add back" : "Edit") + "</button></div>";
             }).join("") : '<div class="empty-state"><strong>No employees yet</strong>Click “Add employee” to put your first driver on the time clock.</div>';
         }
+        $("showRemovedBtn").addEventListener("click", () => { showRemoved = !showRemoved; renderPeople(); });
 
         $("empList").addEventListener("click", e => { const b = e.target.closest("[data-emp]"); if (b) openEmpModal(b.dataset.emp); });
         $("addEmpBtn").addEventListener("click", () => openEmpModal(null));
@@ -1508,22 +2053,35 @@
             });
         });
 
+        // A removed person opens as "Add back": same sign-in, their punches carry on
         function openEmpModal(k) {
             const e = k ? employees[k] : null;
-            emCtx = { ek: k };
-            $("emTitle").textContent = e ? "Edit employee" : "Add employee";
+            const restoring = !!(e && e.removed);
+            emCtx = { ek: k, restoring: restoring };
+            $("emTitle").textContent = restoring ? "Add back employee" : e ? "Edit employee" : "Add employee";
             $("emName").value = e ? (e.name || "") : "";
             $("emEmail").value = e ? e.email : "";
             $("emEmail").disabled = !!e;
-            $("emActive").checked = e ? e.active !== false : true;
+            $("emActive").checked = e ? (restoring || e.active !== false) : true;
             $("emPass").value = "";
             $("createLogin").open = false;
-            $("createLogin").hidden = !!e;
-            $("emDelete").hidden = !e;
+            $("createLogin").hidden = !!e && !restoring;
+            $("emDelete").hidden = !e || restoring;
             $("emMsg").textContent = "";
+            // "Takes the place of": only when adding someone new; lists removed and inactive people
+            const others = empList().filter(p => p.removed || p.active === false);
+            $("emReplaceField").hidden = !!e || !others.length;
+            $("emReplace").innerHTML = '<option value="">Nobody (a new employee)</option>' + others.map(p => '<option value="' + esc(p.ek) + '">' +
+                esc(displayName(p, p.email)) + " · " + esc(p.email) + (p.removed ? " (removed)" : " (inactive)") + "</option>").join("");
             buildSchedEditor(e ? e.schedule : { mon: { start: "08:00" }, tue: { start: "08:00" }, wed: { start: "08:00" }, thu: { start: "08:00" }, fri: { start: "08:00" } });
             openModal("empModal");
         }
+        $("emReplace").addEventListener("change", () => {
+            const old = employees[$("emReplace").value];
+            if (!old) return;
+            if (!$("emName").value.trim()) $("emName").value = old.name || "";
+            buildSchedEditor(old.schedule);
+        });
 
         $("empForm").addEventListener("submit", async ev => {
             ev.preventDefault();
@@ -1531,7 +2089,10 @@
             const email = normEmail($("emEmail").value);
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.textContent = "Enter a valid email address."; return; }
             const k = emCtx.ek || emailKey(email);
-            if (!emCtx.ek && employees[k]) { msg.textContent = email + " is already on the time clock."; return; }
+            const existing = employees[k];
+            if (!emCtx.ek && existing && !existing.removed) { msg.textContent = email + " is already on the time clock."; return; }
+            const replaceEk = !emCtx.ek ? $("emReplace").value : "";
+            if (replaceEk === k) { msg.textContent = "That's the same sign-in. Pick Nobody, or use a new email."; return; }
             const schedule = {};
             for (const row of $("schedEditor").querySelectorAll(".sched-row")) {
                 if (!row.querySelector("input[type=checkbox]").checked) continue;
@@ -1540,22 +2101,49 @@
                 schedule[row.dataset.day] = { start: start }; // start time only: drivers have no set end
             }
             const pass = $("emPass").value;
-            if (!emCtx.ek && pass && pass.length < 6) { msg.textContent = "The starting password needs at least 6 characters."; return; }
+            const canCreate = !emCtx.ek || emCtx.restoring;
+            if (canCreate && pass && pass.length < 6) { msg.textContent = "The starting password needs at least 6 characters."; return; }
+            if (replaceEk && !confirm("Move " + empName(replaceEk) + "'s punches, requests and time off to " + email + "?\n\n" +
+                empName(replaceEk) + "'s old sign-in won't be on the time clock any more.")) return;
             const btn = $("emSave");
             btn.disabled = true; msg.textContent = "";
             try {
-                const before = employees[k] || {};
-                await set(ref(db, P.employees + "/" + k), {
-                    email: email, name: $("emName").value.trim(), active: $("emActive").checked, schedule: schedule,
-                    createdAt: before.createdAt || serverTimestamp()
-                });
+                const before = existing || {};
+                const record = { email: email, name: $("emName").value.trim(), active: $("emActive").checked, schedule: schedule,
+                    createdAt: before.createdAt || serverTimestamp() };
+                await set(ref(db, P.employees + "/" + k), record); // also clears "removed" when adding someone back
+                if (replaceEk) await moveEmployee(replaceEk, k, record);
                 let note = "";
-                if (!emCtx.ek && pass) note = await createLogin(email, pass);
+                if (canCreate && pass) note = await createLogin(email, pass);
+                const action = replaceEk ? "emp-replace" : emCtx.restoring || (existing && existing.removed) ? "emp-restore" : emCtx.ek ? "emp-edit" : "emp-add";
+                const changes = action === "emp-edit" ? empChanges(before, record) : action === "emp-add" || action === "emp-replace" ? ["Schedule: " + schedText(schedule)] : [];
+                if (action !== "emp-edit" || changes.length) {
+                    await logEmpAudit(k, action, changes, Object.assign({ name: displayName(record, email) }, replaceEk ? { from: empName(replaceEk) + " (" + String(replaceEk).replace(/,/g, ".") + ")" } : {}));
+                }
                 closeModal("empModal");
-                toast((emCtx.ek ? "Saved " : "Added ") + displayName({ name: $("emName").value }, email) + "." + note, /couldn't/i.test(note));
+                toast((emCtx.ek && !emCtx.restoring ? "Saved " : replaceEk ? "Moved everything to " : emCtx.restoring ? "Added back " : "Added ") +
+                    displayName({ name: $("emName").value }, email) + "." + note, /couldn't/i.test(note));
             } catch (err) { msg.textContent = "Couldn't save: " + errText(err); }
             btn.disabled = false;
         });
+
+        // A new sign-in takes someone's place: their punches, requests, time off and open shift move to it, in one write
+        async function moveEmployee(from, to, record) {
+            const [sh, rq, off, op] = await Promise.all([P.shifts, P.requests, P.timeoff, P.open].map(path => get(ref(db, path + "/" + from))));
+            const u = {};
+            const move = (path, snap) => Object.entries(snap.val() || {}).forEach(([id, v]) => { u[path + "/" + to + "/" + id] = v; u[path + "/" + from + "/" + id] = null; });
+            move(P.shifts, sh); move(P.requests, rq); move(P.timeoff, off);
+            if (op.exists()) { u[P.open + "/" + to] = op.val(); u[P.open + "/" + from] = null; }
+            for (const [id, r] of Object.entries(vanReports)) if (r && r.ek === from) u[P.vanReports + "/" + id + "/ek"] = to;
+            u[P.employees + "/" + from] = null;
+            u[P.prefs + "/" + from] = null;
+            u[P.pushTokens + "/" + from] = null; // the old sign-in's phones stop getting reminders
+            await update(ref(db), u);
+            // A van they hold now belongs to the new sign-in
+            for (const [gpsId, c] of Object.entries(claims)) {
+                if (c && c.ek === from) await set(ref(db, P.claims + "/" + gpsId), Object.assign({}, c, { ek: to, email: record.email, name: displayName(record, record.email) }));
+            }
+        }
 
         // Creates the Firebase sign-in account on a separate app instance so the admin stays signed in
         async function createLogin(email, pass) {
@@ -1573,12 +2161,20 @@
             }
         }
 
+        // Removing keeps the record (marked removed), so their punches stay on timesheets and exports.
+        // A van they hold is freed straight away.
         $("emDelete").addEventListener("click", async () => {
             const k = emCtx && emCtx.ek;
             if (!k) return;
             const e = employees[k];
-            if (!confirm("Remove " + displayName(e, e.email) + " from the time clock?\n\nTheir past punches are kept. To keep them on timesheets, untick “Active” instead.")) return;
-            try { await remove(ref(db, P.employees + "/" + k)); closeModal("empModal"); toast("Removed " + displayName(e, e.email) + "."); }
+            if (!confirm("Remove " + displayName(e, e.email) + " from the time clock?\n\nThey can't punch in any more. Their punches stay on timesheets and exports, and you can add them back later.")) return;
+            try {
+                await update(ref(db, P.employees + "/" + k), { removed: true, active: false, removedAt: serverTimestamp() });
+                for (const [gpsId, c] of Object.entries(claims)) if (c && c.ek === k) await releaseVan(gpsId, c);
+                await logEmpAudit(k, "emp-remove", [], { name: displayName(e, e.email) });
+                closeModal("empModal");
+                toast("Removed " + displayName(e, e.email) + ".");
+            }
             catch (err) { $("emMsg").textContent = "Couldn't remove: " + errText(err); }
         });
 
@@ -1607,24 +2203,36 @@
             const c = claims[b.dataset.release];
             if (!c || !confirm("Release GPS " + c.vehicleName + " from " + (c.name || c.nickname) + "? Their RouteWatcher nickname on it is removed too.")) return;
             try {
-                await releaseClaim(b.dataset.release, null);
-                const s = c.ek && c.shiftId ? findShift(c.ek, c.shiftId) : null;
-                if (s && typeof s.out !== "number" && s.vehicleId === b.dataset.release) {
-                    await update(ref(db, P.shifts + "/" + c.ek + "/" + s.id), { vehicleId: null, vehicleName: null, nickname: null });
-                }
+                await releaseVan(b.dataset.release, c);
                 toast("GPS " + c.vehicleName + " released.");
             } catch (err) { toast("Couldn't release: " + errText(err), true); }
         });
+
+        // Frees a GPS and takes it off the driver's open shift, with a line in the shift's van history
+        async function releaseVan(gpsId, c) {
+            await releaseClaim(gpsId, null);
+            const s = c.ek && c.shiftId ? findShift(c.ek, c.shiftId) : null;
+            if (s && typeof s.out !== "number" && s.vehicleId === gpsId) {
+                const base = P.shifts + "/" + c.ek + "/" + s.id;
+                await update(ref(db), { [base + "/vehicleId"]: null, [base + "/vehicleName"]: null, [base + "/nickname"]: null,
+                    [base + "/vans/" + push(ref(db, base + "/vans")).key]: { at: serverTimestamp(), how: "admin", by: String(user.email).slice(0, 60) } });
+            }
+        }
 
         // ---------- Settings ----------
         $("tzName").textContent = TZ;
         function fillSettingsForm() {
             if (document.activeElement && $("settingsForm").contains(document.activeElement)) return;
             $("sReminder").value = settings.reminderMinutes;
+            if (!(document.activeElement && $("shopForm").contains(document.activeElement))) {
+                $("shLat").value = typeof settings.shopLat === "number" ? settings.shopLat : "";
+                $("shLng").value = typeof settings.shopLng === "number" ? settings.shopLng : "";
+                $("shRadius").value = settings.shopRadius;
+            }
         }
         $("settingsForm").addEventListener("submit", async e => {
             e.preventDefault();
-            const next = settingsWithDefaults({ reminderMinutes: $("sReminder").value });
+            const next = settingsWithDefaults(Object.assign({}, settingsRaw, { reminderMinutes: $("sReminder").value }));
             try {
                 await set(ref(db, P.settings), next);
                 viewWeek = weekStartKey(dayKey(now()), next.weekStart);
@@ -1632,6 +2240,38 @@
                 toast("Settings saved.");
             } catch (err) { toast("Couldn't save settings: " + errText(err), true); }
         });
+
+        // Shop location (A4): punches farther than the radius are flagged on the timesheet
+        async function saveShop(lat, lng, radius) {
+            const next = Object.assign({}, settingsRaw, { shopRadius: radius });
+            if (lat === null) { delete next.shopLat; delete next.shopLng; } else { next.shopLat = lat; next.shopLng = lng; }
+            await set(ref(db, P.settings), settingsWithDefaults(next));
+        }
+        $("shopForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            // Accepts "49.8485, -99.9501" pasted into the latitude box too
+            let latText = $("shLat").value.trim(), lngText = $("shLng").value.trim();
+            const both = latText.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+            if (both) { latText = both[1]; lngText = both[2]; }
+            const radius = parseInt($("shRadius").value, 10);
+            if (!isFinite(radius) || radius < 50 || radius > 50000) { toast("Enter a distance from 50 to 50000 metres.", true); return; }
+            if (!latText && !lngText) { await saveShop(null, null, radius).then(() => toast("Shop location cleared."), err => toast("Couldn't save: " + errText(err), true)); return; }
+            const lat = Number(latText), lng = Number(lngText);
+            if (!latText || !lngText || !isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+                toast("Enter the latitude and longitude as numbers, e.g. 49.8485 and -99.9501.", true); return;
+            }
+            try { await saveShop(Math.round(lat * 1e6) / 1e6, Math.round(lng * 1e6) / 1e6, radius); document.activeElement.blur(); toast("Shop location saved."); }
+            catch (err) { toast("Couldn't save: " + errText(err), true); }
+        });
+        $("shHere").addEventListener("click", () => {
+            if (!navigator.geolocation) { toast("This browser can't share its location.", true); return; }
+            navigator.geolocation.getCurrentPosition(pos => {
+                $("shLat").value = pos.coords.latitude.toFixed(6);
+                $("shLng").value = pos.coords.longitude.toFixed(6);
+                toast("Filled in where this device is (about " + Math.round(pos.coords.accuracy) + " m accurate). Click Save to keep it.");
+            }, () => toast("Couldn't get this device's location.", true), { enableHighAccuracy: true, timeout: 15000 });
+        });
+        $("shClear").addEventListener("click", () => { $("shLat").value = ""; $("shLng").value = ""; });
 
         // ---------- Ticking ----------
         setInterval(() => {

@@ -36,6 +36,26 @@ rules** actually stop an employee from changing their own punches.
   punch. Only the admin panel writes the street address.
 - Each employee can read and change only their own punch-in reminder setting
   (`timeclock/prefs`).
+- An employee can only have one shift open at a time. Each punch in also writes
+  `timeclock/open/{ek}` (the open shift's id), and a punch in is refused while that
+  shift is still open.
+- Removed employees (`removed: true`) can't punch in or report a van problem.
+- Only the admin panel can mark a punch as added by an admin (`src: "admin"`).
+- A punch can carry the time it was pressed on the phone (`tap`, `outTap`), so a punch
+  saved with no signal shows when it was really made. It can't be more than a week old.
+- Employees can send, read and cancel their own punch-fix requests
+  (`timeclock/requests/{ek}`) and time-off requests (`timeclock/timeoff/{ek}`) while
+  they're still open. Only admins can answer them.
+- Employees can add a van problem report (`timeclock/van_reports`) in their own name, but
+  can't read the reports or close one. Only admins can.
+
+`tests/rules/` checks these rules against the Firebase emulator (`npm ci && npm test`
+in that folder; needs Java 11 or later). GitHub runs them on every push.
+
+**Order when updating:** publish the new rules in the Firebase console soon after the
+pages update. Until then, punches still work, but Fix a punch, Time off and van
+problem reports show an error when sent. If `functions/` changed, deploy the functions
+too (see *Reminders when the app is closed → 3*).
 
 Firebase console → **Realtime Database** → **Rules**: merge the `timeclock` block and
 the `developer/dispatch_dashboard/drivers` and `driver_nicknames` entries into your
@@ -53,6 +73,15 @@ lock to hold.
 In the admin panel: **Employees → Add employee**. Enter their name, email and their
 start time for each day they work. There's no end time, because drivers' hours vary. If they don't already have a login for the E&C apps, open *Create
 their sign-in account* and set a starting password.
+
+**Removing someone** hides them from the clock, the live board and the employee list
+(**Show removed** brings them back into view) and frees any van they had. Their punches
+stay, so old timesheets and the CSV still include them. **Add back** undoes it.
+
+**Forgotten password:** the sign-in emails aren't real inboxes, so a password can't be
+reset by email. Add the person again with a new sign-in email and pick their old record
+under **Takes the place of**. Their punches, requests, time off, schedule and van move to
+the new sign-in, and the old record is deleted. The change log records the move.
 
 ### 3. Employees add the clock to their phone
 
@@ -153,6 +182,49 @@ open (or the next check) picks it up.
   **Admin → Employees** shows *Reminder off* for anyone who turned it off.
 - **Admin edits** are marked "Edited by admin" on the employee's own screen, and each
   one is saved to the change log (`timeclock/audit`) with the reason.
+
+## No signal
+
+A punch works with no signal. The app saves it on the phone right away (with the time
+it was pressed) and a bar at the top says it's waiting. It's sent when the phone is
+back online, or the next time the app is opened if it was closed first. The punch time
+is the time the server receives it; the time pressed is saved with it. When the two
+are more than 2 minutes apart, the admin timesheet shows **sent late · pressed 7:02 AM**,
+and editing that punch has a **Use the phone's time** link to set it to the time pressed.
+
+## Requests, the Inbox and Reports
+
+**Employees** have a **Requests** card on the clock:
+
+- **Fix a punch:** for a missed punch in or out, both, a wrong time, or anything else,
+  with the day, the times and a note.
+- **Time off:** a first and last day (60 days at most) and a note. Approved days show as
+  *Time off* in My week, and no punch-in reminder is sent on those days.
+- Each request shows whether it's waiting, done, approved or declined, with the admin's
+  reply. A request can be cancelled while it's still waiting.
+- **Van check:** after picking a van, the app asks if anything is wrong with it (tap
+  **All good** to skip). The *Something wrong with this van? Report it* link under the
+  vehicle sends a report any time.
+- **Last pay week:** the total, regular and overtime hours for the last full pay week.
+
+**Admin → Inbox** lists punch fixes, time off and van problems, with a count on the tab.
+**Fix it** opens the punch editor already filled in from the request, and saving marks the
+request done. Time off can be approved or declined, and van problems marked fixed with
+a note. **Show handled** shows the finished ones.
+
+**Admin → Reports** shows the hours, overtime and overtime share for the last 4, 8, 13 or
+26 pay weeks, a table of each person's overtime by pay week (brighter orange is more
+overtime), and hours driven per van. Hover over any cell or bar for the numbers.
+
+**Other admin tools:**
+
+- **Export CSV** takes any date range (or *This pay week*, *Last pay week*, *This month*,
+  *Last month*), with every punch and a total per pay week, or one line per employee.
+- **Settings → Shop location:** punches made farther than the set distance from the shop
+  show **Far from shop** on the timesheet.
+- **Settings → Change log** includes employee changes (added, edited, removed, added back,
+  moved to a new sign-in), can be filtered to one person, and loads older changes on
+  request.
 
 ## Punch locations
 
