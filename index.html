@@ -816,7 +816,7 @@
         const {
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
-            fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
+            fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, vehicleList, isManualVan, esc, errText,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, timeOffList, timeOffOn, workdayFor
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -1404,14 +1404,13 @@
         function atShop(open) { return !!(open && open.shop && !open.vehicleId); }
 
         async function loadGps() {
-            try {
-                const snap = await get(ref(db, P.gps));
-                gpsUnits = gpsList(snap.val());
-                gpsError = "";
-            } catch (err) {
-                gpsUnits = [];
-                gpsError = "Couldn't load the GPS list from RouteWatcher: " + errText(err);
-            }
+            // GPS units from RouteWatcher, plus the vans with no GPS the admin added
+            const [gps, vans] = await Promise.all([
+                get(ref(db, P.gps)).then(s => ({ val: s.val() }), err => ({ err: err })),
+                get(ref(db, P.vans)).then(s => s.val(), err => { console.warn("Vans without GPS not loaded:", err); return null; })
+            ]);
+            gpsUnits = vehicleList(gps.val, vans);
+            gpsError = gps.err ? "Couldn't load the GPS list from RouteWatcher: " + errText(gps.err) : "";
         }
 
         async function openSheet() {
@@ -1466,8 +1465,8 @@
                 ' style="--i:0" aria-label="Shop, ' + (shop ? "you're working here" : "not driving") + '">' +
                 '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 17h10"/></svg></span>' +
                 '<span class="gps-name">Shop</span><span class="gps-state">' + (shop ? "You're here" : "Not driving") + "</span></button>";
-            if (gpsError) { grid.innerHTML = shopTile; $("sheetMsg").textContent = gpsError; return; }
-            if (!gpsUnits.length) { grid.innerHTML = shopTile + '<p class="empty">No GPS units are set up in RouteWatcher yet.</p>'; return; }
+            if (gpsError) $("sheetMsg").textContent = gpsError;
+            if (!gpsUnits.length) { grid.innerHTML = shopTile + (gpsError ? "" : '<p class="empty">No vans are set up yet.</p>'); return; }
             const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gps : null;
             // The van the other driver left behind is most likely the one this driver is in now
             const suggestId = lost && lost.suggestId && !claims[lost.suggestId] ? lost.suggestId : null;
@@ -1536,8 +1535,10 @@
                 saveLocation(P.shifts + "/" + ek + "/" + open.id + "/vans/" + entry.key + "/loc", where);
                 if (prevId && prevId !== g.id) await releaseVehicle(prevId, prevNick).catch(err => console.warn("Vehicle release:", err));
                 let nickOk = true;
-                try { await set(ref(db, P.nicknames + "/" + g.id), nick); }
-                catch (err) { nickOk = false; console.warn("Nickname not saved:", err); }
+                if (!g.manual) { // a van without GPS has no RouteWatcher name
+                    try { await set(ref(db, P.nicknames + "/" + g.id), nick); }
+                    catch (err) { nickOk = false; console.warn("Nickname not saved:", err); }
+                }
                 picking = null;
                 closeSheet();
                 const msg = (prevId || lost ? "Van swap done. " : "") + "You are driving vehicle " + g.name + (holder ? ". " + holderName + " has been unassigned." : "");
@@ -1586,7 +1587,7 @@
         async function releaseVehicle(gpsId, nick) {
             const res = await runTransaction(ref(db, P.claims + "/" + gpsId), cur => (cur === null || cur.ek === ek) ? null : undefined);
             if (!res.committed) return; // another driver took this van: its RouteWatcher name is theirs now
-            if (nick) {
+            if (nick && !isManualVan(gpsId)) {
                 await runTransaction(ref(db, P.nicknames + "/" + gpsId), cur => (cur === null || cur === nick) ? null : undefined)
                     .catch(err => console.warn("Nickname not cleared:", err));
             }

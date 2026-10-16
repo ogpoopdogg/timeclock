@@ -33,6 +33,7 @@
 //   timeclock/timeoff/{ek}/{id}        time-off requests: { at, from, to, note, status: "pending" | "approved" | "declined", reply, by, doneAt }
 //   timeclock/van_reports/{id}         problems drivers report with a van: { at, ek, name, vehicleId, vehicleName, shiftId,
 //                                        text, status: "open" | "fixed", fixNote, by, doneAt }
+//   timeclock/vans/{van_id}            vans with no GPS unit, added by an admin: { name, at, by }
 // {ek} is the employee's email in lower case with "." replaced by "," (keys can't contain ".").
 //
 // GPS units and their nicknames are the ones RouteWatcher uses:
@@ -65,6 +66,7 @@ export const P = {
     requests: "timeclock/requests",
     timeoff: "timeclock/timeoff",
     vanReports: "timeclock/van_reports",
+    vans: "timeclock/vans",
     gps: "developer/dispatch_dashboard/drivers",
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
@@ -307,6 +309,27 @@ export function gpsList(drivers) {
     return Object.entries(drivers || {})
         .filter(([, d]) => d && String(d.deviceId || "").trim())
         .map(([id, d]) => ({ id: id, name: String(d.name || "").trim() || "Unnamed GPS", color: d.color || "#ffcc00" }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+// Vans with no GPS unit, added by an admin: timeclock/vans/{id} = { name }. Their ids start with
+// "van_", so they never clash with a GPS id. They are claimed and swapped like GPS vans, but have no
+// RouteWatcher nickname.
+export const VAN_PREFIX = "van_";
+export function isManualVan(id) { return String(id || "").startsWith(VAN_PREFIX); }
+// "Van 12", "van12" and "12" are the same van
+export function vanKey(name) { return String(name || "").toLowerCase().replace(/\bvan(?=\b|\d)/g, "").replace(/[^a-z0-9]/g, ""); }
+export function manualVans(vans) {
+    return Object.entries(vans || {})
+        .filter(([id, v]) => isManualVan(id) && v && String(v.name || "").trim())
+        .map(([id, v]) => ({ id: id, name: String(v.name).trim(), color: "#ffcc00", manual: true }));
+}
+// Everything a driver can pick: GPS units and vans without GPS, in name order. Once a GPS unit in
+// RouteWatcher has the same name as a van without GPS, the GPS unit is that van and the other is left out.
+export function vehicleList(drivers, vans) {
+    const gps = gpsList(drivers);
+    const named = new Set(gps.map(g => vanKey(g.name)).filter(Boolean));
+    return gps.concat(manualVans(vans).filter(v => !named.has(vanKey(v.name))))
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 }
 

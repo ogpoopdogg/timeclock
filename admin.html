@@ -323,6 +323,12 @@
 
         /* ---------- Settings ---------- */
         .settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+        .vans-card { margin-top: 18px; max-width: 640px; }
+        .vans-add { display: flex; gap: 8px; margin-top: 10px; }
+        .vans-add .input { flex: 1; min-width: 0; }
+        .vans-list { display: grid; gap: 8px; margin-top: 6px; }
+        .van-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); }
+        .van-row .muted { color: var(--muted); font-size: 0.85rem; }
         .card { padding: 20px; border-radius: 18px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line); }
         .card h3 { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; margin-bottom: 4px; }
         .card .hint { color: var(--muted); font-size: 0.92rem; margin-bottom: 16px; }
@@ -638,10 +644,17 @@
         <!-- Vehicles -->
         <section class="panel" id="panel-vehicles" role="tabpanel" hidden>
             <div class="panel-head">
-                <div><h1 class="panel-title">Vehicles</h1><p class="panel-sub">GPS units registered in RouteWatcher (names from RouteWatcher Settings) and who has each one.</p></div>
+                <div><h1 class="panel-title">Vehicles</h1><p class="panel-sub">GPS units registered in RouteWatcher (names from RouteWatcher Settings), vans without GPS, and who has each one.</p></div>
                 <div class="panel-actions"><button type="button" class="btn" id="gpsRefresh">Refresh list</button></div>
             </div>
             <div class="gps-grid" id="gpsGrid"></div>
+            <form class="card vans-card" id="vansForm">
+                <h3>Vans without GPS</h3>
+                <p class="hint">Vans added here show up in the drivers' van list with the GPS vans. If you later name a GPS unit in RouteWatcher the same (for example "Van 12" or "12"), drivers see the GPS unit instead and this one is left out of the list.</p>
+                <div class="vans-add"><input class="input" id="vanName" maxlength="40" placeholder="Van 12" autocomplete="off" aria-label="Van name"><button type="submit" class="btn primary">Add van</button></div>
+                <p class="modal-msg" id="vanMsg" role="alert"></p>
+                <div class="vans-list" id="vansList"></div>
+            </form>
         </section>
 
         <!-- Reports -->
@@ -833,7 +846,7 @@
         const {
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
-            fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
+            fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             timeOffList, timeOffOn, workdayFor, sentLate, farFromShop, fmtDistance, rangeDays, vanTime
         } = core;
@@ -851,7 +864,7 @@
 
         // ---------- State ----------
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
-        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, audit = [], pushTokens = {}, prefs = {};
+        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [], pushTokens = {}, prefs = {};
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
         let requestsAll = {}, timeoffAll = {}, vanReports = {}; // the Inbox: punch fixes, time off, van problems
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
@@ -949,6 +962,7 @@
             sub(ref(db, P.pushTokens), s => { pushTokens = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.prefs), s => { prefs = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
+            sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
             sub(ref(db, P.timeoff), s => { timeoffAll = s.val() || {}; renderInboxCount(); renderAll(); });
             sub(query(ref(db, P.vanReports), limitToLast(300)), s => { vanReports = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
@@ -986,10 +1000,11 @@
 
         async function loadGps() {
             try {
-                gpsUnits = gpsList((await get(ref(db, P.gps))).val());
+                gpsRaw = (await get(ref(db, P.gps))).val();
+                gpsUnits = vehicleList(gpsRaw, vansRaw);
                 gpsLoaded = true;
             } catch (err) {
-                gpsUnits = []; gpsLoaded = true;
+                gpsRaw = null; gpsUnits = vehicleList(null, vansRaw); gpsLoaded = true;
                 toast("Couldn't load GPS units from RouteWatcher: " + errText(err), true);
             }
             if (activeTab === "vehicles") renderVehicles();
@@ -1511,7 +1526,7 @@
             const known = gpsUnits.map(g => {
                 const c = claims[g.id];
                 const busy = c && !(smCtx && smCtx.shift && c.shiftId === smCtx.shift.id);
-                return '<option value="' + esc(g.id) + '">GPS ' + esc(g.name) + (busy ? " — in use by " + esc(c.nickname || c.name) : "") + "</option>";
+                return '<option value="' + esc(g.id) + '">' + (g.manual ? esc(g.name) + " (no GPS)" : "GPS " + esc(g.name)) + (busy ? " — in use by " + esc(c.nickname || c.name) : "") + "</option>";
             });
             const extra = selectedId && !gpsUnits.some(g => g.id === selectedId) && smCtx && smCtx.shift
                 ? ['<option value="' + esc(selectedId) + '">GPS ' + esc(smCtx.shift.vehicleName || selectedId) + " (no longer in RouteWatcher)</option>"] : [];
@@ -1706,7 +1721,7 @@
             if (takeClaim) {
                 await set(ref(db, P.claims + "/" + vehicleId), { ek: k, email: emp.email, name: displayName(emp, emp.email), nickname: nickname,
                     shiftId: id, vehicleName: vehicleName, at: now() });
-                await set(ref(db, P.nicknames + "/" + vehicleId), nickname).catch(err => toast("GPS nickname not set: " + errText(err), true));
+                if (!isManualVan(vehicleId)) await set(ref(db, P.nicknames + "/" + vehicleId), nickname).catch(err => toast("GPS nickname not set: " + errText(err), true));
             }
             flashRow = k + "/" + id;
             await logAudit(k, id, action, before, data, note);
@@ -1716,7 +1731,7 @@
         async function releaseClaim(gpsId, shiftId) {
             const c = claims[gpsId];
             await runTransaction(ref(db, P.claims + "/" + gpsId), cur => (cur === null || !shiftId || cur.shiftId === shiftId) ? null : undefined);
-            if (c && c.nickname && (!shiftId || c.shiftId === shiftId)) {
+            if (c && c.nickname && !isManualVan(gpsId) && (!shiftId || c.shiftId === shiftId)) {
                 await runTransaction(ref(db, P.nicknames + "/" + gpsId), cur => (cur === null || cur === c.nickname) ? null : undefined)
                     .catch(err => console.warn("Nickname not cleared:", err));
             }
@@ -1959,8 +1974,10 @@
             for (const [k, list] of Object.entries(byEk)) for (const s of list) {
                 if (dayKey(s.in) < from) continue;
                 for (const v of vanTime(s, t)) {
-                    const o = vans[v.vehicleId] || (vans[v.vehicleId] = { id: v.vehicleId, name: v.vehicleName, ms: 0, drivers: new Set(), shifts: 0 });
                     const g = gpsUnits.find(u => u.id === v.vehicleId);
+                    const name = g ? g.name : v.vehicleName || v.vehicleId;
+                    const key = vanKey(name) || v.vehicleId; // a van without GPS and the GPS unit later named after it count as one van
+                    const o = vans[key] || (vans[key] = { id: v.vehicleId, name: name, ms: 0, drivers: new Set(), shifts: 0 });
                     if (g) o.name = g.name;
                     o.ms += v.ms; o.drivers.add(k); o.shifts++;
                 }
@@ -2191,7 +2208,8 @@
             if (!gpsLoaded) { grid.innerHTML = '<div class="empty-state">Loading GPS units…</div>'; return; }
             const orphan = Object.keys(claims).filter(id => !gpsUnits.some(g => g.id === id)).map(id => ({ id: id, name: claims[id].vehicleName || id, color: "#6b727a" }));
             const all = gpsUnits.concat(orphan);
-            if (!all.length) { grid.innerHTML = '<div class="empty-state"><strong>No GPS units</strong>Add GPS units in RouteWatcher → Settings (with a Device ID) and they show up here.</div>'; return; }
+            renderVansList();
+            if (!all.length) { grid.innerHTML = '<div class="empty-state"><strong>No vans yet</strong>Add GPS units in RouteWatcher → Settings (with a Device ID), or add vans without GPS below.</div>'; return; }
             grid.innerHTML = all.map((g, i) => {
                 const c = claims[g.id];
                 const nick = typeof nicknames[g.id] === "string" ? nicknames[g.id] : "";
@@ -2199,7 +2217,7 @@
                     '<div class="gps-name"><span class="gps-dot"></span>' + esc(g.name) + "</div>" +
                     '<div class="gps-info">' + (c ? "In use by <strong>" + esc(c.name || c.nickname) + "</strong> since " + esc(fmtTime(c.at)) +
                         (dayKey(c.at) !== dayKey(now()) ? " (" + esc(fmtKey(dayKey(c.at))) + ")" : "") : "Available") +
-                    "<br>RouteWatcher nickname: " + (nick ? "<strong>" + esc(nick) + "</strong>" : "none") + "</div>" +
+                    (g.manual ? "<br>No GPS unit" : "<br>RouteWatcher nickname: " + (nick ? "<strong>" + esc(nick) + "</strong>" : "none")) + "</div>" +
                     '<div class="gps-foot">' + (c ? '<span class="tag gps">Taken</span><button type="button" class="btn sm" data-release="' + esc(g.id) + '">Release</button>'
                         : '<span class="tag live">Free</span>') + "</div></article>";
             }).join("");
@@ -2208,11 +2226,53 @@
             const b = e.target.closest("[data-release]");
             if (!b) return;
             const c = claims[b.dataset.release];
-            if (!c || !confirm("Release GPS " + c.vehicleName + " from " + (c.name || c.nickname) + "? Their RouteWatcher nickname on it is removed too.")) return;
+            const manual = isManualVan(b.dataset.release);
+            if (!c || !confirm("Release " + (manual ? "van " : "GPS ") + c.vehicleName + " from " + (c.name || c.nickname) + "?" + (manual ? "" : " Their RouteWatcher nickname on it is removed too."))) return;
             try {
                 await releaseVan(b.dataset.release, c);
-                toast("GPS " + c.vehicleName + " released.");
+                toast((manual ? "Van " : "GPS ") + c.vehicleName + " released.");
             } catch (err) { toast("Couldn't release: " + errText(err), true); }
+        });
+
+        // Vans without GPS: add and remove (punches that used a removed van keep its name)
+        function renderVansList() {
+            const list = manualVans(vansRaw).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+            const gps = gpsList(gpsRaw);
+            $("vansList").innerHTML = list.length ? list.map(v => {
+                const c = claims[v.id];
+                const same = gps.find(g => vanKey(g.name) && vanKey(g.name) === vanKey(v.name));
+                return '<div class="van-row"><div><strong>' + esc(v.name) + "</strong><div class=\"muted\">" +
+                    (same ? "Drivers now see GPS " + esc(same.name) + " for this van" : c ? "In use by " + esc(c.name || c.nickname) : "Available") + "</div></div>" +
+                    '<button type="button" class="btn sm ghost" data-van-remove="' + esc(v.id) + '">Remove</button></div>';
+            }).join("") : '<p class="hint" style="margin:0">No vans without GPS yet.</p>';
+        }
+        $("vansForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const name = $("vanName").value.trim().replace(/\s+/g, " ").slice(0, 40), msg = $("vanMsg");
+            msg.textContent = "";
+            if (!name) { msg.textContent = "Type the van's name, like Van 12."; return; }
+            if (!vanKey(name)) { msg.textContent = "Add the van's number or name, like Van 12."; return; }
+            const dupe = manualVans(vansRaw).find(v => vanKey(v.name) === vanKey(name));
+            if (dupe) { msg.textContent = dupe.name + " is already on the list."; return; }
+            const gps = gpsList(gpsRaw).find(g => vanKey(g.name) === vanKey(name));
+            if (gps) { msg.textContent = "GPS " + gps.name + " is already in RouteWatcher, so drivers can pick it already."; return; }
+            try {
+                await set(ref(db, P.vans + "/van_" + push(ref(db, P.vans)).key), { name: name, at: serverTimestamp(), by: String(user.email).slice(0, 60) });
+                $("vanName").value = "";
+                toast(name + " added. Drivers can pick it now.");
+            } catch (err) { msg.textContent = "Couldn't add the van: " + errText(err); }
+        });
+        $("vansList").addEventListener("click", async e => {
+            const b = e.target.closest("[data-van-remove]");
+            if (!b) return;
+            const id = b.dataset.vanRemove, v = vansRaw[id], c = claims[id];
+            if (!v || !confirm("Remove " + v.name + " from the van list?" + (c ? "\n\n" + (c.name || c.nickname) + " has it now, so it is released from them too." : "") +
+                "\n\nPast punches keep the van's name.")) return;
+            try {
+                if (c) await releaseVan(id, c);
+                await remove(ref(db, P.vans + "/" + id));
+                toast(v.name + " removed.");
+            } catch (err) { toast("Couldn't remove the van: " + errText(err), true); }
         });
 
         // Frees a GPS and takes it off the driver's open shift, with a line in the shift's van history
