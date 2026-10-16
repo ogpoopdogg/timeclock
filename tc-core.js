@@ -201,9 +201,18 @@ export function shiftList(obj) {
         .sort((a, b) => a.in - b.in);
 }
 
+// Hours are paid in 15-minute blocks: each punch counts as the nearest quarter hour.
+// 7 minutes or less past a quarter rounds down, 8 or more rounds up (5:07 -> 5:00, 5:08 -> 5:15).
+// Seconds are ignored, so the time on the clock decides. The saved punch times are not changed.
+export const ROUND_MINUTES = 15;
+export function roundPunch(ts) {
+    const min = Math.floor(ts / 60000);
+    return Math.round(min / ROUND_MINUTES) * ROUND_MINUTES * 60000;
+}
+
 export function shiftMs(s, now) {
     const end = typeof s.out === "number" ? s.out : now;
-    return Math.max(0, end - s.in);
+    return Math.max(0, roundPunch(end) - roundPunch(s.in));
 }
 
 export function openShift(list) {

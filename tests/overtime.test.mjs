@@ -10,7 +10,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={},ALLOWED_EMAIL="justin@ec.com";\n' + src);
-const { weekTotals, weekDays, keyToEpoch } = await import(pathToFileURL(tmp).href);
+const { weekTotals, weekDays, keyToEpoch, roundPunch, shiftMs } = await import(pathToFileURL(tmp).href);
 const H = 3600000, days = weekDays('2026-10-12'); // Mon 12 – Sun 18
 const at = (k, hh) => keyToEpoch(k, hh);
 let n = 0;
@@ -64,4 +64,27 @@ test('shifts outside the week are ignored; open shift counts up to now', () => {
   const now = at(days[0], '18:00');
   const r = weekTotals([{ id: 'x', in: at('2026-10-11', '08:00'), out: at('2026-10-11', '20:00') }, { id: 'o', in: at(days[0], '08:00') }], days, now);
   assert.deepStrictEqual([h(r.total), h(r.regular), h(r.overtime)], [10, 8, 2]);
+});
+
+// Hours count in 15-minute blocks: each punch goes to the nearest quarter hour (7 min down, 8 up)
+test('punches round to the nearest 15 minutes', () => {
+  const t = (hhmm, sec) => at(days[0], hhmm) + (sec || 0) * 1000;
+  assert.equal(roundPunch(t('17:01')), t('17:00'));
+  assert.equal(roundPunch(t('17:07', 59)), t('17:00')); // seconds don't count
+  assert.equal(roundPunch(t('17:08')), t('17:15'));
+  assert.equal(roundPunch(t('17:14')), t('17:15'));
+  assert.equal(roundPunch(t('17:17')), t('17:15'));
+  assert.equal(roundPunch(t('17:23')), t('17:30'));
+  assert.equal(roundPunch(t('17:53')), t('18:00'));
+  assert.equal(roundPunch(t('23:55')), at(days[1], '00:00'));
+});
+
+test('hours and overtime use the rounded punches', () => {
+  // 6:53 to 3:08 is 8 h 15 counted (7:00 to 3:15): 8 regular + 0.25 overtime
+  const s = { id: 'r', in: at(days[0], '06:53'), out: at(days[0], '15:08') };
+  assert.equal(shiftMs(s), 8.25 * H);
+  const r = sum([s]);
+  assert.equal(r.reg, 8); assert.equal(r.ot, 0.25);
+  // A 5-minute punch counts as nothing
+  assert.equal(shiftMs({ in: at(days[0], '09:01'), out: at(days[0], '09:06') }), 0);
 });

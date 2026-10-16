@@ -269,6 +269,7 @@
         .punches .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
         .no-punches { padding: 16px 18px; color: var(--dim); }
         .punches td.when { vertical-align: top; }
+        .counted { color: var(--dim); font-size: 0.78rem; margin-top: 2px; }
         .loc {
             display: flex; align-items: flex-start; gap: 4px; max-width: 260px; margin-top: 3px; padding: 0; border: 0; background: none;
             color: var(--blue); font: inherit; font-size: 0.8rem; line-height: 1.3; text-align: left; cursor: pointer;
@@ -832,7 +833,7 @@
         const {
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
-            fmtClockDur, fmtHours, shiftList, shiftMs, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
+            fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, gpsList, esc, errText,
             AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             timeOffList, timeOffOn, workdayFor, sentLate, farFromShop, fmtDistance, rangeDays, vanTime
         } = core;
@@ -1201,8 +1202,8 @@
                     if (s.edited && s.edited.note) tags.push('<span class="tag" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note.length > 34 ? s.edited.note.slice(0, 33) + "…" : s.edited.note) + "”</span>");
                     return '<tr data-row="' + esc(e.ek + "/" + s.id) + '">' +
                         '<td class="day">' + esc(fmtKey(dayKey(s.in))) + "</td>" +
-                        '<td data-l="In" class="when">' + esc(fmtTime(s.in)) + locLine(e.ek, s.id, "in", s.inLoc, s.inAddr, s.inAddrErr) + "</td>" +
-                        '<td data-l="Out" class="when">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "") +
+                        '<td data-l="In" class="when">' + esc(fmtTime(s.in)) + countedLine(s.in) + locLine(e.ek, s.id, "in", s.inLoc, s.inAddr, s.inAddrErr) + "</td>" +
+                        '<td data-l="Out" class="when">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "") + countedLine(s.out) +
                             locLine(e.ek, s.id, "out", s.outLoc, s.outAddr, s.outAddrErr)) + "</td>" +
                         '<td class="num">' + esc(fmtHours(shiftMs(s, t))) + "</td>" +
                         '<td data-l="GPS" class="vancell">' + vanCell(e.ek, s) + "</td>" +
@@ -1233,6 +1234,11 @@
         function placeText(loc, addr, addrErr) { return addr || (addrErr || !MAPS_KEY || mapsFailed ? coordsText(loc) : "Finding address… (" + coordsText(loc) + ")"); }
 
         // The address under a punch time; tap it for the map. Punches from before locations were saved show nothing.
+        // Punches count to the nearest 15 minutes; show the counted time when it differs from the punch
+        function countedLine(ts) {
+            if (typeof ts !== "number" || fmtTime(roundPunch(ts)) === fmtTime(ts)) return "";
+            return '<div class="counted" title="Hours are counted in 15-minute blocks">Counts as ' + esc(fmtTime(roundPunch(ts))) + "</div>";
+        }
         function locLine(k, shiftId, which, loc, addr, addrErr) {
             if (!loc) return "";
             if (!hasCoords(loc)) return '<div class="loc none" title="' + esc(LOCATION_ERRORS[loc.err] || loc.err || "") + '">No location · ' +
@@ -1459,7 +1465,7 @@
                 : v.vehicleName + " " + fmtTime(v.at) + (v.how === "swap" ? " (swap)" : "") + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")).join("; ");
             const rows = kind === "summary"
                 ? [["Employee", "Email", "From", "To", "Shifts", "Hours", "Regular", "Overtime"]]
-                : [["Employee", "Email", "Date", "In", "Out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note",
+                : [["Employee", "Email", "Date", "In", "Out", "Counted in", "Counted out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note",
                     "In location", "Out location", "Van changes"]];
             people.forEach(e => {
                 const list = byEk[e.ek] || [];
@@ -1473,7 +1479,7 @@
                 }
                 // Each pay week (Friday to Thursday) inside the range gets its own total line
                 let weekStart = null, wk = { ms: 0, reg: 0, ot: 0 };
-                const weekLine = () => rows.push([name, e.email, "PAY WEEK " + weekStart + " TOTAL", "", "", fmtHours(wk.ms), fmtHours(wk.reg), fmtHours(wk.ot), "", "", "", "", "", ""]);
+                const weekLine = () => rows.push([name, e.email, "PAY WEEK " + weekStart + " TOTAL", "", "", "", "", fmtHours(wk.ms), fmtHours(wk.reg), fmtHours(wk.ot), "", "", "", "", "", ""]);
                 days.forEach(k => {
                     const ws = weekStartKey(k, settings.weekStart);
                     if (weekStart !== null && ws !== weekStart && wk.ms) weekLine();
@@ -1483,13 +1489,14 @@
                         wk.ms += split.regular + split.overtime; wk.reg += split.regular; wk.ot += split.overtime;
                         rows.push([name, e.email, dayKey(s.in), fmtTime(s.in),
                             typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
+                            fmtTime(roundPunch(s.in)), typeof s.out === "number" ? fmtTime(roundPunch(s.out)) : "",
                             fmtHours(shiftMs(s, t)), fmtHours(split.regular), fmtHours(split.overtime),
                             s.vehicleName || (s.shop ? "Shop" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
                             place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]);
                     });
                 });
                 if (wk.ms) weekLine();
-                rows.push([name, e.email, "TOTAL " + from + " to " + to, "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", "", "", "", ""]);
+                rows.push([name, e.email, "TOTAL " + from + " to " + to, "", "", "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", "", "", "", ""]);
             });
             return rows.map(r => r.map(v => {
                 const s = String(v);
@@ -1599,7 +1606,7 @@
 
         function updateCalc() {
             const r = readShiftForm();
-            $("smCalc").innerHTML = r.error ? "" : (r.out ? "Shift length <strong>" + esc(fmtDur(r.out - r.in)) + "</strong> (" + esc(fmtHours(r.out - r.in)) + " h)"
+            $("smCalc").innerHTML = r.error ? "" : (r.out ? "Counted <strong>" + esc(fmtDur(shiftMs(r, r.out))) + "</strong> (" + esc(fmtHours(shiftMs(r, r.out))) + " h, in 15-minute blocks)"
                 : "On the clock since <strong>" + esc(fmtTime(r.in)) + "</strong>");
         }
 
