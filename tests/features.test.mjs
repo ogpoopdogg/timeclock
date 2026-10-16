@@ -10,7 +10,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={};\n' + src);
-const { vanTime, sentLate, farFromShop, distanceM, timeOffOn, workdayFor, settingsWithDefaults, rangeDays, keyToEpoch } = await import(pathToFileURL(tmp).href);
+const { vanTime, sentLate, farFromShop, distanceM, timeOffOn, workdayFor, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -80,4 +80,25 @@ test('time off: only approved days take a day off the schedule', () => {
 
 test('date ranges include both ends', () => {
   assert.deepStrictEqual(rangeDays('2026-10-30', '2026-11-02'), ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02']);
+});
+
+// ---------- Vans without GPS ----------
+test('vans without GPS are blended into the van list in name order', () => {
+  const drivers = { g7: { name: '7', deviceId: 'x7' }, g3: { name: 'Van 3', deviceId: 'x3' }, gx: { name: 'No device' } };
+  const vans = { van_a: { name: 'Van 12' }, van_b: { name: 'Van 5' }, van_c: { name: '' }, bad: { name: 'Van 9' } };
+  const list = vehicleList(drivers, vans);
+  assert.deepEqual(list.map(v => v.name), ['7', 'Van 3', 'Van 5', 'Van 12']);
+  assert.deepEqual(list.map(v => !!v.manual), [false, false, true, true]);
+  assert.equal(isManualVan('van_a'), true);
+  assert.equal(isManualVan('g7'), false);
+});
+
+test('once a GPS unit is named after a van without GPS, the GPS unit replaces it', () => {
+  assert.equal(vanKey('Van 12'), '12');
+  assert.equal(vanKey('van12'), '12');
+  assert.equal(vanKey(' 12 '), '12');
+  const vans = { van_a: { name: 'Van 12' } };
+  assert.deepEqual(vehicleList({}, vans).map(v => v.id), ['van_a']);
+  assert.deepEqual(vehicleList({ g12: { name: '12', deviceId: 'x' } }, vans).map(v => v.id), ['g12']);
+  assert.deepEqual(vehicleList({ g12: { name: 'VAN 12', deviceId: 'x' } }, vans).map(v => v.id), ['g12']);
 });

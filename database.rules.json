@@ -190,6 +190,13 @@
         ".indexOn": ["ek"]
       },
 
+      "vans": {
+        ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+        "$vanId": {
+          ".validate": "$vanId.beginsWith('van_') && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 40"
+        }
+      },
+
       "vehicle_claims": {
         ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
         "$gpsId": {

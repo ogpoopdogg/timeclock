@@ -46,6 +46,8 @@ rules** actually stop an employee from changing their own punches.
 - Employees can send, read and cancel their own punch-fix requests
   (`timeclock/requests/{ek}`) and time-off requests (`timeclock/timeoff/{ek}`) while
   they're still open. Only admins can answer them.
+- Employees can read the list of vans without GPS (`timeclock/vans`); only admins can
+  change it.
 - Employees can add a van problem report (`timeclock/van_reports`) in their own name, but
   can't read the reports or close one. Only admins can.
 
@@ -155,6 +157,13 @@ open (or the next check) picks it up.
   Settings, not the nickname. Units another driver has taken are greyed out. Picking
   one sets the shared nickname at `developer/dispatch_dashboard/driver_nicknames/{gpsId}`
   to the driver's first name. RouteWatcher and DriverMap read nicknames from that path.
+- **Vans without GPS.** Under **Admin → Vehicles → Vans without GPS**, type a van's name
+  (like *Van 12*) to add it. It shows up in the drivers' van list mixed in with the GPS
+  vans, in name order, and works the same way: one driver at a time, Van swap, van checks,
+  van history and Reports. It just has no RouteWatcher nickname. If a GPS unit in
+  RouteWatcher is later given the same name (*Van 12* or *12*), drivers see the GPS unit
+  instead, and Reports counts both as one van. **Remove** takes a van off the list; past
+  punches keep its name. Saved in `timeclock/vans`.
 - **Shop.** The first tile in the vehicle list is **Shop**, for employees working in the
   shop instead of driving. It is saved on the shift (`shop: true`), and if they had a van
   it is released. They can switch between Shop and a van any time while on the clock.

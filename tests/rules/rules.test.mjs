@@ -182,6 +182,22 @@ test('E7: a report can\'t be made in someone else\'s name, empty, or by a remove
   await assertFails(as('gone@ec.com').ref('timeclock/van_reports/v1').set(report(gone)));
 });
 
+// ---------- Vans without GPS ----------
+test('vans without GPS: admins add them, employees can read the list but not change it', async () => {
+  await assertSucceeds(adminDb().ref('timeclock/vans/van_a').set({ name: 'Van 12', at: Date.now(), by: 'justin@ec.com' }));
+  await assertSucceeds(mattDb().ref('timeclock/vans').once('value'));
+  await assertFails(mattDb().ref('timeclock/vans/van_b').set({ name: 'Van 13' }));
+  await assertFails(adminDb().ref('timeclock/vans/van_c').set({ name: '' }));
+  await assertFails(adminDb().ref('timeclock/vans/g7').set({ name: 'Van 7' })); // ids start with van_
+});
+
+test('a driver on the clock can take a van without GPS', async () => {
+  const db = mattDb();
+  await assertSucceeds(punchIn(db, matt, 's1'));
+  await assertSucceeds(db.ref('timeclock/vehicle_claims/van_a').set({ ek: matt, shiftId: 's1', name: 'Matt', vehicleName: 'Van 12', at: Date.now() }));
+  await assertSucceeds(db.ref(`timeclock/shifts/${matt}/s1`).update({ vehicleId: 'van_a', vehicleName: 'Van 12' }));
+});
+
 // ---------- Left as they were ----------
 test('B9 (kept on purpose): an employee can still name any GPS in RouteWatcher', async () => {
   await assertSucceeds(mattDb().ref('developer/dispatch_dashboard/driver_nicknames/g7').set('Matt'));
