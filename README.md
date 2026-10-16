@@ -105,8 +105,9 @@ counts on the day it started, and all shifts started on the same day count towar
 day's 8 hours. For example, five 9-hour days give 40 regular + 5 overtime, and six
 8-hour days give 48 regular + 0 overtime. Where the split shows:
 
-- **Employees:** a Regular / Overtime split under the week total, an orange overtime
-  part on each day's bar, and an OT tag on each punch with overtime.
+- **Employees:** a Regular / Overtime split under the week total, and the overtime under
+  each day's hours in My week (in the same colors as regular time). Tapping a day in My
+  week shows that day's exact punch in and out times and its hours.
 - **Admin:** Reg / OT on each timesheet, OT per day and per punch, the overtime share
   of "Hours this week" on the live board, and **Regular** and **Overtime** columns in
   the CSV export.
@@ -137,8 +138,9 @@ Both pages install as apps: the time clock as **E&C Clock**, the admin panel as
 **Updates are automatic.** Edit and commit the files on GitHub as usual. There's no
 version number to change, and nobody needs to reinstall or clear anything.
 - **Opening the app:** the service worker (`sw.js`) asks the server for the newest copy
-  of every file each time the app opens. A saved copy is used only when the phone is
-  offline, so the app still opens without signal.
+  of every file each time the app opens. A saved copy is used when the phone is offline,
+  or when the server hasn't answered within 3 seconds (weak signal), so the app still
+  opens. The Firebase code and fonts the pages load from Google are saved too.
 - **App left open:** `pwa.js` checks for changes whenever someone returns to the app, and
   every 20 minutes. When something changed, it shows "Updating to the latest version…"
   and reloads by itself. It never does this in the middle of a punch or a vehicle pick,
@@ -211,6 +213,13 @@ is the time the server receives it; the time pressed is saved with it. When the 
 are more than 2 minutes apart, the admin timesheet shows **sent late · pressed 7:02 AM**,
 and editing that punch has a **Use the phone's time** link to set it to the time pressed.
 
+The clock also **opens** with no signal. The phone keeps a small copy of who is signed in
+and their open shift (`tc_offline` in the browser's storage, cleared on sign-out). If the
+server can't be reached when the app opens, the punch button shows from that copy after a
+few seconds (right away when the phone says it's offline), so a driver can punch out.
+My week only shows the open shift until the signal is back. This needs the app to have
+been opened once with signal after this version was published.
+
 ## Requests, the Inbox and Reports
 
 **Employees** have a **Requests** card on the clock:
@@ -231,9 +240,12 @@ and editing that punch has a **Use the phone's time** link to set it to the time
 request done. Time off can be approved or declined, and van problems marked fixed with
 a note. **Show handled** shows the finished ones.
 
-**Admin → Reports** shows the hours, overtime and overtime share for the last 4, 8, 13 or
-26 pay weeks, a table of each person's overtime by pay week (brighter orange is more
-overtime), and hours driven per van. Hover over any cell or bar for the numbers.
+**Admin → Reports** shows the hours, overtime and overtime share for **Last week** (the
+last full pay week, Friday to Thursday), **Last month** (the last calendar month), **Last
+year** (the last calendar year) or a **Custom range** (up to 400 days), a table of each
+person's overtime (brighter orange is more overtime), and hours driven per van. The table
+has a column per pay week for periods up to 3 months, and a column per month for longer
+ones. Hover over any cell or bar for the numbers.
 
 **Other admin tools:**
 

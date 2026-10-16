@@ -447,6 +447,8 @@
         .log-more { margin-top: 10px; width: 100%; }
 
         /* ---------- Reports ---------- */
+        .rep-custom { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+        .rep-custom[hidden] { display: none; }
         .report-card { padding: 20px; border-radius: 18px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 18px; }
         .report-card h3 { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; line-height: 1.1; }
         .report-card .hint { color: var(--muted); font-size: 0.92rem; margin: 2px 0 16px; }
@@ -663,11 +665,16 @@
                 <div><h1 class="panel-title">Reports</h1><p class="panel-sub" id="repSub">Overtime by person and hours per van, by pay week (Friday to Thursday).</p></div>
                 <div class="panel-actions">
                     <select class="select" id="repRange" aria-label="Report period">
-                        <option value="4">Last 4 pay weeks</option>
-                        <option value="8" selected>Last 8 pay weeks</option>
-                        <option value="13">Last 13 pay weeks</option>
-                        <option value="26">Last 26 pay weeks</option>
+                        <option value="week" selected>Last week</option>
+                        <option value="month">Last month</option>
+                        <option value="year">Last year</option>
+                        <option value="custom">Custom range</option>
                     </select>
+                    <span class="rep-custom" id="repCustom" hidden>
+                        <input class="input" id="repFrom" type="date" aria-label="First day">
+                        <span>to</span>
+                        <input class="input" id="repTo" type="date" aria-label="Last day">
+                    </span>
                 </div>
             </div>
             <div id="reports"></div>
@@ -1925,29 +1932,75 @@
 
         // ---------- Reports: overtime by person, hours per van ----------
         let reportCache = null, reportLoading = false;
+        // The days the report covers: last pay week (Friday to Thursday), last calendar month, last calendar year, or a custom range
+        function reportPeriod() {
+            const today = dayKey(now()), v = $("repRange").value;
+            const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+            const lastWeek = addDaysKey(weekStartKey(today, settings.weekStart), -7);
+            if (v === "month") {
+                const first = m === 1 ? (y - 1) + "-12-01" : y + "-" + String(m - 1).padStart(2, "0") + "-01";
+                return { from: first, to: addDaysKey(today.slice(0, 8) + "01", -1) };
+            }
+            if (v === "year") return { from: (y - 1) + "-01-01", to: (y - 1) + "-12-31" };
+            if (v === "custom") {
+                if (!$("repFrom").value) $("repFrom").value = lastWeek;
+                if (!$("repTo").value) $("repTo").value = addDaysKey(lastWeek, 6);
+                const from = $("repFrom").value, to = $("repTo").value;
+                if (to < from) return { err: "The last day can't be before the first day." };
+                if (to > addDaysKey(from, 400)) return { err: "Pick 400 days or fewer." };
+                return { from: from, to: to };
+            }
+            return { from: lastWeek, to: addDaysKey(lastWeek, 6) };
+        }
+        // Up to 3 months: a column per pay week (labelled by its Friday). Longer: a column per month.
+        const monthFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", year: "numeric" });
+        function reportColumns(from, to) {
+            const inRange = days => days.filter(k => k >= from && k <= to);
+            const cols = [];
+            cols.byMonth = to > addDaysKey(from, 92);
+            if (!cols.byMonth) {
+                for (let ws = weekStartKey(from, settings.weekStart); ws <= to; ws = addDaysKey(ws, 7)) {
+                    const days = inRange(weekDays(ws));
+                    cols.push({ days: days, label: fmtKey(ws).replace(/^\w+ /, ""), title: (days.length < 7 ? "Part of the week of " : "Week of ") + fmtKey(ws) });
+                }
+            } else {
+                for (let ms = from.slice(0, 8) + "01"; ms <= to; ) {
+                    const next = Number(ms.slice(5, 7)) === 12 ? (Number(ms.slice(0, 4)) + 1) + "-01-01" : ms.slice(0, 5) + String(Number(ms.slice(5, 7)) + 1).padStart(2, "0") + "-01";
+                    const name = monthFmt.format(new Date(ms + "T12:00:00Z")).replace(/\./g, "");
+                    cols.push({ days: inRange(rangeDays(ms, addDaysKey(next, -1))), label: name, title: name });
+                    ms = next;
+                }
+            }
+            return cols;
+        }
+        const reportKey = p => p.err ? "" : p.from + "|" + p.to + "|" + Object.keys(employees).sort().join(",");
         async function renderReports() {
-            const weeks = parseInt($("repRange").value, 10) || 8;
-            const thisWeek = weekStartKey(dayKey(now()), settings.weekStart);
-            const from = addDaysKey(thisWeek, -7 * (weeks - 1)), to = addDaysKey(thisWeek, 6);
-            const key = from + "|" + Object.keys(employees).sort().join(",");
+            $("repCustom").hidden = $("repRange").value !== "custom";
+            const period = reportPeriod();
+            if (period.err) { $("reports").innerHTML = '<div class="empty-state">' + esc(period.err) + "</div>"; return; }
+            const { from, to } = period;
+            const key = reportKey(period);
             if (!reportCache || reportCache.key !== key) {
                 if (reportLoading) return;
                 reportLoading = true;
-                $("reports").innerHTML = '<div class="empty-state">Loading ' + weeks + " pay weeks of punches…</div>";
-                try { reportCache = { key: key, from: from, byEk: await loadRange(from, to, Object.keys(employees)) }; }
+                $("reports").innerHTML = '<div class="empty-state">Loading punches for ' + esc(fmtKey(from)) + " – " + esc(fmtKey(to)) + "…</div>";
+                try { reportCache = { key: key, byEk: await loadRange(from, to, Object.keys(employees)) }; }
                 catch (err) { $("reports").innerHTML = '<div class="empty-state">Couldn\'t load punches: ' + esc(errText(err)) + "</div>"; reportLoading = false; return; }
                 reportLoading = false;
                 if (activeTab !== "reports") return;
+                if (reportKey(reportPeriod()) !== key) { renderReports(); return; } // the period changed while loading
             }
-            drawReports(reportCache.byEk, from, weeks, now());
+            drawReports(reportCache.byEk, from, to, now());
         }
         $("repRange").addEventListener("change", renderReports);
+        $("repFrom").addEventListener("change", renderReports);
+        $("repTo").addEventListener("change", renderReports);
 
-        function drawReports(byEk, from, weeks, t) {
-            const starts = Array.from({ length: weeks }, (_, i) => addDaysKey(from, 7 * i));
-            // Overtime per person per pay week
+        function drawReports(byEk, from, to, t) {
+            const cols = reportColumns(from, to);
+            // Overtime per person per pay week (or month)
             const people = empList().map(e => {
-                const perWeek = starts.map(ws => weekTotals(byEk[e.ek] || [], weekDays(ws), t));
+                const perWeek = cols.map(c => weekTotals(byEk[e.ek] || [], c.days, t));
                 return { e: e, perWeek: perWeek, total: perWeek.reduce((n, w) => n + w.total, 0), ot: perWeek.reduce((n, w) => n + w.overtime, 0) };
             }).filter(p => p.total > 0).sort((a, b) => b.ot - a.ot || b.total - a.total);
             const maxOt = Math.max(3600000, ...people.flatMap(p => p.perWeek.map(w => w.overtime)));
@@ -1956,16 +2009,16 @@
                 '<div class="kpi"><div class="kpi-label">Hours worked</div><div class="kpi-value">' + esc(fmtHours(sumH)) + "<small>h</small></div></div>" +
                 '<div class="kpi" style="--k:var(--orange)"><div class="kpi-label">Overtime</div><div class="kpi-value">' + esc(fmtHours(sumOt)) + "<small>h</small></div></div>" +
                 '<div class="kpi" style="--k:var(--orange)"><div class="kpi-label">Overtime share</div><div class="kpi-value">' + (sumH ? Math.round(sumOt / sumH * 100) : 0) + "<small>%</small></div></div></div>";
-            const head = "<tr><th class=\"name\">Employee</th>" + starts.map(ws => "<th>" + esc(fmtKey(ws).replace(/^\w+ /, "")) + "</th>").join("") + "<th>Total OT</th></tr>";
+            const head = "<tr><th class=\"name\">Employee</th>" + cols.map(c => "<th>" + esc(c.label) + "</th>").join("") + "<th>Total OT</th></tr>";
             const rows = people.map(p => '<tr><td class="name">' + esc(displayName(p.e, p.e.email)) + (p.e.removed ? ' <span class="tag off">Removed</span>' : "") + "</td>" +
                 p.perWeek.map((w, i) => {
                     const a = w.overtime / maxOt;
-                    const tip = displayName(p.e, p.e.email) + "|Week of " + fmtKey(starts[i]) + "|" + fmtHours(w.overtime) + " h overtime of " + fmtHours(w.total) + " h";
+                    const tip = displayName(p.e, p.e.email) + "|" + cols[i].title + "|" + fmtHours(w.overtime) + " h overtime of " + fmtHours(w.total) + " h";
                     return '<td><span class="ot-cell' + (w.overtime < 60000 ? " zero" : "") + '" data-tip="' + esc(tip) + '"' +
                         (w.overtime >= 60000 ? ' style="background:rgba(255,159,67,' + (0.1 + a * 0.75).toFixed(3) + ')"' : "") + ">" + (w.overtime >= 60000 ? esc(fmtHours(w.overtime)) : "–") + "</span></td>";
                 }).join("") +
                 '<td class="total">' + esc(fmtHours(p.ot)) + " h<small>of " + esc(fmtHours(p.total)) + " h</small></td></tr>").join("");
-            const otCard = '<div class="report-card"><h3>Overtime by person</h3><p class="hint">Hours past 8 in a day, for each pay week (labelled by its Friday). Brighter orange means more overtime.</p>' +
+            const otCard = '<div class="report-card"><h3>Overtime by person</h3><p class="hint">Hours past 8 in a day, for each ' + (cols.byMonth ? "month" : "pay week (labelled by its Friday)") + '. Brighter orange means more overtime.</p>' +
                 (people.length ? '<div class="ot-scroll"><table class="ot-table"><thead>' + head + "</thead><tbody>" + rows + "</tbody></table></div>" +
                     '<div class="ot-legend"><span>Less</span><span class="ramp"></span><span>More (' + esc(fmtHours(maxOt)) + " h)</span></div>"
                     : '<p class="hint">No punches in this period.</p>') + "</div>";
@@ -1990,7 +2043,8 @@
                     return '<div class="van-bar" data-tip="' + esc(tip) + '"><span class="vb-name">' + esc(v.name) + '</span><span class="vb-track"><span class="vb-fill" style="display:block;width:' +
                         (v.ms / maxVan * 100).toFixed(1) + '%"></span></span><span class="vb-val">' + esc(fmtHours(v.ms)) + " h<small>" + v.drivers.size + (v.drivers.size === 1 ? " driver" : " drivers") + "</small></span></div>";
                 }).join("") + "</div>" : '<p class="hint">No van time in this period.</p>') + "</div>";
-            $("repSub").textContent = "Pay weeks " + fmtKey(from) + " – " + fmtKey(addDaysKey(starts[starts.length - 1], 6)) + " (Friday to Thursday).";
+            const withYear = k => fmtKey(k) + (k.slice(0, 4) !== dayKey(t).slice(0, 4) ? ", " + k.slice(0, 4) : "");
+            $("repSub").textContent = "Overtime by person and hours per van, " + withYear(from) + " – " + withYear(to) + ".";
             $("reports").innerHTML = kpis + otCard + vanCard;
         }
 
