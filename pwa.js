@@ -1,9 +1,10 @@
 // Installable-app (PWA) support shared by the time clock and the admin panel:
-// - registers the service worker (sw.js), which fetches the newest files on every open,
+// - registers the service worker (sw.js), which opens the app from the copy saved on the phone and
+//   fetches the newest files in the background on every open,
 // - shows an "Install app" button until the app is installed: it opens the browser's install
 //   prompt where there is one (Android / desktop Chrome and Edge), otherwise shows the steps,
-// - checks for a newer version of the app while it stays open (on return to the app and
-//   every 20 minutes) and reloads to it automatically, but only when isBusy() says it's safe.
+// - reloads to a newer version once sw.js has saved one (it looks on every open, on return to the app
+//   and every 20 minutes), but only when isBusy() says it's safe.
 // Nothing needs bumping when the files change: updates are detected from the file contents.
 
 const CHECK_EVERY_MS = 20 * 60 * 1000;
@@ -89,6 +90,12 @@ async function fingerprint() {
 
 function setupUpdates(registration, toast, isBusy) {
     let baseline = null, checking = false, pending = false, reloading = false;
+    const sw = "serviceWorker" in navigator ? navigator.serviceWorker : null;
+
+    // sw.js says "tc-updated" once it has saved a newer version. The page's first lines also listen
+    // (window.tcUpdateReady), in case it said so before this file was loaded.
+    if (sw) sw.addEventListener("message", e => { if (e.data && e.data.type === "tc-updated") { pending = true; applyUpdate(); } });
+    if (window.tcUpdateReady) pending = true;
 
     async function check() {
         if (checking || reloading || !navigator.onLine) return;
@@ -96,6 +103,9 @@ function setupUpdates(registration, toast, isBusy) {
         try {
             const reg = await registration;
             if (reg) reg.update().catch(() => {}); // also pick up a new sw.js
+            // The service worker downloads the newest files and tells us if they changed
+            if (sw && sw.controller) { sw.controller.postMessage({ type: "tc-refresh" }); return; }
+            // No service worker running this page (yet): compare the files themselves
             const current = await fingerprint();
             if (baseline === null) baseline = current;
             else if (current !== baseline) pending = true;
@@ -107,10 +117,12 @@ function setupUpdates(registration, toast, isBusy) {
         if (pending) applyUpdate();
     }
 
+    let retryTimer = null;
     function applyUpdate() {
         if (reloading) return;
+        clearTimeout(retryTimer);
         if (document.visibilityState !== "visible" || isBusy()) {
-            setTimeout(applyUpdate, RETRY_BUSY_MS);
+            retryTimer = setTimeout(applyUpdate, RETRY_BUSY_MS);
             return;
         }
         reloading = true;
@@ -118,6 +130,7 @@ function setupUpdates(registration, toast, isBusy) {
         setTimeout(() => location.reload(), 1200);
     }
 
+    if (pending) applyUpdate();
     // Baseline a few seconds after load (the files this page is running), then keep checking
     setTimeout(check, 4000);
     setInterval(check, CHECK_EVERY_MS);

@@ -69,20 +69,20 @@ function swapTimerFor(ek, shiftId, takenAt, n) {
 }
 
 function swapMessage(hint, n) {
-  const van = hint.vehicleName ? 'van ' + hint.vehicleName : 'your van';
+  const van = hint.vehicleName ? 'vehicle ' + hint.vehicleName : 'your vehicle';
   const took = (hint.by ? hint.by + ' took ' + van : capital(van) + ' was given to another driver') + '. ';
   if (!n) {
     return {
-      title: 'Van swap needed',
+      title: 'Vehicle swap needed',
       body: took + (hint.suggestName
-        ? 'Are you in van ' + hint.suggestName + ' now? Open the time clock and tap Van swap to confirm the van you\'re in.'
-        : 'Open the time clock, tap Van swap and pick the van you\'re in.')
+        ? 'Are you in vehicle ' + hint.suggestName + ' now? Open the time clock and tap Vehicle swap to confirm the vehicle you\'re in.'
+        : 'Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.')
     };
   }
   return {
-    title: 'Reminder: van swap',
-    body: 'You\'re on the clock without a van' + (hint.by ? ' since ' + hint.by + ' took ' + van : '') +
-      '. Open the time clock, tap Van swap and pick the van you\'re in.'
+    title: 'Reminder: vehicle swap',
+    body: 'You\'re on the clock without a vehicle' + (hint.by ? ' since ' + hint.by + ' took ' + van : '') +
+      '. Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.'
   };
 }
 const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);

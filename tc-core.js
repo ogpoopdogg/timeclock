@@ -6,7 +6,7 @@
 //       removed                          true once the admin removes them: they can't punch in and are hidden from the
 //                                        live board, but their punches still show on timesheets and exports
 //   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, shop, src, edited,
-//                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint }
+//                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint, oil }
 //       vehicleId/vehicleName/nickname   the van the driver has now
 //       shop                             true while they're working in the shop instead of driving
 //       inLoc / outLoc                   where the phone was at the punch: { lat, lng, acc, at } or { err }
@@ -20,6 +20,7 @@
 //                                        (no signal) shows both; see sentLate()
 //       swapHint                         set by the server when another driver takes this driver's van:
 //                                        { at, by, vehicleId, vehicleName, suggestId, suggestName }
+//       oil                              the oil check: { done, at, how, seenBy, seenAt } (see oilState())
 //   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at, fromId, fromName }
 //   timeclock/prefs/{ek}               { punchReminder: true | false }  the driver's own choice, kept across phones
 //   timeclock/audit/{id}               admin edit history
@@ -30,7 +31,6 @@
 //                                        database rules can refuse a second open shift
 //   timeclock/requests/{ek}/{id}       "Fix my punch" requests: { at, kind, day, inTime, outTime, shiftId, note,
 //                                        status: "open" | "done" | "declined", reply, by, doneAt }
-//   timeclock/timeoff/{ek}/{id}        time-off requests: { at, from, to, note, status: "pending" | "approved" | "declined", reply, by, doneAt }
 //   timeclock/van_reports/{id}         problems drivers report with a van: { at, ek, name, vehicleId, vehicleName, shiftId,
 //                                        text, status: "open" | "fixed", fixNote, by, doneAt }
 //   timeclock/vans/{van_id}            vans with no GPS unit, added by an admin: { name, at, by }
@@ -64,7 +64,6 @@ export const P = {
     prefs: "timeclock/prefs",
     open: "timeclock/open",
     requests: "timeclock/requests",
-    timeoff: "timeclock/timeoff",
     vanReports: "timeclock/van_reports",
     vans: "timeclock/vans",
     gps: "developer/dispatch_dashboard/drivers",
@@ -254,21 +253,18 @@ export function scheduleFor(emp, key) {
     return day && day.start ? day : null;
 }
 
-// ---------- Time off ----------
-// Requests as a list, newest first: [{ id, from, to, note, status, ... }]
-export function timeOffList(obj) {
-    return Object.entries(obj || {})
-        .filter(([, t]) => t && typeof t.from === "string" && typeof t.to === "string")
-        .map(([id, t]) => Object.assign({ id: id }, t))
-        .sort((a, b) => (b.from < a.from ? -1 : b.from > a.from ? 1 : (b.at || 0) - (a.at || 0)));
+// ---------- Oil check ----------
+// shifts/{ek}/{id}/oil = { done, at, how, seenBy, seenAt }: whether the driver checked the oil on a shift with a
+// vehicle. how: "box" (they ticked the glowing box) or "out" (asked at punch out). seenBy/seenAt: an admin dealt with
+// a "not checked" in the Inbox. Shop and "Not driving today" shifts have no oil check.
+export function hadVehicle(shift) {
+    return !!shift && (!!shift.vehicleId || Object.values(shift.vans || {}).some(v => v && v.vehicleId));
 }
-// The approved time off that covers this day (a "YYYY-MM-DD" key), or null
-export function timeOffOn(obj, key) {
-    return timeOffList(obj).find(t => t.status === "approved" && t.from <= key && key <= t.to) || null;
-}
-// Their schedule for the day, unless they have approved time off then
-export function workdayFor(emp, key, timeoff) {
-    return timeOffOn(timeoff, key) ? null : scheduleFor(emp, key);
+// "none" (no vehicle), "checked", "waiting" (on the clock, not checked yet) or "missed" (said no, or never answered)
+export function oilState(shift) {
+    if (!hadVehicle(shift)) return "none";
+    if (shift.oil && shift.oil.done === true) return "checked";
+    return typeof shift.out === "number" ? "missed" : "waiting";
 }
 
 // ---------- Punches sent late ----------
@@ -317,8 +313,8 @@ export function gpsList(drivers) {
 // RouteWatcher nickname.
 export const VAN_PREFIX = "van_";
 export function isManualVan(id) { return String(id || "").startsWith(VAN_PREFIX); }
-// "Van 12", "van12" and "12" are the same van
-export function vanKey(name) { return String(name || "").toLowerCase().replace(/\bvan(?=\b|\d)/g, "").replace(/[^a-z0-9]/g, ""); }
+// "Van 12", "van12", "Vehicle 12" and "12" are the same van
+export function vanKey(name) { return String(name || "").toLowerCase().replace(/\b(?:van|vehicle)(?=\b|\d)/g, "").replace(/[^a-z0-9]/g, ""); }
 export function manualVans(vans) {
     return Object.entries(vans || {})
         .filter(([id, v]) => isManualVan(id) && v && String(v.name || "").trim())

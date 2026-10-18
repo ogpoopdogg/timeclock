@@ -10,6 +10,11 @@
     <meta name="apple-mobile-web-app-title" content="E&amp;C Clock">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Time Clock &middot; E&amp;C Courier</title>
+    <script>
+        // sw.js says "tc-updated" once it has saved a newer version of the app; pwa.js reloads to it when it's safe.
+        // Listening this early means the message isn't missed while the rest of the page is still loading.
+        if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.type === "tc-updated") window.tcUpdateReady = true; });
+    </script>
     <link rel="manifest" href="clock.webmanifest">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -113,7 +118,9 @@
 
         .boot {
             min-height: 70vh; display: grid; place-items: center; color: var(--muted);
+            animation: bootIn 0.3s ease-out 0.6s both; /* a quick open never shows the spinner */
         }
+        @keyframes bootIn { from { opacity: 0; } to { opacity: 1; } }
         .boot-spinner {
             width: 46px; height: 46px; border-radius: 50%;
             border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: var(--yellow);
@@ -561,7 +568,7 @@
         .pay-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
         .pay-row .split-box strong { font-size: 1.35rem; }
         .pay-sub { color: var(--dim); font-size: 0.85rem; margin-top: 10px; }
-        .req-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .req-btns { display: grid; grid-template-columns: 1fr; gap: 10px; }
         .req-btns .chip-btn { height: 44px; justify-content: center; font-size: 0.98rem; color: var(--text); }
         .req-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
         .req-list:empty { display: none; }
@@ -582,7 +589,25 @@
         }
         .van-report-link:hover { color: var(--yellow); }
 
-        /* ---------- Form sheet (fix a punch, time off, van check) ---------- */
+        /* Oil check: glows until the driver says they checked the oil on this shift */
+        .oil-box {
+            display: flex; align-items: center; gap: 12px; width: min(400px, 100%); margin: 14px auto 0; padding: 14px 16px;
+            border: 0; border-radius: 16px; background: rgba(255, 204, 0, 0.1); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+            box-shadow: inset 0 0 0 1.5px var(--yellow), 0 0 16px rgba(255, 204, 0, 0.3);
+            animation: oilGlow 1.6s ease-in-out infinite;
+        }
+        @keyframes oilGlow { 50% { box-shadow: inset 0 0 0 1.5px var(--yellow), 0 0 32px 6px rgba(255, 204, 0, 0.55); } }
+        .oil-box[hidden] { display: none; }
+        .oil-box svg { width: 28px; height: 28px; flex: none; color: var(--yellow); }
+        .oil-box .ob-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+        .oil-box strong { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; }
+        .oil-box small { color: var(--muted); font-size: 0.85rem; }
+        .oil-box.done { animation: none; cursor: default; background: rgba(53, 208, 127, 0.08); box-shadow: inset 0 0 0 1px rgba(53, 208, 127, 0.4); }
+        .oil-box.done svg { color: var(--green); }
+        .check-row { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line); font-size: 1.05rem; cursor: pointer; }
+        .check-row input { width: 26px; height: 26px; flex: none; accent-color: var(--yellow); }
+
+        /* ---------- Form sheet (fix a punch, vehicle check, oil check) ---------- */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
         .form-grid .full { grid-column: 1 / -1; }
         .form-grid select.input { appearance: none; -webkit-appearance: none; }
@@ -686,13 +711,17 @@
 
                 <div class="vehicle-pill" id="vehiclePill" hidden>
                     <svg class="vp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-                    <span class="vp-text"><span class="vp-label" id="vpLabel">Your van</span><span class="vp-name" id="vpName"></span></span>
+                    <span class="vp-text"><span class="vp-label" id="vpLabel">Your vehicle</span><span class="vp-name" id="vpName"></span></span>
                     <button type="button" class="swap-btn" id="changeVehicleBtn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>
-                        <span id="swapBtnText">Van swap</span>
+                        <span id="swapBtnText">Vehicle swap</span>
                     </button>
                 </div>
-                <button type="button" class="van-report-link" id="vanReportBtn" hidden>Something wrong with this van? Report it</button>
+                <button type="button" class="van-report-link" id="vanReportBtn" hidden>Something wrong with this vehicle? Report it</button>
+                <button type="button" class="oil-box" id="oilBox" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>
+                    <span class="ob-text"><strong id="oilTitle">Oil check</strong><small id="oilSub">Tap here once you've checked the oil</small></span>
+                </button>
             </section>
 
             <aside class="side">
@@ -747,7 +776,6 @@
                     <h2 class="card-title" id="reqTitle" style="margin-bottom:12px">Requests</h2>
                     <div class="req-btns">
                         <button type="button" class="chip-btn" id="fixPunchBtn">Fix a punch</button>
-                        <button type="button" class="chip-btn" id="timeOffBtn">Time off</button>
                     </div>
                     <div class="req-list" id="reqList"></div>
                 </section>
@@ -830,8 +858,8 @@
         const {
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
-            fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, vehicleList, isManualVan, esc, errText,
-            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, timeOffList, timeOffOn, workdayFor
+            fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
+            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
@@ -853,7 +881,7 @@
         // ---------- State ----------
         let user = null, ek = null, emp = null, settings = settingsWithDefaults(null);
         let shifts = [], rawShifts = [], claims = {}, serverOffset = 0;
-        let requests = {}, timeoff = {};       // the driver's own "Fix a punch" and time-off requests
+        let requests = {};                  // the driver's own "Fix a punch" requests
         let shiftsSince = 0, shiftsUnsub = null;
         let prefs = null, prefsLoaded = false;   // timeclock/prefs/{ek}: the driver's saved reminder choice
         let locSaving = 0;                  // locations still being written (don't reload the app meanwhile)
@@ -863,6 +891,7 @@
         let empLoaded = false, shiftsLoaded = false;
         let busy = false;
         let afterPunchInPick = false;       // open the vehicle picker once the success overlay closes
+        let afterPunchOutOil = null;        // the shift to ask "Did you check the oil?" about once it closes
 
         const now = () => Date.now() + serverOffset;
         const current = () => openShift(shifts);
@@ -921,18 +950,16 @@
             authKnown = true; standIn = false;
             user = u; claims = {}; empLoaded = shiftsLoaded = false;
             if (!keep) { emp = null; shifts = []; rawShifts = []; offlineStart = false; online = true; }
-            requests = {}; timeoff = {}; netSeenAt = 0;
-            prefs = null; prefsLoaded = false;
+            requests = {}; netSeenAt = 0;
+            if (!keep) { prefs = null; prefsLoaded = false; }
             pushState = "off"; pushFor = null; pushKey = null;
             if (!keep) { closeSheet(true); closeForm(true); }
             if (!u) { ek = null; clearOfflineCopy(); renderNet(); show("signinScreen"); return; }
             ek = emailKey(u.email);
-            if (!keep) show("bootScreen");
-            clearTimeout(offlineStartTimer);
-            offlineStartTimer = setTimeout(startOffline, navigator.onLine ? OFFLINE_START_MS : 0);
+            if (!keep) { show("bootScreen"); startOffline(); }
 
             listen(ref(db, ".info/serverTimeOffset"), s => { serverOffset = Number(s.val()) || 0; });
-            listen(ref(db, P.settings), s => { settings = settingsWithDefaults(s.val()); render(); }, () => {});
+            listen(ref(db, P.settings), s => { settings = settingsWithDefaults(s.val()); settingsLoaded = true; saveOfflineCopy(); render(); }, () => {});
             listen(ref(db, P.employees + "/" + ek), s => {
                 emp = s.val();
                 empLoaded = true;
@@ -948,8 +975,7 @@
             listen(ref(db, P.claims), s => { claims = s.val() || {}; if (sheetOpen) renderSheet(); render(); }, () => {});
             // Database rules not updated yet: these just stay empty
             listen(ref(db, P.requests + "/" + ek), s => { requests = s.val() || {}; renderRequests(); }, () => {});
-            listen(ref(db, P.timeoff + "/" + ek), s => { timeoff = s.val() || {}; render(); scheduleReminder(); }, () => {});
-            listen(ref(db, P.prefs + "/" + ek), s => { prefs = s.val() || {}; prefsLoaded = true; adoptOldReminder(); render(); scheduleReminder(); },
+            listen(ref(db, P.prefs + "/" + ek), s => { prefs = s.val() || {}; prefsLoaded = true; saveOfflineCopy(); adoptOldReminder(); render(); scheduleReminder(); },
                 // Database rules not updated yet: behave as before (on when the phone allows notifications)
                 () => { prefs = { punchReminder: canNotify && Notification.permission === "granted" }; prefsLoaded = true; render(); });
         });
@@ -999,20 +1025,25 @@
             flushPending();
         }
 
-        // ---------- Opening with no signal ----------
-        // The phone keeps a small copy of what the punch button needs (who is signed in and their open shift). When the
-        // server can't be reached as the app opens, the clock opens from that copy, so a driver can still punch out:
-        // the punch is saved on the phone and sent when there's signal (see "Punches saved on this phone" below).
+        // ---------- Opening instantly ----------
+        // The phone keeps a copy of what the clock screen shows (who is signed in, their punches of the last few weeks,
+        // the settings and their reminder choice). The clock opens from that copy straight away, and the server's data
+        // replaces it as soon as it arrives. With no signal the clock still opens, so a driver can punch: the punch is
+        // saved on the phone and sent when there's signal (see "Punches saved on this phone" below).
         const OFFLINE_KEY = "tc_offline";
-        const OFFLINE_START_MS = 3000;      // with signal shown as on, wait this long for the server before using the copy
+        const OFFLINE_DAYS = 21;            // punches kept in the copy: enough for My week and Last pay week
         let authKnown = false;              // Firebase has said who is signed in
         let standIn = false;                // opened from the copy before Firebase said who is signed in
         let offlineStart = false;           // showing the copy, waiting for the server
-        let offlineStartTimer = null;
+        let settingsLoaded = false;         // the settings came from the server
         function saveOfflineCopy() {
             if (!user || !emp || !ek) return;
-            const open = openShift(rawShifts);
-            try { localStorage.setItem(OFFLINE_KEY, JSON.stringify({ ek: ek, email: user.email, emp: emp, open: open || null })); } catch (e) {}
+            const since = now() - OFFLINE_DAYS * 86400000;
+            const recent = rawShifts.filter(x => x.in >= since || typeof x.out !== "number");
+            try {
+                localStorage.setItem(OFFLINE_KEY, JSON.stringify({ ek: ek, email: user.email, emp: emp, shifts: recent,
+                    settings: settings, prefs: prefsLoaded ? prefs : null }));
+            } catch (e) {}
         }
         function loadOfflineCopy() {
             try { const v = JSON.parse(localStorage.getItem(OFFLINE_KEY) || "null"); return v && v.ek && v.email && v.emp ? v : null; }
@@ -1026,15 +1057,18 @@
             if (user ? emailKey(user.email) !== copy.ek : authKnown) return; // someone else, or signed out
             if (!user) { user = { email: copy.email }; ek = copy.ek; standIn = true; }
             if (!empLoaded) emp = copy.emp;
-            if (!shiftsLoaded) rawShifts = copy.open ? [copy.open] : [];
+            // A copy saved before this version only has the open shift
+            if (!shiftsLoaded) rawShifts = Array.isArray(copy.shifts) ? copy.shifts.filter(x => x && x.id && typeof x.in === "number") : copy.open ? [copy.open] : [];
+            if (!settingsLoaded && copy.settings) settings = settingsWithDefaults(copy.settings);
+            if (!prefsLoaded && copy.prefs) { prefs = copy.prefs; prefsLoaded = true; }
             offlineStart = true;
-            online = false;
+            if (!navigator.onLine) online = false;
             show("clockScreen");
             viewWeek = weekStartKey(dayKey(now()), settings.weekStart);
             refreshShifts();
             renderNet();
         }
-        offlineStartTimer = setTimeout(startOffline, navigator.onLine ? OFFLINE_START_MS : 0);
+        setTimeout(startOffline, 0); // once this script has finished setting up
 
         // ---------- Rendering ----------
         function greetingWord(h) { return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; }
@@ -1064,13 +1098,14 @@
                 const has = !!open.vehicleId && !lost;
                 const shop = atShop(open);
                 pill.classList.toggle("alert", !!lost);
-                $("vpLabel").textContent = lost ? (lost.by ? lost.by + " took van " + lost.vehicleName : "Van " + lost.vehicleName + " was taken")
-                    : has ? "Your van" : shop ? "Working in the" : "No van selected";
-                $("vpName").textContent = lost ? "Pick your van" : has ? (open.vehicleName || "—") : shop ? "Shop" : "Tap to pick one";
-                $("swapBtnText").textContent = has || lost ? "Van swap" : "Pick van";
+                $("vpLabel").textContent = lost ? (lost.by ? lost.by + " took vehicle " + lost.vehicleName : "Vehicle " + lost.vehicleName + " was taken")
+                    : has ? "Your vehicle" : shop ? "Working in the" : "No vehicle selected";
+                $("vpName").textContent = lost ? "Pick your vehicle" : has ? (open.vehicleName || "—") : shop ? "Shop" : "Tap to pick one";
+                $("swapBtnText").textContent = has || lost ? "Vehicle swap" : "Pick vehicle";
                 showSwapBanner(open, lost);
             }
             $("vanReportBtn").hidden = !(open && open.vehicleId && !lostVan(open));
+            renderOilBox(open);
 
             tickClock();
             renderWeek();
@@ -1120,12 +1155,11 @@
             days.forEach(k => {
                 const row = daysEl.querySelector('[data-k="' + k + '"]');
                 const d = byDay[k];
-                const off = scheduleFor(emp, k) && timeOffOn(timeoff, k);
                 row.classList.toggle("is-today", k === today);
                 row.setAttribute("aria-expanded", String(k === openDay));
                 row.setAttribute("aria-label", fmtKey(k, true) + ", " + (d.ms ? fmtDur(d.ms) : "no hours") + ". Show punches.");
                 row.querySelector(".day-name").innerHTML = esc(DOW_SHORT[new Date(k + "T12:00:00Z").getUTCDay()]) +
-                    "<small>" + esc(off ? "Time off" : k.slice(5).replace("-", "/")) + "</small>";
+                    "<small>" + esc(k.slice(5).replace("-", "/")) + "</small>";
                 const bar = row.querySelector(".day-bar i");
                 const live = d.shifts.some(s => typeof s.out !== "number");
                 bar.classList.toggle("live", live);
@@ -1304,6 +1338,7 @@
                 if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
                 burst();
                 showSuccess(!open, res.tap, !res.sent);
+                afterPunchOutOil = open && hadVehicle(open) && !oilDone(open) ? open : null;
             } catch (err) {
                 $("punchMsg").textContent = (open ? "Punch out" : "Punch in") + " failed: " + errText(err);
                 punchEl.classList.remove("shake"); void punchEl.offsetWidth; punchEl.classList.add("shake");
@@ -1355,6 +1390,12 @@
             set(ref(db, shiftPath(id) + "/outTap"), tap).catch(err => console.warn("Punch-out phone time not saved:", err));
         }
 
+        // The oil check answer (see "Oil check" below); a "checked" already on the server is never changed
+        async function sendOil(p) {
+            try { await set(ref(db, shiftPath(p.id) + "/oil"), { done: p.done === true, at: p.tap, how: p.how === "out" ? "out" : "box" }); }
+            catch (err) { if (!(await shiftHas(p.id, "oil/done"))) throw err; }
+        }
+
         // Sends one saved punch; it leaves the phone's list once the server has it (or refused it).
         // Punches go one at a time, in order, so a punch out never reaches the server before its punch in.
         const inflight = new Map();
@@ -1362,11 +1403,12 @@
         function deliver(p) {
             const key = p.kind + "|" + p.id;
             if (inflight.has(key)) return inflight.get(key);
-            if (p.kind === "out") {
+            if (p.kind !== "in") {
                 const pin = loadPending().find(x => x.kind === "in" && x.id === p.id);
                 if (pin) deliver(pin).catch(() => {});
             }
-            const run = sendChain.catch(() => {}).then(() => p.kind === "in" ? sendPunchIn(p.id, p.tap) : sendPunchOut(p.id, p.tap));
+            const run = sendChain.catch(() => {}).then(() => p.kind === "in" ? sendPunchIn(p.id, p.tap)
+                : p.kind === "out" ? sendPunchOut(p.id, p.tap) : sendOil(p));
             sendChain = run;
             const done = run.then(() => {
                 dropPending(p);
@@ -1411,6 +1453,7 @@
                 const s = list.find(x => x.id === p.id);
                 if (p.kind === "in" && !s) list.push({ id: p.id, in: p.tap, tap: p.tap, src: "clock", pending: true });
                 else if (p.kind === "out" && s && typeof s.out !== "number") { s.out = p.tap; s.pending = true; }
+                else if (p.kind === "oil" && s && !oilDone(s)) s.oil = { done: p.done, at: p.tap, how: p.how, pending: true };
             }
             shifts = list.sort((a, b) => a.in - b.in);
             if (!$("clockScreen").hidden) render();
@@ -1485,6 +1528,7 @@
         function hideSuccess() {
             $("success").classList.remove("show");
             if (afterPunchInPick) { afterPunchInPick = false; setTimeout(() => openSheet(), 250); }
+            if (afterPunchOutOil) { const shift = afterPunchOutOil; afterPunchOutOil = null; setTimeout(() => askOilAtPunchOut(shift), 250); }
         }
         $("success").addEventListener("click", () => { clearTimeout(showSuccess.t); hideSuccess(); });
 
@@ -1546,18 +1590,18 @@
             const lost = lostVan(open);
             const has = !!open.vehicleId && !lost;
             const shop = atShop(open);
-            $("sheetTitle").textContent = has || lost ? "Van swap" : "Pick your vehicle";
-            $("sheetSub").textContent = lost ? (lost.by ? lost.by + " took van " + lost.vehicleName + ". " : "") + "Tap the van you're in now, or Shop."
-                : has ? "Tap the van you're in now, or Shop if you're working in the shop. If another driver has the van, they'll be unassigned and asked to pick theirs."
-                : shop ? "You're working in the shop. If you're driving now, tap your van."
+            $("sheetTitle").textContent = has || lost ? "Vehicle swap" : "Pick your vehicle";
+            $("sheetSub").textContent = lost ? (lost.by ? lost.by + " took vehicle " + lost.vehicleName + ". " : "") + "Tap the vehicle you're in now, or Shop."
+                : has ? "Tap the vehicle you're in now, or Shop if you're working in the shop. If another driver has the vehicle, they'll be unassigned and asked to pick theirs."
+                : shop ? "You're working in the shop. If you're driving now, tap your vehicle."
                 : "Please choose the vehicle you're driving today, or Shop if you're working in the shop.";
-            $("sheetSkip").textContent = has ? "Keep van " + open.vehicleName : shop ? "Stay in the shop" : lost ? "Close" : "Not driving today";
+            $("sheetSkip").textContent = has ? "Keep vehicle " + open.vehicleName : shop ? "Stay in the shop" : lost ? "Close" : "Not driving today";
             const shopTile = '<button type="button" class="gps shop' + (shop ? " mine" : "") + (picking === SHOP ? " picking" : "") + '" data-shop="1"' +
                 ' style="--i:0" aria-label="Shop, ' + (shop ? "you're working here" : "not driving") + '">' +
                 '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 17h10"/></svg></span>' +
                 '<span class="gps-name">Shop</span><span class="gps-state">' + (shop ? "You're here" : "Not driving") + "</span></button>";
             if (gpsError) $("sheetMsg").textContent = gpsError;
-            if (!gpsUnits.length) { grid.innerHTML = shopTile + (gpsError ? "" : '<p class="empty">No vans are set up yet.</p>'); return; }
+            if (!gpsUnits.length) { grid.innerHTML = shopTile + (gpsError ? "" : '<p class="empty">No vehicles are set up yet.</p>'); return; }
             const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gps : null;
             // The van the other driver left behind is most likely the one this driver is in now
             const suggestId = lost && lost.suggestId && !claims[lost.suggestId] ? lost.suggestId : null;
@@ -1567,8 +1611,8 @@
                 const mine = c && c.ek === ek && !lost;
                 const taken = c && c.ek !== ek;
                 const suggest = g.id === suggestId;
-                const state = mine ? "Your van" : taken ? (c.nickname || c.name || "Another driver") + " has it · tap to take"
-                    : suggest ? "Likely yours" + (lost.by ? " · " + lost.by + "'s old van" : "") : "Available";
+                const state = mine ? "Your vehicle" : taken ? (c.nickname || c.name || "Another driver") + " has it · tap to take"
+                    : suggest ? "Likely yours" + (lost.by ? " · " + lost.by + "'s old vehicle" : "") : "Available";
                 return '<button type="button" class="gps' + (mine ? " mine" : "") + (taken ? " taken" : "") + (suggest ? " suggest" : "") +
                     (picking === g.id ? " picking" : "") + '" data-gps="' + esc(g.id) + '"' +
                     ' style="--i:' + (i + 1) + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
@@ -1594,8 +1638,8 @@
             // Taking a van another driver has: they get unassigned, and the server tells them to do a van swap
             const holder = claims[g.id] && claims[g.id].ek !== ek ? claims[g.id] : null;
             const holderName = holder ? holder.nickname || holder.name || "another driver" : "";
-            if (holder && !confirm("Van " + g.name + " is assigned to " + holderName + ". Take it?\n\n" + holderName +
-                " will be unassigned and asked to pick the van they're in.")) return;
+            if (holder && !confirm("Vehicle " + g.name + " is assigned to " + holderName + ". Take it?\n\n" + holderName +
+                " will be unassigned and asked to pick the vehicle they're in.")) return;
             picking = g.id;
             btn.classList.add("picking");
             $("sheetMsg").textContent = "";
@@ -1632,7 +1676,7 @@
                 }
                 picking = null;
                 closeSheet();
-                const msg = (prevId || lost ? "Van swap done. " : "") + "You are driving vehicle " + g.name + (holder ? ". " + holderName + " has been unassigned." : "");
+                const msg = (prevId || lost ? "Vehicle swap done. " : "") + "You are driving vehicle " + g.name + (holder ? ". " + holderName + " has been unassigned." : "");
                 if (nickOk) toast(msg);
                 else toast(msg + " Its RouteWatcher name couldn't be updated, so tell your administrator.", true);
                 setTimeout(() => openVanCheck(g.id, g.name, true), 450); // van check: anything wrong with it?
@@ -1666,7 +1710,7 @@
                 if (prevId) await releaseVehicle(prevId, open.nickname).catch(err => console.warn("Vehicle release:", err));
                 picking = null;
                 closeSheet();
-                toast((prevId ? "Van " + prevName + " released. " : "") + "You're working in the shop.");
+                toast((prevId ? "Vehicle " + prevName + " released. " : "") + "You're working in the shop.");
             } catch (err) {
                 picking = null;
                 renderSheet();
@@ -1690,14 +1734,19 @@
         $("sheetSkip").addEventListener("click", () => closeSheet());
         document.addEventListener("keydown", e => {
             if (e.key !== "Escape") return;
-            if (formOpen) closeForm(); else if (sheetOpen) closeSheet();
+            if (formOpen) cancelForm(); else if (sheetOpen) closeSheet();
         });
 
-        // ---------- Form sheet: Fix a punch, Time off, Van check ----------
-        let formOpen = false, formSubmit = null;
+        // ---------- Form sheet: Fix a punch, Vehicle Check, Oil check ----------
+        // o.offline: works with no signal (saved on the phone). o.onCancel: runs when closed without sending.
+        // o.onClose: runs once the sheet has closed, sent or not.
+        let formOpen = false, formSubmit = null, formOffline = false, formCancelFn = null, formCloseFn = null;
         function openForm(o) {
             formOpen = true;
             formSubmit = o.onSubmit;
+            formOffline = !!o.offline;
+            formCancelFn = o.onCancel || null;
+            formCloseFn = o.onClose || null;
             $("formTitle").textContent = o.title;
             $("formSub").textContent = o.sub || "";
             $("formBody").innerHTML = o.body;
@@ -1705,6 +1754,7 @@
             $("formSubmit").textContent = o.submit || "Send";
             $("formSubmit").disabled = false;
             $("formCancel").textContent = o.cancel || "Cancel";
+            $("formCancel").hidden = !!o.noCancel;
             $("formBackdrop").classList.add("show");
             const f = $("formSheet");
             f.classList.add("show");
@@ -1712,21 +1762,29 @@
             if (o.afterOpen) o.afterOpen();
         }
         function closeForm(instant) {
+            const after = instant ? null : formCloseFn;
             formOpen = false;
             formSubmit = null;
+            formCancelFn = formCloseFn = null;
             $("formBackdrop").classList.remove("show");
             const f = $("formSheet");
             f.classList.remove("show");
             f.setAttribute("aria-hidden", "true");
             if (!instant) punchBtn.focus({ preventScroll: true });
+            if (after) setTimeout(after, 350); // once the sheet has slid away
+        }
+        function cancelForm() {
+            const fn = formCancelFn;
+            if (fn) fn();
+            closeForm();
         }
         const formFail = text => { $("formMsg").textContent = text; return false; };
-        $("formCancel").addEventListener("click", () => closeForm());
-        $("formBackdrop").addEventListener("click", () => closeForm());
+        $("formCancel").addEventListener("click", cancelForm);
+        $("formBackdrop").addEventListener("click", cancelForm);
         $("formSheet").addEventListener("submit", async e => {
             e.preventDefault();
             if (!formSubmit) return;
-            if (!online) { formFail("No signal. Try again when you're back online."); return; }
+            if (!online && !formOffline) { formFail("No signal. Try again when you're back online."); return; }
             const btn = $("formSubmit");
             btn.disabled = true;
             $("formMsg").textContent = "";
@@ -1787,44 +1845,19 @@
             toast("Sent to the office. You'll see their answer under Requests.");
         }
 
-        // Time off: approved days drop off the schedule and the punch-in reminder
-        function openTimeOff() {
-            const tomorrow = addDaysKey(dayKey(now()), 1), today = dayKey(now());
-            openForm({
-                title: "Time off",
-                sub: "Ask for a day or more off. Once the office approves it, you won't get punch-in reminders those days.",
-                body: '<div class="form-grid">' +
-                    '<div><label class="field-label" for="toFrom">First day off</label><input class="input" id="toFrom" type="date" min="' + today + '" value="' + tomorrow + '"></div>' +
-                    '<div><label class="field-label" for="toTo">Last day off</label><input class="input" id="toTo" type="date" min="' + today + '" value="' + tomorrow + '"></div>' +
-                    '<div class="full"><label class="field-label" for="toNote">Reason (optional)</label><textarea class="input textarea" id="toNote" maxlength="500" placeholder="e.g. Appointment"></textarea></div></div>',
-                submit: "Ask for time off",
-                onSubmit: sendTimeOff
-            });
-        }
-        $("formBody").addEventListener("input", e => {
-            if (e.target.id === "toFrom" && $("toTo").value < e.target.value) $("toTo").value = e.target.value;
-        });
-        async function sendTimeOff() {
-            const from = $("toFrom").value, to = $("toTo").value, note = $("toNote").value.trim();
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return formFail("Pick the first and last day off.");
-            if (to < from) return formFail("The last day can't be before the first day.");
-            if (from < dayKey(now())) return formFail("Pick today or a later day.");
-            if (to > addDaysKey(from, 60)) return formFail("Ask for 60 days or fewer at a time.");
-            await set(push(ref(db, P.timeoff + "/" + ek)), { at: serverTimestamp(), from: from, to: to, note: note, status: "pending" });
-            toast("Sent to the office. You'll see their answer under Requests.");
-        }
-
-        // Van check: after picking a van (and from the link under the van), the driver can report what's wrong with it
+        // Vehicle Check: after picking a vehicle (and from the link under the vehicle), the driver can report what's wrong
+        // with it. After a pick, the oil check reminder comes next.
         function openVanCheck(vehicleId, vehicleName, afterPick) {
             openForm({
-                title: "Van check · " + vehicleName,
-                sub: afterPick ? "Anything wrong with this van that needs attention? If it's all good, tap All good."
-                    : "What's wrong with this van? The office sees your report.",
+                title: "Vehicle Check · " + vehicleName,
+                sub: afterPick ? "Anything wrong with this vehicle that needs attention? If it's all good, tap All good."
+                    : "What's wrong with this vehicle? The office sees your report.",
                 body: '<label class="field-label" for="vcText">What needs attention</label>' +
-                    '<textarea class="input textarea" id="vcText" maxlength="1000" placeholder="e.g. Check engine light is on, back door sticks"></textarea>',
+                    '<textarea class="input textarea" id="vcText" maxlength="1000" placeholder="e.g. Signal light out, door latch broken etc"></textarea>',
                 submit: "Send report",
                 cancel: afterPick ? "All good" : "Cancel",
-                onSubmit: () => sendVanReport(vehicleId, vehicleName)
+                onSubmit: () => sendVanReport(vehicleId, vehicleName),
+                onClose: afterPick ? remindOil : null
             });
         }
         async function sendVanReport(vehicleId, vehicleName) {
@@ -1833,7 +1866,88 @@
             const open = current();
             await set(push(ref(db, P.vanReports)), { at: serverTimestamp(), ek: ek, name: displayName(emp, user.email), vehicleId: vehicleId,
                 vehicleName: String(vehicleName).slice(0, 60), shiftId: open && !open.pending ? open.id : null, text: text, status: "open" });
-            toast("Thanks. The office has your report on van " + vehicleName + ".");
+            toast("Thanks. The office has your report on vehicle " + vehicleName + ".");
+        }
+
+        // ---------- Oil check ----------
+        // Every shift with a vehicle (hadVehicle: not just Shop or "Not driving today"): a reminder after the vehicle is picked, a glowing box until the driver ticks
+        // "I checked the oil", and the same question at punch out if they never did. The answer is saved on the shift
+        // (shifts/{ek}/{id}/oil = { done, at, how: "box" | "out" }) and shows in the admin Inbox. It's saved on the
+        // phone first, like a punch, so it works with no signal.
+        const OIL_ASKED_KEY = "tc_oil_asked";   // the shift the reminder was last shown for (once per shift)
+        function oilDone(s) { return !!(s && s.oil && s.oil.done === true); }
+        function vehicleOf(s) { return s.vehicleName || (vanHistory(s).filter(v => v.vehicleName).pop() || {}).vehicleName || ""; }
+
+        function renderOilBox(open) {
+            const box = $("oilBox");
+            box.hidden = !(open && hadVehicle(open));
+            if (box.hidden) return;
+            const done = oilDone(open);
+            box.classList.toggle("done", done);
+            box.setAttribute("aria-disabled", String(done));
+            $("oilTitle").textContent = done ? "Oil checked" : "Oil check";
+            $("oilSub").textContent = done ? fmtTime(open.oil.at) + (open.oil.pending ? " · saved on this phone" : "")
+                : "Tap here once you've checked the oil";
+        }
+
+        function remindOil() {
+            const open = current();
+            if (!open || !hadVehicle(open) || oilDone(open) || formOpen || sheetOpen) return;
+            try { if (localStorage.getItem(OIL_ASKED_KEY) === open.id) return; localStorage.setItem(OIL_ASKED_KEY, open.id); } catch (e) {}
+            const name = vehicleOf(open);
+            openForm({
+                title: "Please check your oil",
+                sub: "Check the oil" + (name ? " in vehicle " + name : "") + " before you head out. When it's done, tap the glowing Oil check box.",
+                body: "",
+                submit: "OK",
+                noCancel: true,
+                offline: true,
+                onSubmit: () => {}
+            });
+        }
+
+        function openOilCheck() {
+            const open = current();
+            if (!open || oilDone(open)) return;
+            const name = vehicleOf(open);
+            openForm({
+                title: "Oil check",
+                sub: name ? "Vehicle " + name : "",
+                body: '<label class="check-row"><input type="checkbox" id="oilYes"><span>I checked the oil</span></label>',
+                submit: "Save",
+                offline: true,
+                onSubmit: () => {
+                    if (!$("oilYes").checked) return formFail("Tick the box once you've checked the oil.");
+                    saveOil(open.id, true, "box");
+                    toast("Oil check saved. Thanks!");
+                }
+            });
+        }
+        $("oilBox").addEventListener("click", openOilCheck);
+
+        // At punch out, when the oil wasn't ticked during the shift: checked or not, the answer is saved
+        function askOilAtPunchOut(shift) {
+            const name = vehicleOf(shift);
+            openForm({
+                title: "Did you check the oil?",
+                sub: "Let the office know if you checked the oil" + (name ? " in vehicle " + name : "") + " today.",
+                body: '<label class="check-row"><input type="checkbox" id="oilYes"><span>I checked the oil</span></label>',
+                submit: "Save",
+                noCancel: true,
+                offline: true,
+                onSubmit: () => {
+                    const yes = $("oilYes").checked;
+                    saveOil(shift.id, yes, "out");
+                    toast(yes ? "Oil check saved. Thanks!" : "Saved: oil not checked.");
+                },
+                onCancel: () => saveOil(shift.id, false, "out")
+            });
+        }
+
+        function saveOil(id, done, how) {
+            const p = { kind: "oil", id: id, tap: now(), done: done, how: how };
+            addPending(p);
+            if (!standIn) deliver(p).catch(err => toast("Your oil check couldn't be sent: " + errText(err), true));
         }
 
         // The driver's requests and the office's answers
@@ -1842,31 +1956,26 @@
             if (!user || !emp) return;
             const items = [];
             for (const [id, r] of Object.entries(requests || {})) if (r && r.kind) items.push({ type: "fix", id: id, r: r });
-            for (const t of timeOffList(timeoff)) items.push({ type: "off", id: t.id, r: t });
             items.sort((a, b) => (b.r.at || 0) - (a.r.at || 0));
             const html = items.slice(0, 6).map(it => {
                 const r = it.r;
-                const what = it.type === "fix" ? FIX_KINDS[r.kind] || "Fix a punch" : "Time off";
-                const detail = it.type === "fix"
-                    ? fmtKey(r.day) + (r.inTime ? " · in " + fmtHHMM(r.inTime) : "") + (r.outTime ? " · out " + fmtHHMM(r.outTime) : "") + (r.note ? " · " + r.note : "")
-                    : (r.from === r.to ? fmtKey(r.from) : fmtKey(r.from) + " – " + fmtKey(r.to)) + (r.note ? " · " + r.note : "");
-                const st = r.status === "done" ? ["Fixed", "ok"] : r.status === "approved" ? ["Approved", "ok"] : r.status === "declined" ? ["Declined", "no"] : ["Waiting", ""];
-                const waiting = r.status === "open" || r.status === "pending";
+                const what = FIX_KINDS[r.kind] || "Fix a punch";
+                const detail = fmtKey(r.day) + (r.inTime ? " · in " + fmtHHMM(r.inTime) : "") + (r.outTime ? " · out " + fmtHHMM(r.outTime) : "") + (r.note ? " · " + r.note : "");
+                const st = r.status === "done" ? ["Fixed", "ok"] : r.status === "declined" ? ["Declined", "no"] : ["Waiting", ""];
+                const waiting = r.status === "open";
                 return '<div class="req"><span class="req-what">' + esc(what) + '</span><span class="req-state ' + st[1] + '">' + st[0] + "</span>" +
                     '<span class="req-detail">' + esc(detail) + "</span>" + (r.reply ? '<span class="req-reply">Office: ' + esc(r.reply) + "</span>" : "") +
-                    (waiting ? '<button type="button" class="req-cancel" data-cancel="' + it.type + "|" + esc(it.id) + '">Cancel request</button>' : "") + "</div>";
+                    (waiting ? '<button type="button" class="req-cancel" data-cancel="' + esc(it.id) + '">Cancel request</button>' : "") + "</div>";
             }).join("");
             if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
         }
         $("reqList").addEventListener("click", async e => {
             const b = e.target.closest("[data-cancel]");
             if (!b || !confirm("Cancel this request?")) return;
-            const [type, id] = b.dataset.cancel.split("|");
-            try { await remove(ref(db, (type === "fix" ? P.requests : P.timeoff) + "/" + ek + "/" + id)); toast("Request cancelled."); }
+            try { await remove(ref(db, P.requests + "/" + ek + "/" + b.dataset.cancel)); toast("Request cancelled."); }
             catch (err) { toast("Couldn't cancel: " + errText(err), true); }
         });
         $("fixPunchBtn").addEventListener("click", openFixPunch);
-        $("timeOffBtn").addEventListener("click", openTimeOff);
 
         // ---------- Van taken by another driver ----------
         let swapBannerFor = null, swapBannerDismissed = null;
@@ -1875,7 +1984,7 @@
             if (key && key !== swapBannerDismissed) {
                 if (bannerMode !== "swap" || swapBannerFor !== key) {
                     swapBannerFor = key;
-                    showBanner("Van swap needed", (lost.by ? lost.by + " took van " + lost.vehicleName + ". " : "") + "Tap here and pick the van you're in.", "swap");
+                    showBanner("Vehicle swap needed", (lost.by ? lost.by + " took vehicle " + lost.vehicleName + ". " : "") + "Tap here and pick the vehicle you're in.", "swap");
                 }
             } else if (bannerMode === "swap") hideBanner();
         }
@@ -1908,7 +2017,7 @@
         function reminderInfo() {
             if (!emp) return null;
             const today = dayKey(now());
-            const sched = workdayFor(emp, today, timeoff); // not on approved time off
+            const sched = scheduleFor(emp, today);
             if (!sched) return null;
             return { today: today, start: sched.start, at: keyToEpoch(today, sched.start) + settings.reminderMinutes * 60000 };
         }
@@ -1936,7 +2045,7 @@
             if (!prefsLoaded) {
                 text += "Loading your setting…";
             } else if (!on) {
-                text += "You won't be reminded to punch in. Van swap alerts still come through.";
+                text += "You won't be reminded to punch in. Vehicle swap alerts still come through.";
             } else {
                 text += info ? "Today at " + esc(fmtTime(info.at)) + " if you haven't punched in (" + mins + " min after your " + esc(fmtHHMM(info.start)) + " start)."
                     : "You'll get a reminder " + mins + " minutes after your scheduled start on work days.";
@@ -1963,7 +2072,7 @@
         $("remindBtn").addEventListener("click", async () => {
             const turningOff = reminderWanted() && (!canNotify || Notification.permission !== "default");
             if (turningOff) {
-                try { await savePunchReminder(false); toast("Punch-in reminder off. You'll still get van swap alerts."); }
+                try { await savePunchReminder(false); toast("Punch-in reminder off. You'll still get vehicle swap alerts."); }
                 catch (err) { prefs.punchReminder = true; renderReminderCard(); toast("Couldn't save: " + errText(err), true); }
                 return;
             }

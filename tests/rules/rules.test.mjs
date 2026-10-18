@@ -152,18 +152,45 @@ test('A3: the admin answers a request; the employee can no longer cancel it', as
   await assertFails(mattDb().ref(`timeclock/requests/${matt}/r1`).remove());
 });
 
-// ---------- Time off (E8) ----------
-const off = (extra) => Object.assign({ at: NOW, from: '2026-10-20', to: '2026-10-21', note: '', status: 'pending' }, extra || {});
+// ---------- Oil check ----------
+const oil = (extra) => Object.assign({ done: true, at: Date.now(), how: 'box' }, extra || {});
 
-test('E8: an employee can ask for time off; the admin approves it', async () => {
-  await assertSucceeds(mattDb().ref(`timeclock/timeoff/${matt}/t1`).set(off()));
-  await assertFails(mattDb().ref(`timeclock/timeoff/${matt}/t1/status`).set('approved'));
-  await assertSucceeds(adminDb().ref(`timeclock/timeoff/${matt}/t1`).update({ status: 'approved', reply: '', by: 'justin@ec.com', doneAt: Date.now() }));
+test('oil check: a driver saves it on their own shift; "checked" can\'t be taken back', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1', {}));
+  await assertFails(daveDb().ref(`timeclock/shifts/${matt}/s1/oil`).set(oil()));
+  await assertSucceeds(mattDb().ref(`timeclock/shifts/${matt}/s1/oil`).set(oil({ done: false, how: 'out' })));
+  await assertSucceeds(mattDb().ref(`timeclock/shifts/${matt}/s1/oil`).set(oil()));                    // no -> yes is fine
+  await assertFails(mattDb().ref(`timeclock/shifts/${matt}/s1/oil`).set(oil({ done: false, how: 'out' }))); // yes -> no isn't
 });
 
-test('E8: the last day can\'t be before the first, and nobody approves their own time off', async () => {
-  await assertFails(mattDb().ref(`timeclock/timeoff/${matt}/t1`).set(off({ from: '2026-10-22', to: '2026-10-21' })));
-  await assertFails(mattDb().ref(`timeclock/timeoff/${matt}/t1`).set(off({ status: 'approved' })));
+test('oil check: only for a real shift, with a sensible time, and never "seen" by the driver', async () => {
+  await assertFails(mattDb().ref(`timeclock/shifts/${matt}/nope/oil`).set(oil()));
+  await assertSucceeds(punchIn(mattDb(), matt, 's1', {}));
+  const p = `timeclock/shifts/${matt}/s1/oil`;
+  await assertFails(mattDb().ref(p).set(oil({ at: Date.now() + DAY })));
+  await assertFails(mattDb().ref(p).set(oil({ at: Date.now() - 8 * DAY })));
+  await assertFails(mattDb().ref(p).set(oil({ how: 'later' })));
+  await assertFails(mattDb().ref(p).set(oil({ extra: 1 })));
+  await assertFails(mattDb().ref(p).set(oil({ seenBy: 'matt@ec.com' })));
+});
+
+test('oil check: can be answered just after punching out, not days later', async () => {
+  await seed({ timeclock: {
+    employees: { [matt]: { email: 'matt@ec.com', active: true } },
+    shifts: { [matt]: { s1: { in: Date.now() - 9 * 3600000, out: Date.now() - 60000 }, s0: { in: Date.now() - 3 * DAY, out: Date.now() - 2 * DAY } } }
+  } });
+  await assertSucceeds(mattDb().ref(`timeclock/shifts/${matt}/s1/oil`).set(oil({ done: false, how: 'out' })));
+  await assertFails(mattDb().ref(`timeclock/shifts/${matt}/s0/oil`).set(oil({ how: 'out' })));
+});
+
+test('oil check: an admin marks a missed one as seen, even when the driver never answered', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1', {}));
+  await assertSucceeds(adminDb().ref(`timeclock/shifts/${matt}/s1/oil`).update({ seenBy: 'justin@ec.com', seenAt: Date.now() }));
+  await assertFails(mattDb().ref(`timeclock/shifts/${matt}/s1/oil/seenBy`).set('matt@ec.com'));
+});
+
+test('time off is gone: employees can\'t write it any more', async () => {
+  await assertFails(mattDb().ref(`timeclock/timeoff/${matt}/t1`).set({ at: NOW, from: '2026-10-20', to: '2026-10-21', note: '', status: 'pending' }));
 });
 
 // ---------- Van problems (E7) ----------

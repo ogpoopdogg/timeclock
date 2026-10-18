@@ -10,6 +10,11 @@
     <meta name="apple-mobile-web-app-title" content="Clock Admin">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Time Clock Admin &middot; E&amp;C Courier</title>
+    <script>
+        // sw.js says "tc-updated" once it has saved a newer version of the app; pwa.js reloads to it when it's safe.
+        // Listening this early means the message isn't missed while the rest of the page is still loading.
+        if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.type === "tc-updated") window.tcUpdateReady = true; });
+    </script>
     <link rel="manifest" href="admin.webmanifest">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -425,6 +430,7 @@
             animation: panelIn 0.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms);
         }
         .inbox-item.done { opacity: 0.6; }
+        .inbox-item.waiting { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
         .inbox-item .ii-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
         .inbox-item .ii-who { font-weight: 600; }
         .inbox-item .ii-when { color: var(--dim); font-size: 0.8rem; white-space: nowrap; }
@@ -602,13 +608,13 @@
         <!-- Inbox -->
         <section class="panel" id="panel-inbox" role="tabpanel" hidden>
             <div class="panel-head">
-                <div><h1 class="panel-title">Inbox</h1><p class="panel-sub">Punch fixes and time off drivers asked for, and problems they reported with vans.</p></div>
+                <div><h1 class="panel-title">Inbox</h1><p class="panel-sub">Punch fixes drivers asked for, oil checks, and problems they reported with vehicles.</p></div>
                 <div class="panel-actions"><label class="switch"><input type="checkbox" id="inboxHandled"><span class="track"></span>Show handled</label></div>
             </div>
             <div class="inbox-grid">
                 <div class="inbox-col"><h3>Punch fixes <span class="tab-count" id="ibFixCount">0</span></h3><div class="inbox-list" id="ibFixes"></div></div>
-                <div class="inbox-col"><h3>Time off <span class="tab-count" id="ibOffCount">0</span></h3><div class="inbox-list" id="ibOff"></div></div>
-                <div class="inbox-col"><h3>Van problems <span class="tab-count" id="ibVanCount">0</span></h3><div class="inbox-list" id="ibVans"></div></div>
+                <div class="inbox-col"><h3>Oil check <span class="tab-count" id="ibOilCount">0</span></h3><div class="inbox-list" id="ibOil"></div></div>
+                <div class="inbox-col"><h3>Vehicle problems <span class="tab-count" id="ibVanCount">0</span></h3><div class="inbox-list" id="ibVans"></div></div>
             </div>
         </section>
         <!-- Timesheets -->
@@ -646,14 +652,14 @@
         <!-- Vehicles -->
         <section class="panel" id="panel-vehicles" role="tabpanel" hidden>
             <div class="panel-head">
-                <div><h1 class="panel-title">Vehicles</h1><p class="panel-sub">GPS units registered in RouteWatcher (names from RouteWatcher Settings), vans without GPS, and who has each one.</p></div>
+                <div><h1 class="panel-title">Vehicles</h1><p class="panel-sub">GPS units registered in RouteWatcher (names from RouteWatcher Settings), vehicles without GPS, and who has each one.</p></div>
                 <div class="panel-actions"><button type="button" class="btn" id="gpsRefresh">Refresh list</button></div>
             </div>
             <div class="gps-grid" id="gpsGrid"></div>
             <form class="card vans-card" id="vansForm">
-                <h3>Vans without GPS</h3>
-                <p class="hint">Vans added here show up in the drivers' van list with the GPS vans. If you later name a GPS unit in RouteWatcher the same (for example "Van 12" or "12"), drivers see the GPS unit instead and this one is left out of the list.</p>
-                <div class="vans-add"><input class="input" id="vanName" maxlength="40" placeholder="Van 12" autocomplete="off" aria-label="Van name"><button type="submit" class="btn primary">Add van</button></div>
+                <h3>Vehicles without GPS</h3>
+                <p class="hint">Vehicles added here show up in the drivers' vehicle list with the GPS vehicles. If you later name a GPS unit in RouteWatcher the same (for example "Van 12" or "12"), drivers see the GPS unit instead and this one is left out of the list.</p>
+                <div class="vans-add"><input class="input" id="vanName" maxlength="40" placeholder="Van 12" autocomplete="off" aria-label="Vehicle name"><button type="submit" class="btn primary">Add vehicle</button></div>
                 <p class="modal-msg" id="vanMsg" role="alert"></p>
                 <div class="vans-list" id="vansList"></div>
             </form>
@@ -662,7 +668,7 @@
         <!-- Reports -->
         <section class="panel" id="panel-reports" role="tabpanel" hidden>
             <div class="panel-head">
-                <div><h1 class="panel-title">Reports</h1><p class="panel-sub" id="repSub">Overtime by person and hours per van, by pay week (Friday to Thursday).</p></div>
+                <div><h1 class="panel-title">Reports</h1><p class="panel-sub" id="repSub">Overtime by person and hours per vehicle, by pay week (Friday to Thursday).</p></div>
                 <div class="panel-actions">
                     <select class="select" id="repRange" aria-label="Report period">
                         <option value="week" selected>Last week</option>
@@ -855,7 +861,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            timeOffList, timeOffOn, workdayFor, sentLate, farFromShop, fmtDistance, rangeDays, vanTime
+            oilState, sentLate, farFromShop, fmtDistance, rangeDays, vanTime
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -873,7 +879,7 @@
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
         let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [], pushTokens = {}, prefs = {};
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
-        let requestsAll = {}, timeoffAll = {}, vanReports = {}; // the Inbox: punch fixes, time off, van problems
+        let requestsAll = {}, vanReports = {}; // the Inbox: punch fixes and vehicle problems (oil checks come from the shifts)
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
         let viewWeek = null, rangeStart = null;
         let unsubs = [], shiftUnsubs = {};
@@ -937,7 +943,7 @@
             stopAll();
             user = u;
             employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = []; pushTokens = {}; prefs = {};
-            requestsAll = {}; timeoffAll = {}; vanReports = {}; settingsRaw = {}; reportCache = null;
+            requestsAll = {}; vanReports = {}; settingsRaw = {}; reportCache = null;
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
                 $("gateSub").textContent = "Only the time clock administrator can open this panel.";
@@ -971,7 +977,6 @@
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
-            sub(ref(db, P.timeoff), s => { timeoffAll = s.val() || {}; renderInboxCount(); renderAll(); });
             sub(query(ref(db, P.vanReports), limitToLast(300)), s => { vanReports = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
             listenAudit();
             unsubs.push(() => { if (auditUnsub) { auditUnsub(); auditUnsub = null; } });
@@ -1061,6 +1066,7 @@
             requestAnimationFrame(moveInk);
             const onCount = empList().filter(e => openShift(shiftsOf(e.ek))).length;
             $("liveCount").textContent = onCount;
+            renderInboxCount();
             if (activeTab === "live") renderLive();
             else if (activeTab === "inbox") renderInbox();
             else if (activeTab === "sheets") renderSheets();
@@ -1077,7 +1083,6 @@
             const sched = scheduleFor(e, today);
             if (open) return { kind: "in", open: open, todays: todays, sched: sched };
             if (todays.length) return { kind: "done", todays: todays, sched: sched };
-            if (sched && timeOffOn(timeoffAll[e.ek], today)) return { kind: "timeoff", sched: null, todays: todays };
             if (!sched) return { kind: "off", sched: null, todays: todays };
             const startTs = keyToEpoch(today, sched.start);
             if (t >= startTs + settings.reminderMinutes * 60000) return { kind: "late", sched: sched, startTs: startTs, todays: todays };
@@ -1107,8 +1112,8 @@
                     foot = '<span class="elapsed" data-since="' + st.open.in + '">' + esc(fmtClockDur(t - st.open.in)) + "</span>" +
                         (st.open.vehicleName ? '<span class="tag gps">GPS ' + esc(st.open.vehicleName) + "</span>"
                             : st.open.shop ? '<span class="tag shop">Shop</span>'
-                            : st.open.swapHint ? '<span class="tag warn" title="' + esc((st.open.swapHint.by || "Another driver") + " took van " + (st.open.swapHint.vehicleName || "")) + '">Needs van swap</span>'
-                            : '<span class="tag">No vehicle</span>') +
+                            : st.open.swapHint ? '<span class="tag warn" title="' + esc((st.open.swapHint.by || "Another driver") + " took vehicle " + (st.open.swapHint.vehicleName || "")) + '">Needs vehicle swap</span>'
+                            : '<span class="tag">No vehicle</span>') + oilTag(st.open) +
                         '<button type="button" class="btn sm" data-punchout="' + esc(e.ek) + '" data-id="' + esc(st.open.id) + '">Punch out</button>';
                 } else if (st.kind === "late") {
                     late++; cls = "late";
@@ -1124,10 +1129,6 @@
                     state = '<div class="person-state">Done for today</div>';
                     detail = esc(fmtDur(dayMs)) + " worked";
                     foot = '<span class="tag">' + st.todays.length + (st.todays.length === 1 ? " shift" : " shifts") + "</span>";
-                } else if (st.kind === "timeoff") {
-                    state = '<div class="person-state" style="color:var(--dim)">Time off today</div>';
-                    detail = "Approved time off";
-                    foot = '<span class="tag off">Time off</span>';
                 } else if (st.kind === "sched") {
                     state = '<div class="person-state">Not in yet</div>';
                     detail = "Starts " + esc(fmtHHMM(st.sched.start));
@@ -1219,6 +1220,8 @@
                     const late = sentLate(s);
                     if (late.in) tags.push('<span class="tag late" title="No signal: the punch in reached the server at ' + esc(fmtTime(s.in)) + '">Punch in sent late · pressed ' + esc(fmtTime(late.in)) + "</span>");
                     if (late.out) tags.push('<span class="tag late" title="No signal: the punch out reached the server at ' + esc(fmtTime(s.out)) + '">Punch out sent late · pressed ' + esc(fmtTime(late.out)) + "</span>");
+                    const oil = oilTag(s);
+                    if (oil) tags.push(oil);
                     if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
                     else if (s.edited) tags.push('<span class="tag edit" title="' + esc((s.edited.note || "") + " — " + (s.edited.by || "")) + '">Edited</span>');
                     if (s.edited && s.edited.note) tags.push('<span class="tag" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note.length > 34 ? s.edited.note.slice(0, 33) + "…" : s.edited.note) + "”</span>");
@@ -1278,13 +1281,13 @@
             if (!list.length) return s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>"
                 : s.shop ? '<span class="tag shop">Shop</span>' : '<span class="muted">—</span>';
             return '<div class="vans">' + list.map(v => {
-                if (v.how === "taken") return '<div class="van-step taken"><span class="tag warn">' + esc(v.takenName || "Van") + " taken</span>" +
+                if (v.how === "taken") return '<div class="van-step taken"><span class="tag warn">' + esc(v.takenName || "Vehicle") + " taken</span>" +
                     '<span class="muted">' + esc(fmtTime(v.at)) + (v.by ? " · by " + esc(v.by) : "") + "</span></div>";
                 const when = esc(fmtTime(v.at)) + (dayKey(v.at) !== dayKey(s.in) ? " " + esc(fmtKey(dayKey(v.at))) : "");
                 if (v.how === "shop") return '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">' + when + (v.by ? " · set by admin" : "") + "</span>" +
                     locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
                 if (v.how === "admin") return '<div class="van-step">' + (v.vehicleId ? '<span class="arrow" aria-label="changed to">⇄</span><span class="tag gps">' + esc(v.vehicleName || v.vehicleId) + "</span>"
-                    : '<span class="tag">No van</span>') + '<span class="muted">' + when + " · set by admin</span></div>";
+                    : '<span class="tag">No vehicle</span>') + '<span class="muted">' + when + " · set by admin</span></div>";
                 return '<div class="van-step">' + (v.how === "swap" ? '<span class="arrow" aria-label="swapped to">⇄</span>' : "") +
                     '<span class="tag gps">' + esc(v.vehicleName) + '</span><span class="muted">' + esc(fmtTime(v.at)) + "</span>" +
                     locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
@@ -1295,7 +1298,7 @@
             if (which === "in") return { loc: s.inLoc, addr: s.inAddr, addrErr: s.inAddrErr, label: "Punch in", at: s.in };
             if (which === "out") return { loc: s.outLoc, addr: s.outAddr, addrErr: s.outAddrErr, label: "Punch out", at: s.out };
             const v = s.vans && s.vans[which.slice(4)];
-            return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: v.how === "shop" ? "Moved to the shop" : (v.how === "swap" ? "Van swap to " : "Picked van ") + v.vehicleName, at: v.at } : null;
+            return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: v.how === "shop" ? "Moved to the shop" : (v.how === "swap" ? "Vehicle swap to " : "Picked vehicle ") + v.vehicleName, at: v.at } : null;
         }
 
         // ---------- Google Maps (the same browser key as RouteWatcher, maps-config.js) ----------
@@ -1481,14 +1484,14 @@
             const days = rangeDays(from, to);
             const place = (loc, addr) => !loc ? "" : !hasCoords(loc) ? "No location (" + (LOCATION_ERRORS[loc.err] || "not recorded") + ")"
                 : (addr ? addr + " " : "") + "(" + coordsText(loc) + ")";
-            const vans = s => vanHistory(s).map(v => v.how === "taken" ? (v.takenName || "van") + " taken by " + (v.by || "another driver") + " " + fmtTime(v.at)
+            const vans = s => vanHistory(s).map(v => v.how === "taken" ? (v.takenName || "vehicle") + " taken by " + (v.by || "another driver") + " " + fmtTime(v.at)
                 : v.how === "shop" ? "Shop " + fmtTime(v.at) + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")
-                : v.how === "admin" ? (v.vehicleId ? v.vehicleName || v.vehicleId : "No van") + " (set by admin " + fmtTime(v.at) + ")"
+                : v.how === "admin" ? (v.vehicleId ? v.vehicleName || v.vehicleId : "No vehicle") + " (set by admin " + fmtTime(v.at) + ")"
                 : v.vehicleName + " " + fmtTime(v.at) + (v.how === "swap" ? " (swap)" : "") + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")).join("; ");
             const rows = kind === "summary"
                 ? [["Employee", "Email", "From", "To", "Shifts", "Hours", "Regular", "Overtime"]]
                 : [["Employee", "Email", "Date", "In", "Out", "Counted in", "Counted out", "Hours", "Regular", "Overtime", "GPS", "Edited by admin", "Note",
-                    "In location", "Out location", "Van changes"]];
+                    "In location", "Out location", "Vehicle changes"]];
             people.forEach(e => {
                 const list = byEk[e.ek] || [];
                 const { byDay, byShift, total, regular, overtime } = weekTotals(list, days, t);
@@ -1809,30 +1812,45 @@
             $("auditLog").innerHTML = html || '<p class="hint" style="margin:0">No changes yet.</p>';
         }
 
-        // ---------- Inbox: punch fixes, time off, van problems ----------
+        // ---------- Inbox: punch fixes, oil checks, vehicle problems ----------
         const FIX_KINDS = { in: "Missed punch in", out: "Missed punch out", both: "Missed a whole shift", wrong: "A punch time is wrong", other: "Something else" };
+        const OIL_DAYS = 14; // oil checks from shifts that started in the last two weeks
         const ago = ts => ts ? fmtKey(dayKey(ts)) + ", " + fmtTime(ts) : "";
+        const vehicleOf = s => s.vehicleName || (vanHistory(s).filter(v => v.vehicleName).pop() || {}).vehicleName || "";
+        // The oil check on a shift, as a tag for the live board and timesheets ("" for a shift with no vehicle)
+        function oilTag(s) {
+            const st = oilState(s);
+            return st === "checked" ? '<span class="tag live" title="' + esc(s.oil.how === "out" ? "Said so at punch out" : "Ticked the oil check box") + '">Oil checked · ' + esc(fmtTime(s.oil.at)) + "</span>"
+                : st === "waiting" ? '<span class="tag warn">Oil not checked yet</span>'
+                : st === "missed" ? '<span class="tag warn" title="' + esc(s.oil ? "Said at punch out they didn't check it" : "Didn't answer at punch out") + '">Oil not checked</span>' : "";
+        }
         function inboxData() {
-            const fixes = [], offs = [], vans = [];
+            const fixes = [], oils = [], vans = [];
             for (const [k, list] of Object.entries(requestsAll)) for (const [id, r] of Object.entries(list || {})) if (r && r.kind) fixes.push(Object.assign({ ek: k, id: id }, r));
-            for (const [k, list] of Object.entries(timeoffAll)) for (const t of timeOffList(list)) offs.push(Object.assign({ ek: k }, t));
+            const since = now() - OIL_DAYS * 86400000;
+            for (const e of empList()) for (const sh of shiftsOf(e.ek)) {
+                const st = sh.in >= since ? oilState(sh) : "none";
+                if (st !== "none") oils.push({ ek: e.ek, s: sh, state: st, open: st === "missed" && !(sh.oil && sh.oil.seenBy) });
+            }
             for (const [id, r] of Object.entries(vanReports)) if (r && r.text) vans.push(Object.assign({ id: id }, r));
             const byNew = (a, b) => (b.at || 0) - (a.at || 0);
+            // On the clock and not checked yet first, then the newest shifts
+            const oilOrder = (a, b) => (b.state === "waiting") - (a.state === "waiting") || b.s.in - a.s.in;
             return {
-                fixes: fixes.sort(byNew), offs: offs.sort((a, b) => a.from < b.from ? -1 : a.from > b.from ? 1 : 0), vans: vans.sort(byNew),
-                openFixes: fixes.filter(r => r.status === "open").length, openOffs: offs.filter(t => t.status === "pending").length,
+                fixes: fixes.sort(byNew), oils: oils.sort(oilOrder), vans: vans.sort(byNew),
+                openFixes: fixes.filter(r => r.status === "open").length, openOils: oils.filter(o => o.open).length,
                 openVans: vans.filter(r => r.status === "open").length
             };
         }
         function renderInboxCount() {
-            const d = inboxData(), n = d.openFixes + d.openOffs + d.openVans;
+            const d = inboxData(), n = d.openFixes + d.openOils + d.openVans;
             $("inboxCount").hidden = !n;
             $("inboxCount").textContent = n;
             requestAnimationFrame(moveInk);
         }
         function renderInbox() {
             const d = inboxData(), handled = $("inboxHandled").checked;
-            $("ibFixCount").textContent = d.openFixes; $("ibOffCount").textContent = d.openOffs; $("ibVanCount").textContent = d.openVans;
+            $("ibFixCount").textContent = d.openFixes; $("ibOilCount").textContent = d.openOils; $("ibVanCount").textContent = d.openVans;
             const reply = r => r.reply ? '<div class="ii-reply">' + esc((r.status === "declined" ? "Declined" : r.status === "fixed" ? "Fixed" : "Answer") + ": " + r.reply) + (r.by ? " · " + esc(r.by) : "") + "</div>" : "";
             const fixes = d.fixes.filter(r => r.status === "open" || handled).map((r, i) => {
                 const done = r.status !== "open";
@@ -1843,21 +1861,22 @@
                     (done ? "" : '<div class="ii-actions"><button type="button" class="btn sm primary" data-fix="' + esc(r.ek + "|" + r.id) + '">Fix it</button>' +
                         '<button type="button" class="btn sm ghost" data-decline="fix|' + esc(r.ek + "|" + r.id) + '">Decline</button></div>') + "</div>";
             });
-            const offs = d.offs.filter(t => t.status === "pending" || (handled && t.to >= addDaysKey(dayKey(now()), -60))).map((t, i) => {
-                const done = t.status !== "pending";
-                const days = rangeDays(t.from, t.to), emp = employees[t.ek];
-                const work = days.filter(k => scheduleFor(emp, k)).length;
-                return '<div class="inbox-item' + (done ? " done" : "") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(t.ek)) + '</span><span class="ii-when">asked ' + esc(ago(t.at)) + "</span></div>" +
-                    '<div class="ii-what">' + esc(t.from === t.to ? fmtKey(t.from, true) : fmtKey(t.from) + " – " + fmtKey(t.to)) + "</div>" +
-                    '<div class="ii-detail">' + days.length + (days.length === 1 ? " day" : " days") + " · " + (work ? (work === days.length && work > 1 ? "all" : work) + " of them a workday" + (work === 1 ? "" : "s") : "none of them workdays") + "</div>" +
-                    (t.note ? '<div class="ii-note">' + esc(t.note) + "</div>" : "") +
-                    (done ? '<div class="ii-reply">' + (t.status === "approved" ? "Approved" : "Declined") + (t.reply ? ": " + esc(t.reply) : "") + (t.by ? " · " + esc(t.by) : "") + "</div>"
-                        : '<div class="ii-actions"><button type="button" class="btn sm primary" data-approve="' + esc(t.ek + "|" + t.id) + '">Approve</button>' +
-                        '<button type="button" class="btn sm ghost" data-decline="off|' + esc(t.ek + "|" + t.id) + '">Decline</button></div>') + "</div>";
+            // Oil: "not checked" needs a look (Got it); still on the clock shows who hasn't checked yet; checked shows with Show handled
+            const oils = d.oils.filter(o => o.open || o.state === "waiting" || handled).map((o, i) => {
+                const s = o.s, name = vehicleOf(s);
+                const what = o.state === "checked" ? "Oil checked" : o.state === "waiting" ? "Not checked yet" : "Oil not checked";
+                const detail = (name ? "Vehicle " + esc(name) + " · " : "") + (o.state === "waiting" ? "On the clock since " + esc(fmtTime(s.in))
+                    : o.state === "checked" ? (s.oil.how === "out" ? "Said so at punch out, " : "Ticked the box, ") + esc(fmtTime(s.oil.at))
+                    : s.oil ? "Said at punch out they didn't check it" : "Didn't answer at punch out");
+                return '<div class="inbox-item' + (o.state === "waiting" ? " waiting" : o.open ? "" : " done") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(o.ek)) +
+                    '</span><span class="ii-when">' + esc(fmtKey(dayKey(s.in))) + "</span></div>" +
+                    '<div class="ii-what">' + what + '</div><div class="ii-detail">' + detail + "</div>" +
+                    (o.open ? '<div class="ii-actions"><button type="button" class="btn sm primary" data-oilseen="' + esc(o.ek + "|" + s.id) + '">Got it</button></div>'
+                        : s.oil && s.oil.seenBy ? '<div class="ii-reply">Seen · ' + esc(s.oil.seenBy) + (s.oil.seenAt ? " · " + esc(ago(s.oil.seenAt)) : "") + "</div>" : "") + "</div>";
             });
             const vans = d.vans.filter(r => r.status === "open" || handled).map((r, i) => {
                 const done = r.status !== "open";
-                return '<div class="inbox-item' + (done ? " done" : "") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">Van ' + esc(r.vehicleName || r.vehicleId) + '</span><span class="ii-when">' + esc(ago(r.at)) + "</span></div>" +
+                return '<div class="inbox-item' + (done ? " done" : "") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">Vehicle ' + esc(r.vehicleName || r.vehicleId) + '</span><span class="ii-when">' + esc(ago(r.at)) + "</span></div>" +
                     '<div class="ii-detail">Reported by ' + esc(r.name || empName(r.ek)) + "</div>" +
                     '<div class="ii-note">' + esc(r.text) + "</div>" +
                     (done ? '<div class="ii-reply">Fixed' + (r.fixNote ? ": " + esc(r.fixNote) : "") + (r.by ? " · " + esc(r.by) : "") + (r.doneAt ? " · " + esc(ago(r.doneAt)) : "") + "</div>"
@@ -1865,8 +1884,8 @@
             });
             const empty = text => '<div class="inbox-empty">' + text + "</div>";
             $("ibFixes").innerHTML = fixes.join("") || empty("No punch fixes waiting.");
-            $("ibOff").innerHTML = offs.join("") || empty("No time off waiting.");
-            $("ibVans").innerHTML = vans.join("") || empty("No van problems waiting.");
+            $("ibOil").innerHTML = oils.join("") || empty("No missed oil checks.");
+            $("ibVans").innerHTML = vans.join("") || empty("No vehicle problems waiting.");
         }
         $("inboxHandled").addEventListener("change", renderInbox);
 
@@ -1909,21 +1928,20 @@
                 if (why === null) return;
                 try {
                     if (type === "fix") await finishRequest({ ek: k, id: id }, "declined", why.trim().slice(0, 300));
-                    else await update(ref(db, P.timeoff + "/" + k + "/" + id), { status: "declined", reply: why.trim().slice(0, 300), by: user.email, doneAt: serverTimestamp() });
                     toast("Declined.");
                 } catch (err) { toast("Couldn't save: " + errText(err), true); }
                 return;
             }
-            const ok = e.target.closest("[data-approve]");
-            if (ok) {
-                const [k, id] = ok.dataset.approve.split("|");
-                try { await update(ref(db, P.timeoff + "/" + k + "/" + id), { status: "approved", reply: "", by: user.email, doneAt: serverTimestamp() }); toast("Time off approved. They won't get punch-in reminders those days."); }
+            const seen = e.target.closest("[data-oilseen]");
+            if (seen) {
+                const [k, id] = seen.dataset.oilseen.split("|");
+                try { await update(ref(db, P.shifts + "/" + k + "/" + id + "/oil"), { seenBy: String(user.email).slice(0, 100), seenAt: serverTimestamp() }); toast("Marked as seen."); }
                 catch (err) { toast("Couldn't save: " + errText(err), true); }
                 return;
             }
             const vf = e.target.closest("[data-vanfixed]");
             if (vf) {
-                const note = prompt("Mark this van problem fixed? Add a note (optional):", "");
+                const note = prompt("Mark this vehicle problem fixed? Add a note (optional):", "");
                 if (note === null) return;
                 try { await update(ref(db, P.vanReports + "/" + vf.dataset.vanfixed), { status: "fixed", fixNote: note.trim().slice(0, 300), by: user.email, doneAt: serverTimestamp() }); toast("Marked fixed."); }
                 catch (err) { toast("Couldn't save: " + errText(err), true); }
@@ -2037,14 +2055,14 @@
             }
             const vanList = Object.values(vans).filter(v => v.ms >= 60000).sort((a, b) => b.ms - a.ms);
             const maxVan = Math.max(1, ...vanList.map(v => v.ms));
-            const vanCard = '<div class="report-card"><h3>Hours per van</h3><p class="hint">Time each van was assigned to a driver on the clock, from van picks, swaps and admin changes.</p>' +
+            const vanCard = '<div class="report-card"><h3>Hours per vehicle</h3><p class="hint">Time each vehicle was assigned to a driver on the clock, from vehicle picks, swaps and admin changes.</p>' +
                 (vanList.length ? '<div class="van-bars">' + vanList.map(v => {
-                    const tip = "Van " + v.name + "|" + fmtHours(v.ms) + " h|" + v.drivers.size + (v.drivers.size === 1 ? " driver" : " drivers") + " · " + v.shifts + (v.shifts === 1 ? " shift" : " shifts");
+                    const tip = "Vehicle " + v.name + "|" + fmtHours(v.ms) + " h|" + v.drivers.size + (v.drivers.size === 1 ? " driver" : " drivers") + " · " + v.shifts + (v.shifts === 1 ? " shift" : " shifts");
                     return '<div class="van-bar" data-tip="' + esc(tip) + '"><span class="vb-name">' + esc(v.name) + '</span><span class="vb-track"><span class="vb-fill" style="display:block;width:' +
                         (v.ms / maxVan * 100).toFixed(1) + '%"></span></span><span class="vb-val">' + esc(fmtHours(v.ms)) + " h<small>" + v.drivers.size + (v.drivers.size === 1 ? " driver" : " drivers") + "</small></span></div>";
-                }).join("") + "</div>" : '<p class="hint">No van time in this period.</p>') + "</div>";
+                }).join("") + "</div>" : '<p class="hint">No vehicle time in this period.</p>') + "</div>";
             const withYear = k => fmtKey(k) + (k.slice(0, 4) !== dayKey(t).slice(0, 4) ? ", " + k.slice(0, 4) : "");
-            $("repSub").textContent = "Overtime by person and hours per van, " + withYear(from) + " – " + withYear(to) + ".";
+            $("repSub").textContent = "Overtime by person and hours per vehicle, " + withYear(from) + " – " + withYear(to) + ".";
             $("reports").innerHTML = kpis + otCard + vanCard;
         }
 
@@ -2077,7 +2095,7 @@
         function phoneTag(k) {
             const n = Object.keys(pushTokens[k] || {}).length;
             const off = prefs[k] && prefs[k].punchReminder === false
-                ? ' <span class="tag off" title="They turned the punch-in reminder off on the time clock. Van swap alerts still reach their phone.">Reminder off</span>' : "";
+                ? ' <span class="tag off" title="They turned the punch-in reminder off on the time clock. Vehicle swap alerts still reach their phone.">Reminder off</span>' : "";
             return n ? ' <span class="tag gps" title="Gets punch-in reminders even with the time clock closed">' + n + (n === 1 ? " phone" : " phones") + "</span>"
                 + off : ' <span class="tag off" title="Only reminded while the time clock is open on their phone">No phone alerts</span>' + off;
         }
@@ -2181,7 +2199,7 @@
             const pass = $("emPass").value;
             const canCreate = !emCtx.ek || emCtx.restoring;
             if (canCreate && pass && pass.length < 6) { msg.textContent = "The starting password needs at least 6 characters."; return; }
-            if (replaceEk && !confirm("Move " + empName(replaceEk) + "'s punches, requests and time off to " + email + "?\n\n" +
+            if (replaceEk && !confirm("Move " + empName(replaceEk) + "'s punches and requests to " + email + "?\n\n" +
                 empName(replaceEk) + "'s old sign-in won't be on the time clock any more.")) return;
             const btn = $("emSave");
             btn.disabled = true; msg.textContent = "";
@@ -2205,12 +2223,12 @@
             btn.disabled = false;
         });
 
-        // A new sign-in takes someone's place: their punches, requests, time off and open shift move to it, in one write
+        // A new sign-in takes someone's place: their punches, requests and open shift move to it, in one write
         async function moveEmployee(from, to, record) {
-            const [sh, rq, off, op] = await Promise.all([P.shifts, P.requests, P.timeoff, P.open].map(path => get(ref(db, path + "/" + from))));
+            const [sh, rq, op] = await Promise.all([P.shifts, P.requests, P.open].map(path => get(ref(db, path + "/" + from))));
             const u = {};
             const move = (path, snap) => Object.entries(snap.val() || {}).forEach(([id, v]) => { u[path + "/" + to + "/" + id] = v; u[path + "/" + from + "/" + id] = null; });
-            move(P.shifts, sh); move(P.requests, rq); move(P.timeoff, off);
+            move(P.shifts, sh); move(P.requests, rq);
             if (op.exists()) { u[P.open + "/" + to] = op.val(); u[P.open + "/" + from] = null; }
             for (const [id, r] of Object.entries(vanReports)) if (r && r.ek === from) u[P.vanReports + "/" + id + "/ek"] = to;
             u[P.employees + "/" + from] = null;
@@ -2263,7 +2281,7 @@
             const orphan = Object.keys(claims).filter(id => !gpsUnits.some(g => g.id === id)).map(id => ({ id: id, name: claims[id].vehicleName || id, color: "#6b727a" }));
             const all = gpsUnits.concat(orphan);
             renderVansList();
-            if (!all.length) { grid.innerHTML = '<div class="empty-state"><strong>No vans yet</strong>Add GPS units in RouteWatcher → Settings (with a Device ID), or add vans without GPS below.</div>'; return; }
+            if (!all.length) { grid.innerHTML = '<div class="empty-state"><strong>No vehicles yet</strong>Add GPS units in RouteWatcher → Settings (with a Device ID), or add vehicles without GPS below.</div>'; return; }
             grid.innerHTML = all.map((g, i) => {
                 const c = claims[g.id];
                 const nick = typeof nicknames[g.id] === "string" ? nicknames[g.id] : "";
@@ -2281,10 +2299,10 @@
             if (!b) return;
             const c = claims[b.dataset.release];
             const manual = isManualVan(b.dataset.release);
-            if (!c || !confirm("Release " + (manual ? "van " : "GPS ") + c.vehicleName + " from " + (c.name || c.nickname) + "?" + (manual ? "" : " Their RouteWatcher nickname on it is removed too."))) return;
+            if (!c || !confirm("Release " + (manual ? "vehicle " : "GPS ") + c.vehicleName + " from " + (c.name || c.nickname) + "?" + (manual ? "" : " Their RouteWatcher nickname on it is removed too."))) return;
             try {
                 await releaseVan(b.dataset.release, c);
-                toast((manual ? "Van " : "GPS ") + c.vehicleName + " released.");
+                toast((manual ? "Vehicle " : "GPS ") + c.vehicleName + " released.");
             } catch (err) { toast("Couldn't release: " + errText(err), true); }
         });
 
@@ -2296,16 +2314,16 @@
                 const c = claims[v.id];
                 const same = gps.find(g => vanKey(g.name) && vanKey(g.name) === vanKey(v.name));
                 return '<div class="van-row"><div><strong>' + esc(v.name) + "</strong><div class=\"muted\">" +
-                    (same ? "Drivers now see GPS " + esc(same.name) + " for this van" : c ? "In use by " + esc(c.name || c.nickname) : "Available") + "</div></div>" +
+                    (same ? "Drivers now see GPS " + esc(same.name) + " for this vehicle" : c ? "In use by " + esc(c.name || c.nickname) : "Available") + "</div></div>" +
                     '<button type="button" class="btn sm ghost" data-van-remove="' + esc(v.id) + '">Remove</button></div>';
-            }).join("") : '<p class="hint" style="margin:0">No vans without GPS yet.</p>';
+            }).join("") : '<p class="hint" style="margin:0">No vehicles without GPS yet.</p>';
         }
         $("vansForm").addEventListener("submit", async e => {
             e.preventDefault();
             const name = $("vanName").value.trim().replace(/\s+/g, " ").slice(0, 40), msg = $("vanMsg");
             msg.textContent = "";
-            if (!name) { msg.textContent = "Type the van's name, like Van 12."; return; }
-            if (!vanKey(name)) { msg.textContent = "Add the van's number or name, like Van 12."; return; }
+            if (!name) { msg.textContent = "Type the vehicle's name, like Van 12."; return; }
+            if (!vanKey(name)) { msg.textContent = "Add the vehicle's number or name, like Van 12."; return; }
             const dupe = manualVans(vansRaw).find(v => vanKey(v.name) === vanKey(name));
             if (dupe) { msg.textContent = dupe.name + " is already on the list."; return; }
             const gps = gpsList(gpsRaw).find(g => vanKey(g.name) === vanKey(name));
@@ -2314,19 +2332,19 @@
                 await set(ref(db, P.vans + "/van_" + push(ref(db, P.vans)).key), { name: name, at: serverTimestamp(), by: String(user.email).slice(0, 60) });
                 $("vanName").value = "";
                 toast(name + " added. Drivers can pick it now.");
-            } catch (err) { msg.textContent = "Couldn't add the van: " + errText(err); }
+            } catch (err) { msg.textContent = "Couldn't add the vehicle: " + errText(err); }
         });
         $("vansList").addEventListener("click", async e => {
             const b = e.target.closest("[data-van-remove]");
             if (!b) return;
             const id = b.dataset.vanRemove, v = vansRaw[id], c = claims[id];
-            if (!v || !confirm("Remove " + v.name + " from the van list?" + (c ? "\n\n" + (c.name || c.nickname) + " has it now, so it is released from them too." : "") +
-                "\n\nPast punches keep the van's name.")) return;
+            if (!v || !confirm("Remove " + v.name + " from the vehicle list?" + (c ? "\n\n" + (c.name || c.nickname) + " has it now, so it is released from them too." : "") +
+                "\n\nPast punches keep the vehicle's name.")) return;
             try {
                 if (c) await releaseVan(id, c);
                 await remove(ref(db, P.vans + "/" + id));
                 toast(v.name + " removed.");
-            } catch (err) { toast("Couldn't remove the van: " + errText(err), true); }
+            } catch (err) { toast("Couldn't remove the vehicle: " + errText(err), true); }
         });
 
         // Frees a GPS and takes it off the driver's open shift, with a line in the shift's van history
