@@ -45,6 +45,10 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-aut
 import { getDatabase } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
 import { firebaseConfig } from "./firebase-config.js";
 
+// The Firebase code the imports above load. Garage (the garage repo) loads the rest of the Firebase SDK from here, so
+// it always uses the same version as this file; keep it the same as the three imports above.
+export const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
+
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
