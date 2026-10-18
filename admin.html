@@ -1093,7 +1093,9 @@
         function renderLive() {
             const t = now(), today = dayKey(t);
             const days = weekDays(weekStartKey(today, settings.weekStart));
-            const people = workingList();
+            // Everyone who can punch in, plus anyone turned off or removed while still on the clock (so their open shift is seen)
+            const active = workingList();
+            const people = empList().filter(e => (e.active !== false && !e.removed) || openShift(shiftsOf(e.ek)));
             let on = 0, late = 0, todayMs = 0, weekMs = 0, weekOt = 0;
             const cards = people.map((e, i) => {
                 const st = liveStatus(e, t, today);
@@ -1107,7 +1109,7 @@
                 const name = displayName(e, e.email);
                 if (st.kind === "in") {
                     on++; cls = "in";
-                    state = '<div class="person-state in">On the clock</div>';
+                    state = '<div class="person-state in">On the clock' + (e.removed ? " · removed" : e.active === false ? " · turned off" : "") + "</div>";
                     detail = "Since " + esc(fmtTime(st.open.in)) + (dayKey(st.open.in) !== today ? " on " + esc(fmtKey(dayKey(st.open.in))) : "");
                     foot = '<span class="elapsed" data-since="' + st.open.in + '">' + esc(fmtClockDur(t - st.open.in)) + "</span>" +
                         (st.open.vehicleName ? '<span class="tag gps">GPS ' + esc(st.open.vehicleName) + "</span>"
@@ -1150,7 +1152,7 @@
             $("kWeek").innerHTML = esc(fmtHours(weekMs)) + "<small>h</small>";
             $("kWeekOt").textContent = weekOt > 0 ? "incl. " + fmtHours(weekOt) + " h overtime" : "No overtime";
             $("kWeekOt").classList.toggle("has", weekOt > 0);
-            $("liveSub").textContent = people.length ? people.length + " active employees · " + fmtKey(today, true)
+            $("liveSub").textContent = people.length ? active.length + " active employees · " + fmtKey(today, true)
                 : "Add employees in the Employees tab to get started.";
             const html = cards.length ? cards.join("") :
                 '<div class="empty-state"><strong>No employees yet</strong>Add your team in the Employees tab, then they can sign in to the time clock.</div>';
@@ -1192,6 +1194,9 @@
             renderEmpFilter();
             const t = now(), today = dayKey(t);
             const thisWeek = weekStartKey(today, settings.weekStart);
+            // A new pay week started while the page stayed open: if it was showing the current week, show the new one
+            if (sheetsThisWeek && sheetsThisWeek !== thisWeek && viewWeek === sheetsThisWeek) viewWeek = thisWeek;
+            sheetsThisWeek = thisWeek;
             const days = weekDays(viewWeek);
             $("wkLabel").textContent = (viewWeek === thisWeek ? "This week · " : "") + fmtKey(days[0]) + " – " + fmtKey(days[6]);
             $("wkNext").disabled = viewWeek >= thisWeek;
@@ -1251,7 +1256,7 @@
                 flashRow = null;
             }
         }
-        let flashRow = null;
+        let flashRow = null, sheetsThisWeek = null;
 
         // ---------- Punch locations ----------
         const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>';
@@ -1524,7 +1529,8 @@
                 rows.push([name, e.email, "TOTAL " + from + " to " + to, "", "", "", "", fmtHours(total), fmtHours(regular), fmtHours(overtime), "", "", "", "", "", ""]);
             });
             return rows.map(r => r.map(v => {
-                const s = String(v);
+                // A cell starting with = + - @ would be run as a formula by Excel: a ' in front keeps it as text
+                const s = typeof v === "string" && /^[=+\-@\t\r]/.test(v) ? "'" + v : String(v);
                 return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
             }).join(",")).join("\r\n");
         }
@@ -1822,7 +1828,14 @@
             const st = oilState(s);
             return st === "checked" ? '<span class="tag live" title="' + esc(s.oil.how === "out" ? "Said so at punch out" : "Ticked the oil check box") + '">Oil checked · ' + esc(fmtTime(s.oil.at)) + "</span>"
                 : st === "waiting" ? '<span class="tag warn">Oil not checked yet</span>'
-                : st === "missed" ? '<span class="tag warn" title="' + esc(s.oil ? "Said at punch out they didn't check it" : "Didn't answer at punch out") + '">Oil not checked</span>' : "";
+                : st === "missed" ? '<span class="tag warn" title="' + esc(oilMissWhy(s)) + '">Oil not checked</span>' : "";
+        }
+        // Why a shift that's over has no oil check. "Got it" adds seenBy/seenAt to oil, so only done === false is a "no".
+        // A driver's own punch out also saves outTap; without it, the office closed the shift and the driver was never asked.
+        function oilMissWhy(s) {
+            if (s.oil && s.oil.done === false) return "Said at punch out they didn't check it";
+            if (typeof s.outTap !== "number" && (s.src === "admin" || s.edited)) return "Punched out by the office, so they weren't asked";
+            return "Didn't answer at punch out";
         }
         function inboxData() {
             const fixes = [], oils = [], vans = [];
@@ -1867,7 +1880,7 @@
                 const what = o.state === "checked" ? "Oil checked" : o.state === "waiting" ? "Not checked yet" : "Oil not checked";
                 const detail = (name ? "Vehicle " + esc(name) + " · " : "") + (o.state === "waiting" ? "On the clock since " + esc(fmtTime(s.in))
                     : o.state === "checked" ? (s.oil.how === "out" ? "Said so at punch out, " : "Ticked the box, ") + esc(fmtTime(s.oil.at))
-                    : s.oil ? "Said at punch out they didn't check it" : "Didn't answer at punch out");
+                    : oilMissWhy(s));
                 return '<div class="inbox-item' + (o.state === "waiting" ? " waiting" : o.open ? "" : " done") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(o.ek)) +
                     '</span><span class="ii-when">' + esc(fmtKey(dayKey(s.in))) + "</span></div>" +
                     '<div class="ii-what">' + what + '</div><div class="ii-detail">' + detail + "</div>" +
@@ -2198,6 +2211,8 @@
             }
             const pass = $("emPass").value;
             const canCreate = !emCtx.ek || emCtx.restoring;
+            // Turning off someone on the clock: they can't punch out themselves any more
+            const closeOpen = emCtx.ek && !emCtx.restoring && existing && existing.active !== false && !$("emActive").checked ? askPunchOutOpen(k) : null;
             if (canCreate && pass && pass.length < 6) { msg.textContent = "The starting password needs at least 6 characters."; return; }
             if (replaceEk && !confirm("Move " + empName(replaceEk) + "'s punches and requests to " + email + "?\n\n" +
                 empName(replaceEk) + "'s old sign-in won't be on the time clock any more.")) return;
@@ -2210,6 +2225,7 @@
                 await set(ref(db, P.employees + "/" + k), record); // also clears "removed" when adding someone back
                 if (replaceEk) await moveEmployee(replaceEk, k, record);
                 let note = "";
+                if (closeOpen) { await punchOutNow(k, closeOpen, "Punched out when turned off"); note = " Punched out."; }
                 if (canCreate && pass) note = await createLogin(email, pass);
                 const action = replaceEk ? "emp-replace" : emCtx.restoring || (existing && existing.removed) ? "emp-restore" : emCtx.ek ? "emp-edit" : "emp-add";
                 const changes = action === "emp-edit" ? empChanges(before, record) : action === "emp-add" || action === "emp-replace" ? ["Schedule: " + schedText(schedule)] : [];
@@ -2257,6 +2273,18 @@
             }
         }
 
+        // Someone turned off or removed while on the clock can't punch out themselves: offer to do it for them.
+        // Returns their open shift if the admin said yes, else null. Said no: they stay on the Live board until punched out.
+        function askPunchOutOpen(k) {
+            const e = employees[k], open = openShift(shiftsOf(k));
+            if (!open) return null;
+            return confirm(displayName(e, e.email) + " is on the clock since " + fmtTime(open.in) + (dayKey(open.in) !== dayKey(now()) ? " on " + fmtKey(dayKey(open.in)) : "") +
+                ". Punch them out now?\n\nOK punches them out now. Cancel leaves them on the clock, and they stay on the Live board until you punch them out.") ? open : null;
+        }
+        function punchOutNow(k, open, note) {
+            return saveShift(k, open, { in: open.in, out: now(), vehicleId: open.vehicleId || null, shop: !!open.shop && !open.vehicleId }, note, "punch-out");
+        }
+
         // Removing keeps the record (marked removed), so their punches stay on timesheets and exports.
         // A van they hold is freed straight away.
         $("emDelete").addEventListener("click", async () => {
@@ -2264,7 +2292,9 @@
             if (!k) return;
             const e = employees[k];
             if (!confirm("Remove " + displayName(e, e.email) + " from the time clock?\n\nThey can't punch in any more. Their punches stay on timesheets and exports, and you can add them back later.")) return;
+            const closeOpen = askPunchOutOpen(k);
             try {
+                if (closeOpen) await punchOutNow(k, closeOpen, "Punched out when removed");
                 await update(ref(db, P.employees + "/" + k), { removed: true, active: false, removedAt: serverTimestamp() });
                 for (const [gpsId, c] of Object.entries(claims)) if (c && c.ek === k) await releaseVan(gpsId, c);
                 await logEmpAudit(k, "emp-remove", [], { name: displayName(e, e.email) });

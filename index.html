@@ -933,7 +933,8 @@
         async function doSignOut() {
             if (current() && !confirm("You're still punched in. Sign out anyway? (You stay on the clock.)")) return;
             clearOfflineCopy();
-            await forgetThisPhone();
+            // With no signal the database never answers, so don't wait for it (signing out itself works offline)
+            if (online) await Promise.race([forgetThisPhone(), new Promise(r => setTimeout(r, 3000))]);
             await signOut(auth);
         }
         $("signOutBtn").addEventListener("click", doSignOut);
@@ -1127,12 +1128,16 @@
             if (open) el.textContent = fmtClockDur(t - open.in) + " on the clock";
         }
 
+        let shownThisWeek = null;          // the current week when My week was last drawn
         function renderWeek() {
             if (!viewWeek) return;
             const t = now(), today = dayKey(t);
+            const thisWeek = weekStartKey(today, settings.weekStart);
+            // A new pay week started while the app stayed open: if it was showing the current week, show the new one
+            if (shownThisWeek && shownThisWeek !== thisWeek && viewWeek === shownThisWeek) viewWeek = thisWeek;
+            shownThisWeek = thisWeek;
             const days = weekDays(viewWeek);
             const { byDay, byShift, total, regular, overtime } = weekTotals(shifts, days, t);
-            const thisWeek = weekStartKey(today, settings.weekStart);
             $("weekLabel").textContent = viewWeek === thisWeek ? "This week" : fmtKey(days[0]) + " – " + fmtKey(days[6]);
             $("weekNext").disabled = viewWeek >= thisWeek;
             $("weekPrev").disabled = addDaysKey(viewWeek, -7) < dayKey(t - HISTORY_MAX_DAYS * 86400000);
@@ -1480,7 +1485,7 @@
         function setOnline(v) {
             online = v;
             clearTimeout(offlineTimer);
-            if (v) { netSeenAt = Date.now(); renderNet(); flushPending(); }
+            if (v) { netSeenAt = Date.now(); renderNet(); flushPending(); if (sheetOpen && !sheetReady) fillSheet(); }
             // Firebase reports "not connected" for a moment at start and on brief drops; only say so after a few seconds
             else offlineTimer = setTimeout(renderNet, 3000);
         }
@@ -1533,37 +1538,57 @@
         $("success").addEventListener("click", () => { clearTimeout(showSuccess.t); hideSuccess(); });
 
         // ---------- Vehicle picker ----------
-        let sheetOpen = false, gpsUnits = [], gpsError = "", picking = null;
+        let sheetOpen = false, sheetReady = false, gpsUnits = [], gpsError = "", picking = null;
+        const GPS_WAIT_MS = 10000; // with no signal the database never answers: say so after this long
         const SHOP = Symbol("shop"); // picking the Shop tile
         // Working in the shop, not driving (the Shop tile in the vehicle picker)
         function atShop(open) { return !!(open && open.shop && !open.vehicleId); }
 
+        // false when there was no answer in time (no signal)
         async function loadGps() {
             // GPS units from RouteWatcher, plus the vans with no GPS the admin added
-            const [gps, vans] = await Promise.all([
+            const both = Promise.all([
                 get(ref(db, P.gps)).then(s => ({ val: s.val() }), err => ({ err: err })),
                 get(ref(db, P.vans)).then(s => s.val(), err => { console.warn("Vans without GPS not loaded:", err); return null; })
             ]);
+            const res = await Promise.race([both, new Promise(r => setTimeout(() => r(null), GPS_WAIT_MS))]);
+            if (!res) return false;
+            const [gps, vans] = res;
             gpsUnits = vehicleList(gps.val, vans);
             gpsError = gps.err ? "Couldn't load the GPS list from RouteWatcher: " + errText(gps.err) : "";
+            return true;
         }
 
         async function openSheet() {
             if (!current()) return;
             swapLink = false;
             sheetOpen = true;
-            $("sheetMsg").textContent = "";
-            $("gpsGrid").innerHTML = '<p class="empty">Loading vehicles…</p>';
             $("sheetBackdrop").classList.add("show");
             const sheet = $("sheet");
             sheet.classList.add("show");
             sheet.setAttribute("aria-hidden", "false");
-            await loadGps();
-            if (sheetOpen) renderSheet();
+            await fillSheet();
+        }
+
+        // Loads the vehicle list into the open sheet. Picking a vehicle needs signal (the server decides who has which
+        // vehicle), so with none the sheet says so and tries again by itself when the signal comes back.
+        async function fillSheet() {
+            sheetReady = false;
+            $("sheetMsg").textContent = "";
+            renderSheetHead();
+            if (online) {
+                $("gpsGrid").innerHTML = '<p class="empty">Loading vehicles…</p>';
+                const ok = await loadGps();
+                if (!sheetOpen || sheetReady) return;
+                if (ok) { sheetReady = true; renderSheet(); return; }
+            }
+            $("gpsGrid").innerHTML = '<p class="empty">No signal, so the vehicle list can\'t load. It loads by itself when you\'re back online, or close this and tap ' +
+                esc($("swapBtnText").textContent) + ' later.</p><button type="button" class="chip-btn" id="sheetRetry">Try again</button>';
         }
 
         function closeSheet(instant) {
             sheetOpen = false;
+            sheetReady = false;
             $("sheetBackdrop").classList.remove("show");
             const sheet = $("sheet");
             sheet.classList.remove("show");
@@ -1583,10 +1608,9 @@
             return open.swapHint || null;
         }
 
-        function renderSheet() {
+        function renderSheetHead() {
             const open = current();
-            if (!open) { closeSheet(); return; }
-            const grid = $("gpsGrid");
+            if (!open) return;
             const lost = lostVan(open);
             const has = !!open.vehicleId && !lost;
             const shop = atShop(open);
@@ -1596,6 +1620,16 @@
                 : shop ? "You're working in the shop. If you're driving now, tap your vehicle."
                 : "Please choose the vehicle you're driving today, or Shop if you're working in the shop.";
             $("sheetSkip").textContent = has ? "Keep vehicle " + open.vehicleName : shop ? "Stay in the shop" : lost ? "Close" : "Not driving today";
+        }
+
+        function renderSheet() {
+            const open = current();
+            if (!open) { closeSheet(); return; }
+            renderSheetHead();
+            if (!sheetReady) return; // still loading, or no signal
+            const grid = $("gpsGrid");
+            const lost = lostVan(open);
+            const shop = atShop(open);
             const shopTile = '<button type="button" class="gps shop' + (shop ? " mine" : "") + (picking === SHOP ? " picking" : "") + '" data-shop="1"' +
                 ' style="--i:0" aria-label="Shop, ' + (shop ? "you're working here" : "not driving") + '">' +
                 '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 17h10"/></svg></span>' +
@@ -1623,8 +1657,11 @@
         }
 
         $("gpsGrid").addEventListener("click", e => {
+            if (e.target.closest("#sheetRetry")) { fillSheet(); return; }
             const btn = e.target.closest(".gps");
             if (!btn || btn.disabled || picking) return;
+            // The pick would wait for the server until the signal is back
+            if (!online) { $("sheetMsg").textContent = "No signal right now. Try again when you're back online."; return; }
             if (btn.dataset.shop) { pickShop(btn); return; }
             const g = gpsUnits.find(u => u.id === btn.dataset.gps);
             if (g) pickVehicle(g, btn);
@@ -1739,14 +1776,15 @@
 
         // ---------- Form sheet: Fix a punch, Vehicle Check, Oil check ----------
         // o.offline: works with no signal (saved on the phone). o.onCancel: runs when closed without sending.
-        // o.onClose: runs once the sheet has closed, sent or not.
-        let formOpen = false, formSubmit = null, formOffline = false, formCancelFn = null, formCloseFn = null;
+        // o.onClose: runs once the sheet has closed, sent or not. o.mustAnswer: only the submit button closes it.
+        let formOpen = false, formSubmit = null, formOffline = false, formCancelFn = null, formCloseFn = null, formMust = false;
         function openForm(o) {
             formOpen = true;
             formSubmit = o.onSubmit;
             formOffline = !!o.offline;
             formCancelFn = o.onCancel || null;
             formCloseFn = o.onClose || null;
+            formMust = !!o.mustAnswer;
             $("formTitle").textContent = o.title;
             $("formSub").textContent = o.sub || "";
             $("formBody").innerHTML = o.body;
@@ -1766,6 +1804,7 @@
             formOpen = false;
             formSubmit = null;
             formCancelFn = formCloseFn = null;
+            formMust = false;
             $("formBackdrop").classList.remove("show");
             const f = $("formSheet");
             f.classList.remove("show");
@@ -1774,6 +1813,7 @@
             if (after) setTimeout(after, 350); // once the sheet has slid away
         }
         function cancelForm() {
+            if (formMust) return; // a tap outside it or Escape doesn't count as an answer
             const fn = formCancelFn;
             if (fn) fn();
             closeForm();
@@ -1925,7 +1965,8 @@
         }
         $("oilBox").addEventListener("click", openOilCheck);
 
-        // At punch out, when the oil wasn't ticked during the shift: checked or not, the answer is saved
+        // At punch out, when the oil wasn't ticked during the shift: checked or not, the answer is saved. Only Save
+        // closes it, so a stray tap outside the sheet can't record "not checked".
         function askOilAtPunchOut(shift) {
             const name = vehicleOf(shift);
             openForm({
@@ -1934,13 +1975,13 @@
                 body: '<label class="check-row"><input type="checkbox" id="oilYes"><span>I checked the oil</span></label>',
                 submit: "Save",
                 noCancel: true,
+                mustAnswer: true,
                 offline: true,
                 onSubmit: () => {
                     const yes = $("oilYes").checked;
                     saveOil(shift.id, yes, "out");
                     toast(yes ? "Oil check saved. Thanks!" : "Saved: oil not checked.");
-                },
-                onCancel: () => saveOil(shift.id, false, "out")
+                }
             });
         }
 
