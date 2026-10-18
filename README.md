@@ -82,6 +82,11 @@ their sign-in account* and set a starting password.
 (**Show removed** brings them back into view) and frees any van they had. Their punches
 stay, so old timesheets and the CSV still include them. **Add back** undoes it.
 
+**Someone on the clock** can't punch out once they're removed or turned off, so removing
+them, or saving them with *Active* off, first asks **Punch them out now?** OK punches them
+out and frees their vehicle. Cancel leaves them on the clock, and they stay on the live
+board (marked *removed* or *turned off*) until someone punches them out there.
+
 **Forgotten password:** the sign-in emails aren't real inboxes, so a password can't be
 reset by email. Add the person again with a new sign-in email and pick their old record
 under **Takes the place of**. Their punches, requests, schedule and vehicle move to
@@ -216,6 +221,11 @@ is the time the server receives it; the time pressed is saved with it. When the 
 are more than 2 minutes apart, the admin timesheet shows **sent late · pressed 7:02 AM**,
 and editing that punch has a **Use the phone's time** link to set it to the time pressed.
 
+Picking a vehicle needs signal, because the server decides who has which vehicle. With
+none, the vehicle picker says so, and the list loads by itself when the signal is back
+(or the driver taps **Try again**, or closes it and picks later). Signing out works with
+no signal too.
+
 The clock **opens instantly**, with or without signal. The phone keeps a copy of what the
 clock screen shows: who is signed in, their punches of the last three weeks, the settings
 and their reminder choice (`tc_offline` in the browser's storage, cleared on sign-out).
@@ -238,13 +248,16 @@ phone's very first sign-in.
   *Please check your oil* reminder pops up after the Vehicle Check, and a glowing **Oil
   check** box stays under the vehicle until the driver taps it and ticks *I checked the
   oil*. If they never did, punching out asks *Did you check the oil?*, and the answer
-  (checked or not) is saved on the shift. It works with no signal, like a punch.
+  (checked or not) is saved on the shift. Only **Save** closes that question, so a stray
+  tap outside it doesn't count as "not checked". It works with no signal, like a punch.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
 **Admin → Inbox** lists punch fixes, oil checks and vehicle problems, with a count on the
 tab. **Fix it** opens the punch editor already filled in from the request, and saving marks
 the request done. **Oil check** shows who is on the clock and hasn't checked yet, and every
-shift of the last two weeks where the oil wasn't checked (**Got it** marks one as seen).
+shift of the last two weeks where the oil wasn't checked (**Got it** marks one as seen),
+and why: they said they didn't, they didn't answer, or the office punched them out so they
+were never asked.
 Vehicle problems can be marked fixed with a note. **Show handled** shows the finished ones,
 including the oil checks that were done. The live board and timesheets also tag each shift
 *Oil checked* or *Oil not checked*.
@@ -260,6 +273,8 @@ ones. Hover over any cell or bar for the numbers.
 
 - **Export CSV** takes any date range (or *This pay week*, *Last pay week*, *This month*,
   *Last month*), with every punch and a total per pay week, or one line per employee.
+  A cell that starts with = + - or @ gets a ' in front, so Excel keeps it as text instead
+  of running it as a formula.
 - **Settings → Shop location:** punches made farther than the set distance from the shop
   show **Far from shop** on the timesheet.
 - **Settings → Change log** includes employee changes (added, edited, removed, added back,
