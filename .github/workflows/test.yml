@@ -21,6 +21,8 @@ jobs:
         run: node --test tests/addresses.test.mjs
       - name: Shared helpers for the new features (vehicle hours, late punches, shop distance, oil check)
         run: node --test tests/features.test.mjs
+      - name: Firebase version Garage loads (FIREBASE_SDK)
+        run: node --test tests/sdk.test.mjs
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
