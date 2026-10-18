@@ -20,7 +20,8 @@
 //                                        (no signal) shows both; see sentLate()
 //       swapHint                         set by the server when another driver takes this driver's van:
 //                                        { at, by, vehicleId, vehicleName, suggestId, suggestName }
-//       oil                              the oil check: { done, at, how, seenBy, seenAt } (see oilState())
+//       oil                              the oil check: { done, at, how, seenBy, seenAt } or { due: false, at } when
+//                                        the vehicle's oil check wasn't due that shift (see oilState(), oilDue())
 //   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at, fromId, fromName }
 //   timeclock/prefs/{ek}               { punchReminder: true | false }  the driver's own choice, kept across phones
 //   timeclock/audit/{id}               admin edit history
@@ -66,6 +67,8 @@ export const P = {
     requests: "timeclock/requests",
     vanReports: "timeclock/van_reports",
     vans: "timeclock/vans",
+    oilPlan: "timeclock/oil_plan",
+    oilLast: "timeclock/oil_last",
     gps: "developer/dispatch_dashboard/drivers",
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
@@ -260,11 +263,68 @@ export function scheduleFor(emp, key) {
 export function hadVehicle(shift) {
     return !!shift && (!!shift.vehicleId || Object.values(shift.vans || {}).some(v => v && v.vehicleId));
 }
-// "none" (no vehicle), "checked", "waiting" (on the clock, not checked yet) or "missed" (said no, or never answered)
+// "none" (no vehicle), "checked", "notdue" (the vehicle's oil check wasn't due), "waiting" (on the clock, not checked
+// yet) or "missed" (said no, or never answered)
 export function oilState(shift) {
     if (!hadVehicle(shift)) return "none";
     if (shift.oil && shift.oil.done === true) return "checked";
+    if (shift.oil && shift.oil.due === false && shift.oil.done === undefined) return "notdue";
     return typeof shift.out === "number" ? "missed" : "waiting";
+}
+
+// ---------- Oil check schedule ----------
+// oil_plan = { def: plan, vehicles: { [vanKey]: plan }, ask: { [vanKey]: time } }: how often each vehicle's oil is
+// checked (Admin → Vehicles). A vehicle with no plan of its own uses def; with no def it's every shift.
+// plan = { mode, every, days }, plus askFrom from ask (the office's "Ask at next shift")
+//   mode "shift"  every shift (how it worked before there was a schedule)
+//        "every"  once every `every` days (1 = once a day), counted from the last check
+//        "days"   on the chosen days of the week (days = { mon: true, thu: true }); if nobody checks it on one of those
+//                 days, the next driver to take it is asked
+//        "never"  no oil check for this vehicle
+//   askFrom   the office asked for a check: it's due until a driver checks it after that time
+// oil_last/{vanKey} = { at, ek, by, shiftId, vehicleName }: the last time any driver said they checked that vehicle.
+export const OIL_MODES = ["shift", "every", "days", "never"];
+export const OIL_EVERY_MAX = 60;
+export function cleanOilPlan(p) {
+    const mode = p && OIL_MODES.includes(p.mode) ? p.mode : "shift";
+    const out = { mode: mode };
+    if (mode === "every") out.every = Math.min(OIL_EVERY_MAX, Math.max(1, Math.round(Number(p.every)) || 1));
+    if (mode === "days") {
+        const days = {};
+        for (const d of DOW_KEYS) if (p.days && p.days[d] === true) days[d] = true;
+        if (!Object.keys(days).length) return { mode: "shift" }; // no day picked: treated as every shift
+        out.days = days;
+    }
+    if (p && typeof p.askFrom === "number" && mode !== "never" && mode !== "shift") out.askFrom = p.askFrom;
+    return out;
+}
+// The plan for a vehicle (by its name), and whether it's the vehicle's own or the default
+export function oilPlanFor(plans, vehicleName) {
+    const key = vanKey(vehicleName);
+    const own = key && plans && plans.vehicles ? plans.vehicles[key] : null;
+    const ask = key && plans && plans.ask ? plans.ask[key] : null;
+    const plan = cleanOilPlan(Object.assign({}, own || (plans && plans.def), typeof ask === "number" ? { askFrom: ask } : {}));
+    return own ? Object.assign(plan, { own: true }) : plan;
+}
+// The day the next oil check is due: a day key (today or earlier means due now), "shift" (every shift) or null (never)
+export function oilNextDue(plan, last, t) {
+    plan = cleanOilPlan(plan);
+    if (plan.mode === "never") return null;
+    if (plan.mode === "shift") return "shift";
+    const today = dayKey(t);
+    const lastAt = last && typeof last.at === "number" ? last.at : null;
+    if (lastAt === null || (plan.askFrom && lastAt < plan.askFrom)) return today;
+    const lastDay = dayKey(lastAt);
+    if (plan.mode === "every") return addDaysKey(lastDay, plan.every);
+    for (let i = 1; i <= 7; i++) {                  // the first chosen day after the last check
+        const k = addDaysKey(lastDay, i);
+        if (plan.days[DOW_KEYS[dowOfKey(k)]]) return k;
+    }
+    return today;
+}
+export function oilDue(plan, last, t) {
+    const next = oilNextDue(plan, last, t);
+    return next === "shift" || (next !== null && next <= dayKey(t));
 }
 
 // ---------- Punches sent late ----------

@@ -47,7 +47,12 @@ rules** actually stop an employee from changing their own punches.
   (`timeclock/requests/{ek}`) while they're still open. Only admins can answer them.
 - A driver can save the oil check on their own shift (`oil` on the shift) while it's open
   or within a day of punching out. Once it says *checked* it can't be changed back. Only
-  admins can mark a missed one as seen.
+  admins can mark a missed one as seen. Before an answer, the clock can also save that the
+  vehicle's oil check wasn't due on that shift (`oil: { due: false }`).
+- Employees can read the oil check schedule (`timeclock/oil_plan`); only admins can change
+  it. Each vehicle's last oil check (`timeclock/oil_last/{vehicle}`) can be saved by a driver
+  only from their own shift that says *checked*, at that check's time, and never over a
+  newer one.
 - Employees can read the list of vans without GPS (`timeclock/vans`); only admins can
   change it.
 - Employees can add a van problem report (`timeclock/van_reports`) in their own name, but
@@ -244,12 +249,14 @@ phone's very first sign-in.
 - **Vehicle Check:** after picking a vehicle, the app asks if anything is wrong with it
   (tap **All good** to skip). The *Something wrong with this vehicle? Report it* link
   under the vehicle sends a report any time.
-- **Oil check:** on every shift with a vehicle (not Shop or *Not driving today*), a
+- **Oil check:** on a shift with a vehicle (not Shop or *Not driving today*) whose oil
+  check is due (see **Admin → Vehicles → Oil check schedule**), a
   *Please check your oil* reminder pops up after the Vehicle Check, and a glowing **Oil
   check** box stays under the vehicle until the driver taps it and ticks *I checked the
   oil*. If they never did, punching out asks *Did you check the oil?*, and the answer
   (checked or not) is saved on the shift. Only **Save** closes that question, so a stray
   tap outside it doesn't count as "not checked". It works with no signal, like a punch.
+  When the vehicle isn't due, nothing is asked.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
 **Admin → Inbox** lists punch fixes, oil checks and vehicle problems, with a count on the
@@ -260,7 +267,18 @@ and why: they said they didn't, they didn't answer, or the office punched them o
 were never asked.
 Vehicle problems can be marked fixed with a note. **Show handled** shows the finished ones,
 including the oil checks that were done. The live board and timesheets also tag each shift
-*Oil checked* or *Oil not checked*.
+*Oil checked*, *Oil not checked*, or *Oil not due* (the vehicle's check wasn't due, so it's
+left out of the Inbox).
+
+**Admin → Vehicles → Oil check schedule** sets how often drivers are asked to check each
+vehicle's oil: **Every shift**, **Once a day**, **Every few days** (2 to 60), **Chosen days of
+the week**, or **Never**. **All vehicles** is the setting for every vehicle left on *Same as
+all vehicles*; until it's changed, that's every shift. A check counts for the vehicle
+whichever driver does it, and the next one is counted from it. On chosen days, if nobody
+checks a vehicle on one of its days, the next driver who takes it is asked. Each vehicle
+shows its last check (when and by whom) and whether it's due or the next day it will be.
+**Ask at next shift** makes a vehicle due again until someone checks it. Changes save
+right away. Until a phone has loaded the schedule once, it asks every shift, as before.
 
 **Admin → Reports** shows the hours, overtime and overtime share for **Last week** (the
 last full pay week, Friday to Thursday), **Last month** (the last calendar month), **Last

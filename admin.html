@@ -329,6 +329,23 @@
         /* ---------- Settings ---------- */
         .settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
         .vans-card { margin-top: 18px; max-width: 640px; }
+        .oil-card { margin-top: 18px; max-width: 760px; }
+        .oil-rows { display: grid; gap: 8px; }
+        .oil-row { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); }
+        .oil-row.def { box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.25); }
+        .oil-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .oil-head .muted { color: var(--muted); font-size: 0.85rem; }
+        .oil-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .oil-ctl .select { min-width: 0; }
+        .oil-every { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.9rem; }
+        .oil-every .input { width: 72px; }
+        .oil-days { display: flex; gap: 4px; flex-wrap: wrap; }
+        .oil-day { position: relative; }
+        .oil-day input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+        .oil-day span { display: inline-block; padding: 6px 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.06); color: var(--muted);
+            font-family: var(--font-display); font-size: 0.85rem; letter-spacing: 0.04em; }
+        .oil-day input:checked + span { background: rgba(255, 204, 0, 0.12); color: var(--yellow); }
+        .oil-day input:focus-visible + span { box-shadow: inset 0 0 0 2px var(--yellow); }
         .vans-add { display: flex; gap: 8px; margin-top: 10px; }
         .vans-add .input { flex: 1; min-width: 0; }
         .vans-list { display: grid; gap: 8px; margin-top: 6px; }
@@ -656,6 +673,11 @@
                 <div class="panel-actions"><button type="button" class="btn" id="gpsRefresh">Refresh list</button></div>
             </div>
             <div class="gps-grid" id="gpsGrid"></div>
+            <div class="card oil-card">
+                <h3>Oil check schedule</h3>
+                <p class="hint">How often drivers are asked to check the oil in each vehicle. A check counts for the vehicle whoever does it, and the next one is counted from it. If nobody checks a vehicle on one of its days, the next driver who takes it is asked. Shop and "Not driving today" shifts are never asked.</p>
+                <div class="oil-rows" id="oilRows"></div>
+            </div>
             <form class="card vans-card" id="vansForm">
                 <h3>Vehicles without GPS</h3>
                 <p class="hint">Vehicles added here show up in the drivers' vehicle list with the GPS vehicles. If you later name a GPS unit in RouteWatcher the same (for example "Van 12" or "12"), drivers see the GPS unit instead and this one is left out of the list.</p>
@@ -861,7 +883,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, sentLate, farFromShop, fmtDistance, rangeDays, vanTime
+            oilState, sentLate, farFromShop, fmtDistance, rangeDays, vanTime, cleanOilPlan, oilPlanFor, oilNextDue, OIL_EVERY_MAX
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -877,7 +899,7 @@
 
         // ---------- State ----------
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
-        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [], pushTokens = {}, prefs = {};
+        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, oilPlans = {}, oilLast = {}, audit = [], pushTokens = {}, prefs = {};
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
         let requestsAll = {}, vanReports = {}; // the Inbox: punch fixes and vehicle problems (oil checks come from the shifts)
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
@@ -976,6 +998,8 @@
             sub(ref(db, P.prefs), s => { prefs = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
+            sub(ref(db, P.oilPlan), s => { oilPlans = s.val() || {}; if (activeTab === "vehicles") renderOilPlan(); });
+            sub(ref(db, P.oilLast), s => { oilLast = s.val() || {}; if (activeTab === "vehicles") renderOilPlan(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
             sub(query(ref(db, P.vanReports), limitToLast(300)), s => { vanReports = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
             listenAudit();
@@ -1827,6 +1851,7 @@
         function oilTag(s) {
             const st = oilState(s);
             return st === "checked" ? '<span class="tag live" title="' + esc(s.oil.how === "out" ? "Said so at punch out" : "Ticked the oil check box") + '">Oil checked · ' + esc(fmtTime(s.oil.at)) + "</span>"
+                : st === "notdue" ? '<span class="tag" title="This vehicle\'s oil check wasn\'t due on this shift (Vehicles → Oil check schedule)">Oil not due</span>'
                 : st === "waiting" ? '<span class="tag warn">Oil not checked yet</span>'
                 : st === "missed" ? '<span class="tag warn" title="' + esc(oilMissWhy(s)) + '">Oil not checked</span>' : "";
         }
@@ -1843,7 +1868,7 @@
             const since = now() - OIL_DAYS * 86400000;
             for (const e of empList()) for (const sh of shiftsOf(e.ek)) {
                 const st = sh.in >= since ? oilState(sh) : "none";
-                if (st !== "none") oils.push({ ek: e.ek, s: sh, state: st, open: st === "missed" && !(sh.oil && sh.oil.seenBy) });
+                if (st !== "none" && st !== "notdue") oils.push({ ek: e.ek, s: sh, state: st, open: st === "missed" && !(sh.oil && sh.oil.seenBy) });
             }
             for (const [id, r] of Object.entries(vanReports)) if (r && r.text) vans.push(Object.assign({ id: id }, r));
             const byNew = (a, b) => (b.at || 0) - (a.at || 0);
@@ -2311,6 +2336,7 @@
             const orphan = Object.keys(claims).filter(id => !gpsUnits.some(g => g.id === id)).map(id => ({ id: id, name: claims[id].vehicleName || id, color: "#6b727a" }));
             const all = gpsUnits.concat(orphan);
             renderVansList();
+            renderOilPlan();
             if (!all.length) { grid.innerHTML = '<div class="empty-state"><strong>No vehicles yet</strong>Add GPS units in RouteWatcher → Settings (with a Device ID), or add vehicles without GPS below.</div>'; return; }
             grid.innerHTML = all.map((g, i) => {
                 const c = claims[g.id];
@@ -2375,6 +2401,93 @@
                 await remove(ref(db, P.vans + "/" + id));
                 toast(v.name + " removed.");
             } catch (err) { toast("Couldn't remove the vehicle: " + errText(err), true); }
+        });
+
+        // ---------- Oil check schedule ----------
+        // How often each vehicle's oil is checked (see "Oil check schedule" in tc-core.js). Saved as soon as it's changed.
+        // "Once a day" is saved as every 1 day. The vehicles are the ones drivers can pick, one row each.
+        const OIL_CHOICES = [["shift", "Every shift"], ["daily", "Once a day"], ["every", "Every few days"], ["days", "Chosen days of the week"], ["never", "Never"]];
+        const oilChoice = plan => plan.mode === "every" && plan.every === 1 ? "daily" : plan.mode;
+        function oilPlanText(plan) {
+            return plan.mode === "never" ? "never" : plan.mode === "shift" ? "every shift" : plan.mode === "every" ? (plan.every === 1 ? "once a day" : "every " + plan.every + " days")
+                : [1, 2, 3, 4, 5, 6, 0].filter(d => plan.days[DOW_KEYS[d]]).map(d => DOW_SHORT[d]).join(", ");
+        }
+        function oilVehicles() {
+            const seen = new Set(), out = [];
+            for (const g of gpsUnits) { const k = vanKey(g.name); if (k && !seen.has(k)) { seen.add(k); out.push({ key: k, name: g.name }); } }
+            return out;
+        }
+        function oilControls(plan, inherit) {
+            const choice = inherit ? "" : oilChoice(plan);
+            const opts = (inherit !== undefined ? '<option value=""' + (choice === "" ? " selected" : "") + ">Same as all vehicles</option>" : "") +
+                OIL_CHOICES.map(([v, t]) => '<option value="' + v + '"' + (v === choice ? " selected" : "") + ">" + t + "</option>").join("");
+            return '<select class="select" data-f="mode" aria-label="How often">' + opts + "</select>" +
+                (choice === "every" ? '<label class="oil-every">every <input class="input" type="number" data-f="every" min="2" max="' + OIL_EVERY_MAX + '" step="1" inputmode="numeric" value="' + plan.every + '"> days</label>' : "") +
+                (choice === "days" ? '<div class="oil-days">' + [1, 2, 3, 4, 5, 6, 0].map(d => '<label class="oil-day"><input type="checkbox" data-day="' + DOW_KEYS[d] + '"' +
+                    (plan.days[DOW_KEYS[d]] ? " checked" : "") + ' aria-label="' + DOW_LONG[d] + '"><span>' + DOW_SHORT[d] + "</span></label>").join("") + "</div>" : "");
+        }
+        function renderOilPlan() {
+            const box = $("oilRows");
+            if (!box || box.contains(document.activeElement) && document.activeElement.matches("input[type=number]")) return; // typing a number
+            const def = cleanOilPlan(oilPlans.def), t = now();
+            const rows = ['<div class="oil-row def" data-oil=""><div class="oil-head"><strong>All vehicles</strong><span class="muted">Used by every vehicle set to "Same as all vehicles"</span></div>' +
+                '<div class="oil-ctl">' + oilControls(def) + "</div></div>"];
+            for (const v of oilVehicles()) {
+                const plan = oilPlanFor(oilPlans, v.name), last = oilLast[v.key], next = oilNextDue(plan, last, t);
+                const due = next !== null && next !== "shift" && next <= dayKey(t);
+                const asked = typeof plan.askFrom === "number" && (!last || !(last.at >= plan.askFrom));
+                const tag = next === null ? '<span class="tag">Off</span>' : next === "shift" ? '<span class="tag">Every shift</span>'
+                    : due ? '<span class="tag warn">' + (asked ? "Asked for next shift" : "Due") + "</span>" : '<span class="tag live">Next: ' + esc(fmtKey(next)) + "</span>";
+                rows.push('<div class="oil-row" data-oil="' + esc(v.key) + '"><div class="oil-head"><div><strong>' + esc(v.name) + "</strong>" +
+                    (plan.own ? "" : ' <span class="muted">· same as all vehicles (' + esc(oilPlanText(def)) + ")</span>") +
+                    '<div class="muted">' + (last && typeof last.at === "number" ? "Last checked " + esc(fmtKey(dayKey(last.at))) + ", " + esc(fmtTime(last.at)) + (last.by ? " by " + esc(last.by) : "")
+                        : "No oil check saved yet") + "</div></div>" + tag + "</div>" +
+                    '<div class="oil-ctl">' + oilControls(plan, !plan.own) +
+                    (next !== null && next !== "shift" && !due ? '<button type="button" class="btn sm ghost" data-oil-ask>Ask at next shift</button>' : "") + "</div></div>");
+            }
+            if (rows.length === 1) rows.push('<p class="hint" style="margin:0">No vehicles yet. Each vehicle drivers can pick shows up here.</p>');
+            box.innerHTML = rows.join("");
+        }
+        // The plan a row's controls describe (null: same as all vehicles)
+        function oilPlanFromRow(row, changedMode) {
+            const mode = row.querySelector('[data-f="mode"]').value;
+            if (!mode) return null;
+            if (mode === "daily") return { mode: "every", every: 1 };
+            if (mode === "every") {
+                const n = row.querySelector('[data-f="every"]');
+                return { mode: "every", every: Math.min(OIL_EVERY_MAX, Math.max(2, Math.round(Number(n && !changedMode ? n.value : 3)) || 3)) };
+            }
+            if (mode === "days") {
+                const days = {};
+                row.querySelectorAll("[data-day]").forEach(c => { if (c.checked) days[c.dataset.day] = true; });
+                if (changedMode || !Object.keys(days).length) days.mon = true; // a new "chosen days" starts with Monday
+                return { mode: "days", days: days };
+            }
+            return { mode: mode };
+        }
+        $("oilRows").addEventListener("change", async e => {
+            const row = e.target.closest("[data-oil]");
+            if (!row) return;
+            const key = row.dataset.oil, isDef = key === "";
+            if (e.target.dataset.day && !row.querySelector("[data-day]:checked")) { e.target.checked = true; toast("Pick at least one day, or choose Never.", true); return; }
+            const plan = oilPlanFromRow(row, e.target.dataset.f === "mode");
+            const path = P.oilPlan + (isDef ? "/def" : "/vehicles/" + key);
+            try {
+                await (plan ? set(ref(db, path), plan) : remove(ref(db, path)));
+                const name = isDef ? "All vehicles" : (oilVehicles().find(v => v.key === key) || { name: key }).name;
+                toast(name + ": oil check " + (plan ? oilPlanText(cleanOilPlan(plan)) : "same as all vehicles") + ".");
+            } catch (err) { toast("Couldn't save the oil check schedule: " + errText(err), true); }
+            if (e.target.matches("input[type=number]")) e.target.blur();
+            renderOilPlan();
+        });
+        $("oilRows").addEventListener("click", async e => {
+            const b = e.target.closest("[data-oil-ask]");
+            if (!b) return;
+            const key = b.closest("[data-oil]").dataset.oil;
+            try {
+                await set(ref(db, P.oilPlan + "/ask/" + key), serverTimestamp());
+                toast("The next driver of " + (oilVehicles().find(v => v.key === key) || { name: key }).name + " will be asked to check the oil.");
+            } catch (err) { toast("Couldn't save: " + errText(err), true); }
         });
 
         // Frees a GPS and takes it off the driver's open shift, with a line in the shift's van history

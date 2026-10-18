@@ -859,6 +859,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
+            vanKey, oilPlanFor, oilDue,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -884,6 +885,7 @@
         let requests = {};                  // the driver's own "Fix a punch" requests
         let shiftsSince = 0, shiftsUnsub = null;
         let prefs = null, prefsLoaded = false;   // timeclock/prefs/{ek}: the driver's saved reminder choice
+        let oilPlans = null, oilLast = null;     // the oil check schedule and the last check of each vehicle (see "Oil check")
         let locSaving = 0;                  // locations still being written (don't reload the app meanwhile)
         let swapLink = new URLSearchParams(location.search).has("swap"); // opened from a "van swap" notification
         let viewWeek = null;                // week start key shown in "My week"
@@ -961,6 +963,8 @@
 
             listen(ref(db, ".info/serverTimeOffset"), s => { serverOffset = Number(s.val()) || 0; });
             listen(ref(db, P.settings), s => { settings = settingsWithDefaults(s.val()); settingsLoaded = true; saveOfflineCopy(); render(); }, () => {});
+            listen(ref(db, P.oilPlan), s => { oilPlans = s.val() || {}; saveOfflineCopy(); render(); }, () => {});
+            listen(ref(db, P.oilLast), s => { oilLast = s.val() || {}; saveOfflineCopy(); render(); }, () => {});
             listen(ref(db, P.employees + "/" + ek), s => {
                 emp = s.val();
                 empLoaded = true;
@@ -1043,7 +1047,7 @@
             const recent = rawShifts.filter(x => x.in >= since || typeof x.out !== "number");
             try {
                 localStorage.setItem(OFFLINE_KEY, JSON.stringify({ ek: ek, email: user.email, emp: emp, shifts: recent,
-                    settings: settings, prefs: prefsLoaded ? prefs : null }));
+                    settings: settings, prefs: prefsLoaded ? prefs : null, oilPlans: oilPlans, oilLast: oilLast }));
             } catch (e) {}
         }
         function loadOfflineCopy() {
@@ -1062,6 +1066,8 @@
             if (!shiftsLoaded) rawShifts = Array.isArray(copy.shifts) ? copy.shifts.filter(x => x && x.id && typeof x.in === "number") : copy.open ? [copy.open] : [];
             if (!settingsLoaded && copy.settings) settings = settingsWithDefaults(copy.settings);
             if (!prefsLoaded && copy.prefs) { prefs = copy.prefs; prefsLoaded = true; }
+            if (!oilPlans && copy.oilPlans) oilPlans = copy.oilPlans;
+            if (!oilLast && copy.oilLast) oilLast = copy.oilLast;
             offlineStart = true;
             if (!navigator.onLine) online = false;
             show("clockScreen");
@@ -1343,7 +1349,7 @@
                 if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
                 burst();
                 showSuccess(!open, res.tap, !res.sent);
-                afterPunchOutOil = open && hadVehicle(open) && !oilDone(open) ? open : null;
+                afterPunchOutOil = open && oilWanted(open) && !oilDone(open) ? open : null;
             } catch (err) {
                 $("punchMsg").textContent = (open ? "Punch out" : "Punch in") + " failed: " + errText(err);
                 punchEl.classList.remove("shake"); void punchEl.offsetWidth; punchEl.classList.add("shake");
@@ -1398,7 +1404,21 @@
         // The oil check answer (see "Oil check" below); a "checked" already on the server is never changed
         async function sendOil(p) {
             try { await set(ref(db, shiftPath(p.id) + "/oil"), { done: p.done === true, at: p.tap, how: p.how === "out" ? "out" : "box" }); }
-            catch (err) { if (!(await shiftHas(p.id, "oil/done"))) throw err; }
+            catch (err) { if (!(await shiftHas(p.id, "oil/done"))) throw err; return; }
+            if (p.done === true && vanKey(p.vehicle)) sendOilLast(p).catch(err => console.warn("Last oil check not saved:", err));
+        }
+        // Whether the vehicle's oil check is due on this shift, saved before any answer (never over an answer).
+        // It only keeps a "not due" shift out of the Inbox, so a refusal isn't worth bothering the driver about.
+        async function sendOilDue(p) {
+            if (await shiftHas(p.id, "oil/done")) return;
+            await set(ref(db, shiftPath(p.id) + "/oil"), { due: p.due === true, at: p.tap }).catch(err => console.warn("Oil check due not saved:", err));
+        }
+        // The vehicle's last oil check, so the next driver isn't asked before it's due (newer checks only)
+        async function sendOilLast(p) {
+            const r = ref(db, P.oilLast + "/" + vanKey(p.vehicle));
+            const was = (await get(r)).val();
+            if (was && typeof was.at === "number" && was.at >= p.tap) return;
+            await set(r, { at: p.tap, ek: ek, by: displayName(emp, user.email).slice(0, 60), shiftId: p.id, vehicleName: String(p.vehicle).slice(0, 60) });
         }
 
         // Sends one saved punch; it leaves the phone's list once the server has it (or refused it).
@@ -1413,7 +1433,7 @@
                 if (pin) deliver(pin).catch(() => {});
             }
             const run = sendChain.catch(() => {}).then(() => p.kind === "in" ? sendPunchIn(p.id, p.tap)
-                : p.kind === "out" ? sendPunchOut(p.id, p.tap) : sendOil(p));
+                : p.kind === "out" ? sendPunchOut(p.id, p.tap) : p.kind === "oilDue" ? sendOilDue(p) : sendOil(p));
             sendChain = run;
             const done = run.then(() => {
                 dropPending(p);
@@ -1459,6 +1479,7 @@
                 if (p.kind === "in" && !s) list.push({ id: p.id, in: p.tap, tap: p.tap, src: "clock", pending: true });
                 else if (p.kind === "out" && s && typeof s.out !== "number") { s.out = p.tap; s.pending = true; }
                 else if (p.kind === "oil" && s && !oilDone(s)) s.oil = { done: p.done, at: p.tap, how: p.how, pending: true };
+                else if (p.kind === "oilDue" && s && !(s.oil && typeof s.oil.done === "boolean")) s.oil = { due: p.due, at: p.tap, pending: true };
             }
             shifts = list.sort((a, b) => a.in - b.in);
             if (!$("clockScreen").hidden) render();
@@ -1910,17 +1931,32 @@
         }
 
         // ---------- Oil check ----------
-        // Every shift with a vehicle (hadVehicle: not just Shop or "Not driving today"): a reminder after the vehicle is picked, a glowing box until the driver ticks
+        // Shifts with a vehicle (hadVehicle: not just Shop or "Not driving today") whose oil check is due: a reminder after the vehicle is picked, a glowing box until the driver ticks
         // "I checked the oil", and the same question at punch out if they never did. The answer is saved on the shift
         // (shifts/{ek}/{id}/oil = { done, at, how: "box" | "out" }) and shows in the admin Inbox. It's saved on the
         // phone first, like a punch, so it works with no signal.
-        const OIL_ASKED_KEY = "tc_oil_asked";   // the shift the reminder was last shown for (once per shift)
+        // How often each vehicle is due is set in Admin → Vehicles (oil_plan; see oilDue() in tc-core.js), counted from
+        // its last check by any driver (oil_last). When it isn't due, the shift gets oil = { due: false } and nothing is
+        // asked. Until the schedule has loaded once on this phone, every shift is asked, as before.
+        const OIL_ASKED_KEY = "tc_oil_asked";   // the shift and vehicle the reminder was last shown for (once each)
         function oilDone(s) { return !!(s && s.oil && s.oil.done === true); }
         function vehicleOf(s) { return s.vehicleName || (vanHistory(s).filter(v => v.vehicleName).pop() || {}).vehicleName || ""; }
+        // Whether the vehicle's oil check is due now, by the schedule
+        function oilDueNow(name) {
+            const key = vanKey(name);
+            return oilDue(oilPlanFor(oilPlans, name), key && oilLast ? oilLast[key] : null, now());
+        }
+        // Whether this shift asks about the oil: what was decided when the vehicle was picked, else the schedule now
+        function oilWanted(s) {
+            if (!s || !hadVehicle(s)) return false;
+            if (oilDone(s) || (s.oil && s.oil.done === false)) return true;
+            if (s.oil && typeof s.oil.due === "boolean") return s.oil.due;
+            return s.vehicleName ? oilDueNow(s.vehicleName) : true;
+        }
 
         function renderOilBox(open) {
             const box = $("oilBox");
-            box.hidden = !(open && hadVehicle(open));
+            box.hidden = !oilWanted(open);
             if (box.hidden) return;
             const done = oilDone(open);
             box.classList.toggle("done", done);
@@ -1930,11 +1966,15 @@
                 : "Tap here once you've checked the oil";
         }
 
+        // After a vehicle is picked: saves whether its oil check is due on this shift, and reminds the driver if it is
         function remindOil() {
             const open = current();
-            if (!open || !hadVehicle(open) || oilDone(open) || formOpen || sheetOpen) return;
-            try { if (localStorage.getItem(OIL_ASKED_KEY) === open.id) return; localStorage.setItem(OIL_ASKED_KEY, open.id); } catch (e) {}
-            const name = vehicleOf(open);
+            if (!open || !open.vehicleName || oilDone(open)) return;
+            const name = open.vehicleName, due = oilDueNow(name);
+            if (!open.oil || open.oil.due !== due) saveOilDue(open.id, due);
+            if (!due || formOpen || sheetOpen) return;
+            const asked = open.id + "|" + vanKey(name);
+            try { if (localStorage.getItem(OIL_ASKED_KEY) === asked) return; localStorage.setItem(OIL_ASKED_KEY, asked); } catch (e) {}
             openForm({
                 title: "Please check your oil",
                 sub: "Check the oil" + (name ? " in vehicle " + name : "") + " before you head out. When it's done, tap the glowing Oil check box.",
@@ -1986,9 +2026,17 @@
         }
 
         function saveOil(id, done, how) {
-            const p = { kind: "oil", id: id, tap: now(), done: done, how: how };
+            const s = shifts.find(x => x.id === id), vehicle = s ? vehicleOf(s) : "";
+            const p = { kind: "oil", id: id, tap: now(), done: done, how: how, vehicle: vehicle };
+            if (done && vanKey(vehicle)) { oilLast = Object.assign({}, oilLast); oilLast[vanKey(vehicle)] = { at: p.tap, pending: true }; }
             addPending(p);
             if (!standIn) deliver(p).catch(err => toast("Your oil check couldn't be sent: " + errText(err), true));
+        }
+        function saveOilDue(id, due) {
+            const p = { kind: "oilDue", id: id, tap: now(), due: due };
+            addPending(p);
+            refreshShifts();
+            if (!standIn) deliver(p).catch(err => console.warn("Oil check schedule not saved on the shift:", err));
         }
 
         // The driver's requests and the office's answers
