@@ -10,7 +10,8 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={};\n' + src);
-const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan } = await import(pathToFileURL(tmp).href);
+const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -79,6 +80,65 @@ test('oil check: only shifts with a vehicle; checked, not yet, or missed', () =>
   assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked }), 'missed');                      // never answered
   assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked, oil: { done: false, at: t0 + H, how: 'out' } }), 'missed');
   assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked, oil: { done: true, at: t0 + H, how: 'out' } }), 'checked');
+});
+
+test('oil check: a vehicle whose check wasn\'t due is left out', () => {
+  assert.strictEqual(oilState({ in: t0, vehicleId: 'g7', oil: { due: false, at: t0 } }), 'notdue');
+  assert.strictEqual(oilState({ in: t0, out: t0 + H, vehicleId: 'g7', oil: { due: false, at: t0 } }), 'notdue');
+  assert.strictEqual(oilState({ in: t0, vehicleId: 'g7', oil: { due: true, at: t0 } }), 'waiting');
+  assert.strictEqual(oilState({ in: t0, out: t0 + H, vehicleId: 'g7', oil: { due: true, at: t0 } }), 'missed');
+});
+
+// ---------- Oil check schedule ----------
+// 2026-10-12 is a Monday
+const day = (k, hhmm) => keyToEpoch(k, hhmm || '09:00');
+const last = k => ({ at: day(k, '07:30') });
+test('oil schedule: every shift unless the office picks something else', () => {
+  assert.deepStrictEqual(cleanOilPlan(null), { mode: 'shift' });
+  assert.deepStrictEqual(cleanOilPlan({ mode: 'nope' }), { mode: 'shift' });
+  assert.strictEqual(oilDue(null, null, t0), true);
+  assert.strictEqual(oilDue({ mode: 'shift' }, last('2026-10-12'), t0), true);  // even if checked earlier that day
+  assert.strictEqual(oilDue({ mode: 'never' }, null, t0), false);
+  assert.strictEqual(oilNextDue({ mode: 'never' }, null, t0), null);
+});
+test('oil schedule: once every few days, counted from the last check', () => {
+  const p = { mode: 'every', every: 3 };
+  assert.strictEqual(oilDue(p, null, t0), true);                                // never checked
+  assert.strictEqual(oilNextDue(p, last('2026-10-12'), t0), '2026-10-15');
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-14')), false);
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-15')), true);
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-20')), true);   // nobody drove it for a while
+  assert.strictEqual(oilDue({ mode: 'every', every: 1 }, last('2026-10-12'), day('2026-10-12', '15:00')), false); // once a day
+  assert.strictEqual(oilDue({ mode: 'every', every: 1 }, last('2026-10-12'), day('2026-10-13', '06:00')), true);
+  assert.strictEqual(cleanOilPlan({ mode: 'every', every: 500 }).every, 60);
+  assert.strictEqual(cleanOilPlan({ mode: 'every', every: 'x' }).every, 1);
+});
+test('oil schedule: chosen days of the week, and a missed day carries over', () => {
+  const p = { mode: 'days', days: { mon: true, thu: true } };
+  assert.strictEqual(oilDue(p, null, day('2026-10-13')), true);                  // never checked
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-12', '15:00')), false); // Monday, already checked
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-14')), false);   // Wednesday
+  assert.strictEqual(oilNextDue(p, last('2026-10-12'), day('2026-10-14')), '2026-10-15');
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-15')), true);    // Thursday
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-17')), true);    // nobody checked it Thursday
+  assert.strictEqual(oilNextDue(p, last('2026-10-16'), day('2026-10-17')), '2026-10-19'); // next Monday
+  assert.deepStrictEqual(cleanOilPlan({ mode: 'days', days: {} }), { mode: 'shift' });
+  assert.deepStrictEqual(cleanOilPlan({ mode: 'days', days: { mon: true, xyz: true, tue: false } }).days, { mon: true });
+});
+test('oil schedule: the office can ask for a check on the next shift', () => {
+  const p = { mode: 'every', every: 7, askFrom: day('2026-10-13', '08:00') };
+  assert.strictEqual(oilDue(p, last('2026-10-12'), day('2026-10-13')), true);
+  assert.strictEqual(oilDue(p, { at: day('2026-10-13', '10:00') }, day('2026-10-13', '11:00')), false); // checked since
+  assert.strictEqual('askFrom' in cleanOilPlan({ mode: 'never', askFrom: 1 }), false);
+});
+test('oil schedule: each vehicle by its name, or the default', () => {
+  const plans = { def: { mode: 'every', every: 2 }, vehicles: { '12': { mode: 'never' } } };
+  assert.deepStrictEqual(oilPlanFor(plans, 'Van 12'), { mode: 'never', own: true });
+  assert.deepStrictEqual(oilPlanFor(plans, '12'), { mode: 'never', own: true });
+  assert.deepStrictEqual(oilPlanFor(plans, 'Van 3'), { mode: 'every', every: 2 });
+  assert.deepStrictEqual(oilPlanFor(null, 'Van 3'), { mode: 'shift' });
+  const asked = Object.assign({ ask: { '3': 5 } }, plans);
+  assert.deepStrictEqual(oilPlanFor(asked, 'Van 3'), { mode: 'every', every: 2, askFrom: 5 });
 });
 
 test('date ranges include both ends', () => {
