@@ -250,7 +250,7 @@ phone's very first sign-in.
   (tap **All good** to skip). The *Something wrong with this vehicle? Report it* link
   under the vehicle sends a report any time.
 - **Oil check:** on a shift with a vehicle (not Shop or *Not driving today*) whose oil
-  check is due (see **Admin → Vehicles → Oil check schedule**), a
+  check is due (see **Garage → Oil schedule**), a
   *Please check your oil* reminder pops up after the Vehicle Check, and a glowing **Oil
   check** box stays under the vehicle until the driver taps it and ticks *I checked the
   oil*. If they never did, punching out asks *Did you check the oil?*, and the answer
@@ -259,26 +259,16 @@ phone's very first sign-in.
   When the vehicle isn't due, nothing is asked.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
-**Admin → Inbox** lists punch fixes, oil checks and vehicle problems, with a count on the
-tab. **Fix it** opens the punch editor already filled in from the request, and saving marks
-the request done. **Oil check** shows who is on the clock and hasn't checked yet, and every
-shift of the last two weeks where the oil wasn't checked (**Got it** marks one as seen),
-and why: they said they didn't, they didn't answer, or the office punched them out so they
-were never asked.
-Vehicle problems can be marked fixed with a note. **Show handled** shows the finished ones,
-including the oil checks that were done. The live board and timesheets also tag each shift
-*Oil checked*, *Oil not checked*, or *Oil not due* (the vehicle's check wasn't due, so it's
-left out of the Inbox).
+**Admin → Inbox** lists punch fixes, with a count on the tab. **Fix it** opens the punch
+editor already filled in from the request, and saving marks the request done. **Show
+handled** shows the finished ones. The live board and timesheets also tag each shift *Oil
+checked*, *Oil not checked*, or *Oil not due* (the vehicle's check wasn't due).
 
-**Admin → Vehicles → Oil check schedule** sets how often drivers are asked to check each
-vehicle's oil: **Every shift**, **Once a day**, **Every few days** (2 to 60), **Chosen days of
-the week**, or **Never**. **All vehicles** is the setting for every vehicle left on *Same as
-all vehicles*; until it's changed, that's every shift. A check counts for the vehicle
-whichever driver does it, and the next one is counted from it. On chosen days, if nobody
-checks a vehicle on one of its days, the next driver who takes it is asked. Each vehicle
-shows its last check (when and by whom) and whether it's due or the next day it will be.
-**Ask at next shift** makes a vehicle due again until someone checks it. Changes save
-right away. Until a phone has loaded the schedule once, it asks every shift, as before.
+**Vehicle problems, oil checks and the oil check schedule are in Garage**
+(`app.eandccourier.ca/garage/`, the [garage](https://github.com/ogpoopdogg/garage) repo), with
+everything else saved about each vehicle. The admin panel links to it from the Inbox and
+**Vehicles**. Garage reads and writes the same `timeclock/van_reports`, the oil check on each
+shift, `timeclock/oil_plan` and `timeclock/oil_last`, so the clock works the same as before.
 
 **Admin → Reports** shows the hours, overtime and overtime share for **Last week** (the
 last full pay week, Friday to Thursday), **Last month** (the last calendar month), **Last
