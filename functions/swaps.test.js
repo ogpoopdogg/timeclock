@@ -67,16 +67,16 @@ test('reminder timers: every 10 minutes, stable IDs Cloud Tasks accepts', () => 
 test('notification text', () => {
   const hint = S.unassign(openShift(), bump, 500, 'b').swapHint;
   assert.deepStrictEqual(S.swapMessage(hint, 0), {
-    title: 'Van swap needed',
-    body: 'Justin took van 7. Are you in van 3 now? Open the time clock and tap Van swap to confirm the van you\'re in.'
+    title: 'Vehicle swap needed',
+    body: 'Justin took vehicle 7. Are you in vehicle 3 now? Open the time clock and tap Vehicle swap to confirm the vehicle you\'re in.'
   });
   assert.strictEqual(S.swapMessage(Object.assign({}, hint, { suggestName: null }), 0).body,
-    'Justin took van 7. Open the time clock, tap Van swap and pick the van you\'re in.');
+    'Justin took vehicle 7. Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.');
   assert.deepStrictEqual(S.swapMessage(hint, 2), {
-    title: 'Reminder: van swap',
-    body: 'You\'re on the clock without a van since Justin took van 7. Open the time clock, tap Van swap and pick the van you\'re in.'
+    title: 'Reminder: vehicle swap',
+    body: 'You\'re on the clock without a vehicle since Justin took vehicle 7. Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.'
   });
-  assert.strictEqual(S.swapMessage({ vehicleName: '7' }, 0).body.startsWith('Van 7 was given to another driver.'), true);
+  assert.strictEqual(S.swapMessage({ vehicleName: '7' }, 0).body.startsWith('Vehicle 7 was given to another driver.'), true);
   assert.strictEqual(S.SWAP_URL, 'https://app.eandccourier.ca/timeclock/?swap=1');
 });
 

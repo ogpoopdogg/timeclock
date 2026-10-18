@@ -44,8 +44,10 @@ rules** actually stop an employee from changing their own punches.
 - A punch can carry the time it was pressed on the phone (`tap`, `outTap`), so a punch
   saved with no signal shows when it was really made. It can't be more than a week old.
 - Employees can send, read and cancel their own punch-fix requests
-  (`timeclock/requests/{ek}`) and time-off requests (`timeclock/timeoff/{ek}`) while
-  they're still open. Only admins can answer them.
+  (`timeclock/requests/{ek}`) while they're still open. Only admins can answer them.
+- A driver can save the oil check on their own shift (`oil` on the shift) while it's open
+  or within a day of punching out. Once it says *checked* it can't be changed back. Only
+  admins can mark a missed one as seen.
 - Employees can read the list of vans without GPS (`timeclock/vans`); only admins can
   change it.
 - Employees can add a van problem report (`timeclock/van_reports`) in their own name, but
@@ -55,8 +57,8 @@ rules** actually stop an employee from changing their own punches.
 in that folder; needs Java 11 or later). GitHub runs them on every push.
 
 **Order when updating:** publish the new rules in the Firebase console soon after the
-pages update. Until then, punches still work, but Fix a punch, Time off and van
-problem reports show an error when sent. If `functions/` changed, deploy the functions
+pages update. Until then, punches still work, but Fix a punch, vehicle problem
+reports and oil checks show an error when sent. If `functions/` changed, deploy the functions
 too (see *Reminders when the app is closed → 3*).
 
 Firebase console → **Realtime Database** → **Rules**: merge the `timeclock` block and
@@ -82,7 +84,7 @@ stay, so old timesheets and the CSV still include them. **Add back** undoes it.
 
 **Forgotten password:** the sign-in emails aren't real inboxes, so a password can't be
 reset by email. Add the person again with a new sign-in email and pick their old record
-under **Takes the place of**. Their punches, requests, time off, schedule and van move to
+under **Takes the place of**. Their punches, requests, schedule and vehicle move to
 the new sign-in, and the old record is deleted. The change log records the move.
 
 ### 3. Employees add the clock to their phone
@@ -137,13 +139,14 @@ Both pages install as apps: the time clock as **E&C Clock**, the admin panel as
 
 **Updates are automatic.** Edit and commit the files on GitHub as usual. There's no
 version number to change, and nobody needs to reinstall or clear anything.
-- **Opening the app:** the service worker (`sw.js`) asks the server for the newest copy
-  of every file each time the app opens. A saved copy is used when the phone is offline,
-  or when the server hasn't answered within 3 seconds (weak signal), so the app still
-  opens. The Firebase code and fonts the pages load from Google are saved too.
-- **App left open:** `pwa.js` checks for changes whenever someone returns to the app, and
-  every 20 minutes. When something changed, it shows "Updating to the latest version…"
-  and reloads by itself. It never does this in the middle of a punch or a vehicle pick,
+- **Opening the app:** the service worker (`sw.js`) opens the app straight from the copy
+  saved on the phone, so it appears at once, signal or not. At the same time it asks the
+  server for the newest copy of every file. Only when all of them have arrived does it
+  replace the saved copy, and if anything changed the app shows "Updating to the latest
+  version…" and reloads by itself. The Firebase code and fonts the pages load from Google
+  are saved too.
+- **App left open:** `pwa.js` has the service worker check again whenever someone
+  returns to the app, and every 20 minutes, and reloads the same way. It never does this in the middle of a punch or a vehicle pick,
   or while an admin edit window is open or a field is being typed in. It waits until
   that's finished.
 
@@ -213,12 +216,12 @@ is the time the server receives it; the time pressed is saved with it. When the 
 are more than 2 minutes apart, the admin timesheet shows **sent late · pressed 7:02 AM**,
 and editing that punch has a **Use the phone's time** link to set it to the time pressed.
 
-The clock also **opens** with no signal. The phone keeps a small copy of who is signed in
-and their open shift (`tc_offline` in the browser's storage, cleared on sign-out). If the
-server can't be reached when the app opens, the punch button shows from that copy after a
-few seconds (right away when the phone says it's offline), so a driver can punch out.
-My week only shows the open shift until the signal is back. This needs the app to have
-been opened once with signal after this version was published.
+The clock **opens instantly**, with or without signal. The phone keeps a copy of what the
+clock screen shows: who is signed in, their punches of the last three weeks, the settings
+and their reminder choice (`tc_offline` in the browser's storage, cleared on sign-out).
+The clock shows from that copy straight away, and the server's data replaces it as soon as
+it arrives. With no signal a driver can still punch. The loading spinner only shows on a
+phone's very first sign-in.
 
 ## Requests, the Inbox and Reports
 
@@ -226,24 +229,30 @@ been opened once with signal after this version was published.
 
 - **Fix a punch:** for a missed punch in or out, both, a wrong time, or anything else,
   with the day, the times and a note.
-- **Time off:** a first and last day (60 days at most) and a note. Approved days show as
-  *Time off* in My week, and no punch-in reminder is sent on those days.
-- Each request shows whether it's waiting, done, approved or declined, with the admin's
-  reply. A request can be cancelled while it's still waiting.
-- **Van check:** after picking a van, the app asks if anything is wrong with it (tap
-  **All good** to skip). The *Something wrong with this van? Report it* link under the
-  vehicle sends a report any time.
+- Each request shows whether it's waiting, done or declined, with the admin's reply. A
+  request can be cancelled while it's still waiting.
+- **Vehicle Check:** after picking a vehicle, the app asks if anything is wrong with it
+  (tap **All good** to skip). The *Something wrong with this vehicle? Report it* link
+  under the vehicle sends a report any time.
+- **Oil check:** on every shift with a vehicle (not Shop or *Not driving today*), a
+  *Please check your oil* reminder pops up after the Vehicle Check, and a glowing **Oil
+  check** box stays under the vehicle until the driver taps it and ticks *I checked the
+  oil*. If they never did, punching out asks *Did you check the oil?*, and the answer
+  (checked or not) is saved on the shift. It works with no signal, like a punch.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
-**Admin → Inbox** lists punch fixes, time off and van problems, with a count on the tab.
-**Fix it** opens the punch editor already filled in from the request, and saving marks the
-request done. Time off can be approved or declined, and van problems marked fixed with
-a note. **Show handled** shows the finished ones.
+**Admin → Inbox** lists punch fixes, oil checks and vehicle problems, with a count on the
+tab. **Fix it** opens the punch editor already filled in from the request, and saving marks
+the request done. **Oil check** shows who is on the clock and hasn't checked yet, and every
+shift of the last two weeks where the oil wasn't checked (**Got it** marks one as seen).
+Vehicle problems can be marked fixed with a note. **Show handled** shows the finished ones,
+including the oil checks that were done. The live board and timesheets also tag each shift
+*Oil checked* or *Oil not checked*.
 
 **Admin → Reports** shows the hours, overtime and overtime share for **Last week** (the
 last full pay week, Friday to Thursday), **Last month** (the last calendar month), **Last
 year** (the last calendar year) or a **Custom range** (up to 400 days), a table of each
-person's overtime (brighter orange is more overtime), and hours driven per van. The table
+person's overtime (brighter orange is more overtime), and hours driven per vehicle. The table
 has a column per pay week for periods up to 3 months, and a column per month for longer
 ones. Hover over any cell or bar for the numbers.
 

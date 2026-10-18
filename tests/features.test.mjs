@@ -10,7 +10,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={};\n' + src);
-const { vanTime, sentLate, farFromShop, distanceM, timeOffOn, workdayFor, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan } = await import(pathToFileURL(tmp).href);
+const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -69,13 +69,16 @@ test('settings keep the shop location; a half-filled one is dropped', () => {
   assert.strictEqual(settingsWithDefaults({ shopLat: '49.5', shopLng: '-99.9' }).shopLat, 49.5);
 });
 
-test('time off: only approved days take a day off the schedule', () => {
-  const emp = { schedule: { mon: { start: '08:00' } } };
-  const off = { a: { from: '2026-10-12', to: '2026-10-13', status: 'approved' }, b: { from: '2026-10-19', to: '2026-10-19', status: 'pending' } };
-  assert.ok(timeOffOn(off, '2026-10-12'));
-  assert.strictEqual(timeOffOn(off, '2026-10-19'), null);
-  assert.strictEqual(workdayFor(emp, '2026-10-12', off), null);
-  assert.deepStrictEqual(workdayFor(emp, '2026-10-19', off), { start: '08:00' });
+test('oil check: only shifts with a vehicle; checked, not yet, or missed', () => {
+  const picked = { a: { at: t0, how: 'pick', vehicleId: 'g7', vehicleName: '7' } };
+  assert.strictEqual(oilState({ in: t0, shop: true, vans: { a: { at: t0, how: 'shop' } } }), 'none');  // Shop
+  assert.strictEqual(oilState({ in: t0 }), 'none');                                                    // Not driving today
+  assert.strictEqual(hadVehicle({ in: t0, vans: picked }), true);  // had a vehicle, later taken or moved to the shop
+  assert.strictEqual(oilState({ in: t0, vehicleId: 'g7' }), 'waiting');
+  assert.strictEqual(oilState({ in: t0, vehicleId: 'g7', oil: { done: true, at: t0, how: 'box' } }), 'checked');
+  assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked }), 'missed');                      // never answered
+  assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked, oil: { done: false, at: t0 + H, how: 'out' } }), 'missed');
+  assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked, oil: { done: true, at: t0 + H, how: 'out' } }), 'checked');
 });
 
 test('date ranges include both ends', () => {
@@ -95,6 +98,7 @@ test('vans without GPS are blended into the van list in name order', () => {
 
 test('once a GPS unit is named after a van without GPS, the GPS unit replaces it', () => {
   assert.equal(vanKey('Van 12'), '12');
+  assert.equal(vanKey('Vehicle 12'), '12');
   assert.equal(vanKey('van12'), '12');
   assert.equal(vanKey(' 12 '), '12');
   const vans = { van_a: { name: 'Van 12' } };

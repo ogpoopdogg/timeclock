@@ -37,15 +37,8 @@ test('no reminder for inactive employees or days off', () => {
   assert.strictEqual(R.planFor(MON_0800, null, null), null);
 });
 
-test('no reminder for removed employees or on approved time off', () => {
+test('no reminder for removed employees', () => {
   assert.strictEqual(R.planFor(MON_0800, null, emp({ removed: true, active: false })), null);
-  const off = (status, from, to) => ({ t1: { status: status, from: from, to: to } });
-  assert.strictEqual(R.planFor(MON_0800, null, emp(), off('approved', '2026-10-12', '2026-10-12')), null);
-  assert.strictEqual(R.planFor(MON_0800, null, emp(), off('approved', '2026-10-09', '2026-10-16')), null);
-  // Pending, declined, or other days: the reminder stays
-  assert.ok(R.planFor(MON_0800, null, emp(), off('pending', '2026-10-12', '2026-10-12')));
-  assert.ok(R.planFor(MON_0800, null, emp(), off('declined', '2026-10-12', '2026-10-12')));
-  assert.ok(R.planFor(MON_0800, null, emp(), off('approved', '2026-10-13', '2026-10-14')));
 });
 
 test('no reminder more than 2 hours after it was due; an old saved end time is ignored', () => {

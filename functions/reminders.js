@@ -72,24 +72,18 @@ function firstName(emp) {
   return local ? local.charAt(0).toUpperCase() + local.slice(1) : '';
 }
 
-/** True when the employee has approved time off covering this day (timeclock/timeoff/<ek>, set in the admin panel's Inbox). */
-function onTimeOff(timeoff, day) {
-  return Object.values(timeoff || {}).some((t) => t && t.status === 'approved' &&
-    typeof t.from === 'string' && typeof t.to === 'string' && t.from <= day && day <= t.to);
-}
-
 /**
  * Today's single reminder for one employee, or null when there is none to send:
- * inactive or removed, not scheduled today, on approved time off, or already past the point where a reminder is useful.
+ * inactive or removed, not scheduled today, or already past the point where a reminder is useful.
  * dueAt = scheduled start + reminder delay; until = dueAt + 2 h. Schedules only have a
  * start time (drivers work irregular hours); an old saved end time is ignored.
  */
-function planFor(now, settings, emp, timeoff) {
+function planFor(now, settings, emp) {
   if (!emp || emp.active === false || emp.removed === true) return null;
   const s = settingsWithDefaults(settings);
   const day = dayKey(now);
   const sched = scheduleFor(emp, day);
-  if (!sched || onTimeOff(timeoff, day)) return null;
+  if (!sched) return null;
   const dueAt = keyToEpoch(day, sched.start) + s.reminderMinutes * 60000;
   const until = dueAt + LATE_WINDOW_MS;
   if (now >= until) return null;
@@ -130,5 +124,5 @@ function reminderMessage(emp, start) {
 
 module.exports = {
   TZ, DOW_KEYS, LATE_WINDOW_MS, zoned, dayKey, addDaysKey, keyToEpoch, settingsWithDefaults,
-  scheduleFor, planFor, timerFor, isCurrent, hasPunchedToday, reminderMessage, firstName, onTimeOff
+  scheduleFor, planFor, timerFor, isCurrent, hasPunchedToday, reminderMessage, firstName
 };
