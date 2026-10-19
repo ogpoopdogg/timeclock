@@ -17,7 +17,7 @@
     </script>
     <link rel="manifest" href="clock.webmanifest">
     <link rel="icon" href="favicon.ico" sizes="any">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -2155,7 +2155,7 @@
             btn.classList.toggle("on", on);
             btn.textContent = on ? "Turn off" : "Turn on";
             if (!canNotify) {
-                text += isIOS && !standalone ? " On iPhone, tap Share → Add to Home Screen and open the clock from there to turn on notifications."
+                text += isIOS && !standalone ? " On iPhone, install the clock first (tap Install at the top), then open it from your Home Screen to turn on notifications."
                     : " This browser can't show notifications.";
             } else if (Notification.permission === "denied") {
                 text += " Notifications are blocked for this site — allow them in your browser settings.";
