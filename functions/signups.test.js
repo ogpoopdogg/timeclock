@@ -26,8 +26,10 @@ test('an @ec.com address an admin put on the time clock is allowed', () => {
   assert.strictEqual(G.signupAllowed('matt@ec.com', Object.assign({}, matt, { removed: true })), false);
 });
 
-test('admin emails are always allowed', () => {
-  for (const e of G.ADMIN_EMAILS) assert.strictEqual(G.signupAllowed(e, null), true);
+test('an admin email is refused unless it is on the time clock', () => {
+  // The database rules make anyone signed in as an admin email an admin, so it gets no free pass
+  assert.strictEqual(G.signupAllowed('desirae@ec.com', null), false);
+  assert.strictEqual(G.signupAllowed('desirae@ec.com', { email: 'desirae@ec.com' }), true);
 });
 
 test('emailKey matches the time clock record key', () => {
