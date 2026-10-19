@@ -23,6 +23,13 @@
    - timeclockVanSwapReminder is that timer: if they still haven't picked a van,
      it reminds them and sets the next one (3 reminders at most).
 
+   New sign-ins (see signups.js):
+   - timeclockBeforeUserCreated runs inside Firebase Authentication before any new
+     account is saved. It refuses a new @ec.com account unless an admin already put
+     that email on the time clock, so nobody can make themselves a staff sign-in
+     through Request Pickup or by calling Firebase directly. Needs Firebase
+     Authentication with Identity Platform (see README).
+
    This is its own Firebase "codebase" (see ../firebase.json), so deploying it
    never touches the dispatch app's functions in the same project.
    Memory is set explicitly (with the default 1 vCPU) so running costs are
@@ -32,11 +39,13 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onValueWritten } = require('firebase-functions/v2/database');
 const { onTaskDispatched } = require('firebase-functions/v2/tasks');
+const { beforeUserCreated, HttpsError } = require('firebase-functions/v2/identity');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const { getFunctions } = require('firebase-admin/functions');
 const R = require('./reminders');
 const S = require('./swaps');
+const G = require('./signups');
 
 admin.initializeApp();
 
@@ -258,5 +267,18 @@ exports.timeclockVanSwapReminder = onTaskDispatched(
     const result = await sendTo(ek, { title: msg.title, body: msg.body, tag: 'tc-van-swap', url: S.SWAP_URL });
     logger.info('Van swap reminder', { ek, shiftId, n, ...result });
     if (n < S.SWAP_REMINDERS) await setSwapTimer(ek, shiftId, takenAt, n + 1);
+  }
+);
+
+// Must answer within 7 seconds, or Firebase Authentication fails the sign-up
+exports.timeclockBeforeUserCreated = beforeUserCreated(
+  { region: REGION, memory: MEMORY },
+  async (event) => {
+    const email = event.data && event.data.email;
+    if (!G.isStaffEmail(email)) return;
+    const employee = (await admin.database().ref(`timeclock/employees/${G.emailKey(email)}`).once('value')).val();
+    if (G.signupAllowed(email, employee)) return;
+    logger.warn('Refused a new @ec.com sign-in that is not on the time clock', { email: G.normEmail(email) });
+    throw new HttpsError('permission-denied', 'This email can only be added by an E&C admin.');
   }
 );
