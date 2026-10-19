@@ -5,20 +5,17 @@
 //   they replace the saved copy together, and if any changed the open pages are told ("tc-updated"): pwa.js then
 //   reloads to the new version when nobody is in the middle of a punch.
 // - keeps a copy of the Firebase code and the fonts the app loads from Google, so it opens with no signal too
-//   (those files never change at the same address, so the saved copy is used first),
-// - shows the punch-in reminders the server pushes while the time clock is closed (functions/index.js),
-// - lets the page show its own reminders as system notifications (Android Chrome needs a service worker for that),
-// - opens the clock when a notification is tapped (a "vehicle swap" notification opens the vehicle picker).
+//   (those files never change at the same address, so the saved copy is used first).
 // Firebase's own traffic (the database and sign-in) always goes straight to the network.
 
 const CACHE = "tc-offline-v2";
 const SHELL = [
-    "./", "index.html", "admin.html", "tc-core.js", "pwa.js", "firebase-config.js", "push-config.js", "maps-config.js",
+    "./", "index.html", "admin.html", "tc-core.js", "pwa.js", "firebase-config.js", "maps-config.js",
     "clock.webmanifest", "admin.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png", "apple-touch-icon.png", "favicon.ico"
 ];
 // The Firebase code the pages import (keep the version the same as in tc-core.js, index.html and admin.html)
 const SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
-const SDK_FILES = ["firebase-app.js", "firebase-auth.js", "firebase-database.js", "firebase-messaging.js"].map(f => SDK + f);
+const SDK_FILES = ["firebase-app.js", "firebase-auth.js", "firebase-database.js"].map(f => SDK + f);
 const LIBS = /^https:\/\/(www\.gstatic\.com\/firebasejs\/|fonts\.googleapis\.com\/|fonts\.gstatic\.com\/)/;
 const CODE = /(\/|\.html|\.js|\.webmanifest)$/; // files whose change is a new version of the app (not the pictures)
 const REFRESH_GAP_MS = 30 * 1000;               // look for a new version at most this often
@@ -121,36 +118,3 @@ function refresh() {
     })().finally(() => { refreshing = null; });
     return refreshing;
 }
-
-// Firebase Cloud Messaging delivers the server's data-only message here as JSON with a "data" object
-self.addEventListener("push", event => {
-    let payload = {};
-    try { payload = event.data ? event.data.json() : {}; } catch (e) {}
-    const d = Object.assign({}, payload.notification || {}, payload.data || {});
-    event.waitUntil(self.registration.showNotification(d.title || "E&C Time Clock", {
-        body: d.body || "",
-        icon: "icon-192.png",
-        badge: "icon-192.png",
-        tag: d.tag || "tc-push",
-        renotify: true,
-        requireInteraction: true,
-        vibrate: [200, 100, 200],
-        data: { url: d.url || self.registration.scope }
-    }));
-});
-
-self.addEventListener("notificationclick", event => {
-    event.notification.close();
-    const target = (event.notification.data && event.notification.data.url) || self.registration.scope;
-    event.waitUntil(
-        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
-            for (const client of list) {
-                if (client.url.startsWith(self.registration.scope) && !/admin\.html/.test(client.url) && "focus" in client) {
-                    client.postMessage({ type: "tc-open", url: target }); // e.g. …?swap=1 tells the open clock to show the vehicle picker
-                    return client.focus();
-                }
-            }
-            return self.clients.openWindow ? self.clients.openWindow(target) : null;
-        })
-    );
-});

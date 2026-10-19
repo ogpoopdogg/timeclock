@@ -1,7 +1,7 @@
 {
   "name": "ec-timeclock-functions",
   "private": true,
-  "description": "Sends E&C time clock punch-in reminders to phones, even when the app is closed",
+  "description": "E&C time clock server code: vehicle swaps, and the check on new @ec.com sign-ins",
   "main": "index.js",
   "engines": { "node": "22" },
   "scripts": {

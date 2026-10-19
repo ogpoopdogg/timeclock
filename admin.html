@@ -698,7 +698,7 @@
                     <h3>Time clock</h3>
                     <p class="hint">All times use Brandon, MB time (<span id="tzName"></span>).</p>
                     <div class="field">
-                        <label for="sReminder">Punch-in reminder (minutes after scheduled start)</label>
+                        <label for="sReminder">Late after (minutes after scheduled start)</label>
                         <input class="input" id="sReminder" type="number" min="0" max="240" step="1" inputmode="numeric">
                     </div>
                     <div class="field">
@@ -882,7 +882,7 @@
 
         // ---------- State ----------
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
-        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [], pushTokens = {}, prefs = {};
+        let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [];
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
         let requestsAll = {}; // the Inbox: punch fixes (vehicle problems and oil checks are in Garage)
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
@@ -947,7 +947,7 @@
         onAuthStateChanged(auth, u => {
             stopAll();
             user = u;
-            employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = []; pushTokens = {}; prefs = {};
+            employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = [];
             requestsAll = {}; settingsRaw = {}; reportCache = null;
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
@@ -977,8 +977,6 @@
             });
             sub(ref(db, P.employees), s => { employees = s.val() || {}; syncShiftListeners(); renderAll(); });
             sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
-            sub(ref(db, P.pushTokens), s => { pushTokens = s.val() || {}; if (activeTab === "people") renderPeople(); });
-            sub(ref(db, P.prefs), s => { prefs = s.val() || {}; if (activeTab === "people") renderPeople(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
@@ -2068,15 +2066,6 @@
             }).join("") + "</div>";
         }
 
-        // How many phones get this person's punch-in reminders while the time clock is closed
-        function phoneTag(k) {
-            const n = Object.keys(pushTokens[k] || {}).length;
-            const off = prefs[k] && prefs[k].punchReminder === false
-                ? ' <span class="tag off" title="They turned the punch-in reminder off on the time clock. Vehicle swap alerts still reach their phone.">Reminder off</span>' : "";
-            return n ? ' <span class="tag gps" title="Gets punch-in reminders even with the time clock closed">' + n + (n === 1 ? " phone" : " phones") + "</span>"
-                + off : ' <span class="tag off" title="Only reminded while the time clock is open on their phone">No phone alerts</span>' + off;
-        }
-
         function renderPeople() {
             const all = empList();
             const removedCount = all.filter(e => e.removed).length;
@@ -2092,7 +2081,7 @@
                     schedSummary(e) +
                     '<div class="emp-status">' + (e.removed ? '<span class="tag off">Removed</span>' : e.active === false ? '<span class="tag off">Inactive</span>'
                         : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
-                    (e.removed ? "" : phoneTag(e.ek)) + "</div>" +
+                    "</div>" +
                     '<button type="button" class="btn sm" data-emp="' + esc(e.ek) + '">' + (e.removed ? "Add back" : "Edit") + "</button></div>";
             }).join("") : '<div class="empty-state"><strong>No employees yet</strong>Click “Add employee” to put your first driver on the time clock.</div>';
         }
@@ -2213,8 +2202,6 @@
             if (op.exists()) { u[P.open + "/" + to] = op.val(); u[P.open + "/" + from] = null; }
             for (const [id, r] of Object.entries(vr.val() || {})) if (r && r.ek === from) u[P.vanReports + "/" + id + "/ek"] = to;
             u[P.employees + "/" + from] = null;
-            u[P.prefs + "/" + from] = null;
-            u[P.pushTokens + "/" + from] = null; // the old sign-in's phones stop getting reminders
             await update(ref(db), u);
             // A van they hold now belongs to the new sign-in
             for (const [gpsId, c] of Object.entries(claims)) {

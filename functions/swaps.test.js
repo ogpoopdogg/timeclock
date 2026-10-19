@@ -44,45 +44,11 @@ test('a closed shift, or a driver already in another van, is left alone', () => 
   assert.strictEqual(S.unassign(null, bump, 500, 'b'), undefined);
 });
 
-test('reminders continue only while the driver has no van since that van was taken', () => {
+test('a swap is still needed only while the driver has no van since that van was taken', () => {
   const bumped = S.unassign(openShift(), bump, 500, 'b');
   assert.strictEqual(S.stillNeedsSwap(bumped, 500), true);
   assert.strictEqual(S.stillNeedsSwap(Object.assign({}, bumped, { vehicleId: 'g3' }), 500), false); // picked a van
   assert.strictEqual(S.stillNeedsSwap(Object.assign({}, bumped, { out: 900 }), 500), false);        // punched out
-  assert.strictEqual(S.stillNeedsSwap(bumped, 499), false);                                         // a newer swap has its own reminders
+  assert.strictEqual(S.stillNeedsSwap(bumped, 499), false);                                         // a newer swap replaced it
   assert.strictEqual(S.stillNeedsSwap(null, 500), false);
-});
-
-test('reminder timers: every 10 minutes, stable IDs Cloud Tasks accepts', () => {
-  const t1 = S.swapTimerFor('matt@ec,com', 's1', 500, 1);
-  const t3 = S.swapTimerFor('matt@ec,com', 's1', 500, 3);
-  assert.strictEqual(t1.fireAt, 500 + 10 * 60000);
-  assert.strictEqual(t3.fireAt, 500 + 30 * 60000);
-  assert.strictEqual(t1.id, S.swapTimerFor('matt@ec,com', 's1', 500, 1).id);
-  assert.notStrictEqual(t1.id, t3.id);
-  assert.match(t1.id, /^vs-[0-9a-f]{40}$/);
-  assert.strictEqual(S.SWAP_REMINDERS, 3);
-});
-
-test('notification text', () => {
-  const hint = S.unassign(openShift(), bump, 500, 'b').swapHint;
-  assert.deepStrictEqual(S.swapMessage(hint, 0), {
-    title: 'Vehicle swap needed',
-    body: 'Justin took vehicle 7. Are you in vehicle 3 now? Open the time clock and tap Vehicle swap to confirm the vehicle you\'re in.'
-  });
-  assert.strictEqual(S.swapMessage(Object.assign({}, hint, { suggestName: null }), 0).body,
-    'Justin took vehicle 7. Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.');
-  assert.deepStrictEqual(S.swapMessage(hint, 2), {
-    title: 'Reminder: vehicle swap',
-    body: 'You\'re on the clock without a vehicle since Justin took vehicle 7. Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.'
-  });
-  assert.strictEqual(S.swapMessage({ vehicleName: '7' }, 0).body.startsWith('Vehicle 7 was given to another driver.'), true);
-  assert.strictEqual(S.SWAP_URL, 'https://app.eandccourier.ca/timeclock/?swap=1');
-});
-
-test('punch-in reminder is skipped only when the driver turned it off', () => {
-  assert.strictEqual(S.wantsPunchReminder(null), true);            // never chose: as before
-  assert.strictEqual(S.wantsPunchReminder({}), true);
-  assert.strictEqual(S.wantsPunchReminder({ punchReminder: true }), true);
-  assert.strictEqual(S.wantsPunchReminder({ punchReminder: false }), false);
 });

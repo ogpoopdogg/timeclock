@@ -16,7 +16,7 @@ const RETRY_BUSY_MS = 30 * 1000;
 const AUTO_SHOW_GAP_MS = 24 * 60 * 60 * 1000; // the install steps open by themselves at most once a day
 const AUTO_SHOW_DELAY_MS = 1500;
 // The files that make up each page; a change to any of them means a new version
-const SHARED_FILES = ["tc-core.js", "pwa.js", "firebase-config.js", "push-config.js"];
+const SHARED_FILES = ["tc-core.js", "pwa.js", "firebase-config.js"];
 
 export function isStandalone() {
     return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;

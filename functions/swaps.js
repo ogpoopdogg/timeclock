@@ -3,17 +3,9 @@
 
    Van swaps: when a driver picks a van another driver has (Van swap in the time
    clock), timeclock/vehicle_claims/<gpsId> changes hands. The driver who had it
-   is unassigned and gets a notification right away, then reminders every
-   SWAP_REMINDER_EVERY_MS until they pick the van they're in (at most
-   SWAP_REMINDERS of them), or punch out. */
+   is unassigned, and their clock shows a "Vehicle swap needed" banner until they
+   pick the van they're in, or punch out. */
 'use strict';
-
-const crypto = require('crypto');
-
-const SWAP_REMINDER_EVERY_MS = 10 * 60 * 1000;
-const SWAP_REMINDERS = 3; // after the first notification
-const CLOCK_URL = 'https://app.eandccourier.ca/timeclock/';
-const SWAP_URL = CLOCK_URL + '?swap=1'; // opens the van picker (see sw.js and index.html)
 
 const str = (v) => (typeof v === 'string' ? v : '');
 
@@ -61,38 +53,4 @@ function stillNeedsSwap(shift, takenAt) {
     shift.swapHint && shift.swapHint.at === takenAt);
 }
 
-/** One-shot timer for reminder n (1..SWAP_REMINDERS) after the van was taken. Same inputs -> same ID. */
-function swapTimerFor(ek, shiftId, takenAt, n) {
-  const fireAt = takenAt + n * SWAP_REMINDER_EVERY_MS;
-  const id = 'vs-' + crypto.createHash('sha256').update(ek + '|' + shiftId + '|' + takenAt + '|' + n).digest('hex').slice(0, 40);
-  return { id: id, fireAt: fireAt };
-}
-
-function swapMessage(hint, n) {
-  const van = hint.vehicleName ? 'vehicle ' + hint.vehicleName : 'your vehicle';
-  const took = (hint.by ? hint.by + ' took ' + van : capital(van) + ' was given to another driver') + '. ';
-  if (!n) {
-    return {
-      title: 'Vehicle swap needed',
-      body: took + (hint.suggestName
-        ? 'Are you in vehicle ' + hint.suggestName + ' now? Open the time clock and tap Vehicle swap to confirm the vehicle you\'re in.'
-        : 'Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.')
-    };
-  }
-  return {
-    title: 'Reminder: vehicle swap',
-    body: 'You\'re on the clock without a vehicle' + (hint.by ? ' since ' + hint.by + ' took ' + van : '') +
-      '. Open the time clock, tap Vehicle swap and pick the vehicle you\'re in.'
-  };
-}
-const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-/** False only when the driver turned their punch-in reminder off (timeclock/prefs/<ek>). */
-function wantsPunchReminder(prefs) {
-  return !(prefs && prefs.punchReminder === false);
-}
-
-module.exports = {
-  SWAP_REMINDER_EVERY_MS, SWAP_REMINDERS, CLOCK_URL, SWAP_URL,
-  bumpFrom, unassign, stillNeedsSwap, swapTimerFor, swapMessage, wantsPunchReminder
-};
+module.exports = { bumpFrom, unassign, stillNeedsSwap };
