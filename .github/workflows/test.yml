@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - name: Unit tests (punch-in reminders, van swaps, punch addresses)
+      - name: Unit tests (punch-in reminders, van swaps, punch addresses, new @ec.com sign-ins)
         working-directory: functions
         run: node --test
       - name: Overtime rules (after 8 h a day, no weekly overtime)

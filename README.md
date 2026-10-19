@@ -465,3 +465,54 @@ closed-app reminders, and *No phone alerts* for everyone who won't.
 On iPhone, the clock must be added to the Home Screen and opened from there (iOS 16.4
 or later). The page checks whether the browser supports this kind of push, and falls
 back to the open-app reminder if it doesn't.
+
+## Only admins can make @ec.com sign-ins
+
+@ec.com addresses aren't real inboxes, so nobody can prove they own one by email.
+Without a check on the server, anyone could create one through the Request Pickup
+sign-up page or by calling Firebase directly with the public web key.
+
+`timeclockBeforeUserCreated` (`functions/signups.js`) runs inside Firebase
+Authentication before any new account is saved. A new @ec.com account goes through
+only if:
+
+- an admin already added that exact email under **Employees** (and didn't remove it), or
+- it is one of the admin emails (`ADMIN_EMAILS`, the same list as `tc-core.js`).
+
+Every other @ec.com sign-up is refused with *"This email can only be added by an E&C
+admin."* and logged as *"Refused a new @ec.com sign-in"*. Customer addresses aren't
+affected, and accounts that already exist keep working.
+
+**Adding someone works as before.** **Add employee** saves their record first and then
+creates the sign-in, so the check lets it through. Staff who aren't on the time clock
+need to be added under **Employees** before their sign-in is made.
+
+An employee record with no sign-in yet (added without a starting password) can be
+claimed by whoever signs up with that email first. Set a starting password when you add
+someone.
+
+### Turning it on
+
+1. **Upgrade to Identity Platform.** Firebase only runs this kind of function ("blocking
+   function") on projects upgraded to *Firebase Authentication with Identity Platform*:
+   Firebase console → **Authentication** → **Settings** → upgrade. Check the pricing on
+   <https://cloud.google.com/identity-platform/pricing> first.
+2. **Deploy the functions** the same way as above:
+   `npx firebase-tools deploy --only functions:timeclock --project eandccourier-36fcc`
+3. **Check it's registered:** Firebase console → **Authentication** → **Settings** →
+   *Blocking functions* should list `timeclockBeforeUserCreated` before account creation.
+4. **Test it** from Cloud Shell. This makes a direct sign-up call, the same way someone
+   skipping the apps would:
+
+   ```sh
+   curl -s "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAKmgoXA4m3cRTmxJq4aUyva5SVvFbTNqg" \
+     -H "Content-Type: application/json" \
+     -d '{"email":"blocktest@ec.com","password":"blocktest123","returnSecureToken":true}'
+   ```
+
+   It should answer with an error that mentions *"This email can only be added by an E&C
+   admin."* If it returns an `idToken` instead, the check isn't running: delete
+   `blocktest@ec.com` under **Authentication → Users** and go back to step 3.
+
+The function must answer within 7 seconds, or Firebase fails the sign-up. It reads one
+database record, so it normally takes well under a second.
