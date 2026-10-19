@@ -1681,6 +1681,7 @@
                 await remove(ref(db, P.shifts + "/" + smCtx.ek + "/" + s.id));
                 if (s.vehicleId) await releaseClaim(s.vehicleId, s.id);
                 await logAudit(smCtx.ek, s.id, "delete", s, null, $("smNote").value.trim());
+                if (smCtx.request) await finishRequest(smCtx.request, "done", "Punch deleted").catch(err => toast("Punch deleted, but the request couldn't be marked done: " + errText(err), true));
                 closeModal("shiftModal");
                 toast("Punch deleted.");
             } catch (err) { $("smMsg").textContent = "Couldn't delete: " + errText(err); }
@@ -1823,7 +1824,8 @@
         }
 
         // ---------- Inbox: punch fixes (vehicle problems and oil checks moved to Garage) ----------
-        const FIX_KINDS = { in: "Missed punch in", out: "Missed punch out", both: "Missed a whole shift", wrong: "A punch time is wrong", other: "Something else" };
+        const FIX_KINDS = { in: "Missed punch in", out: "Missed punch out", both: "Missed a whole shift", wrong: "A punch time is wrong",
+            accident: "Punched in by accident", other: "Something else" };
         const ago = ts => ts ? fmtKey(dayKey(ts)) + ", " + fmtTime(ts) : "";
         // The oil check on a shift, as a tag for the live board and timesheets ("" for a shift with no vehicle)
         function oilTag(s) {
@@ -1857,9 +1859,10 @@
             const reply = r => r.reply ? '<div class="ii-reply">' + esc((r.status === "declined" ? "Declined" : "Answer") + ": " + r.reply) + (r.by ? " · " + esc(r.by) : "") + "</div>" : "";
             const fixes = d.fixes.filter(r => r.status === "open" || handled).map((r, i) => {
                 const done = r.status !== "open";
+                const punch = r.kind === "accident" && r.shiftId ? findShift(r.ek, r.shiftId) : null;
                 return '<div class="inbox-item' + (done ? " done" : "") + '" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(r.ek)) + '</span><span class="ii-when">' + esc(ago(r.at)) + "</span></div>" +
                     '<div class="ii-what">' + esc(FIX_KINDS[r.kind] || "Punch fix") + "</div>" +
-                    '<div class="ii-detail">' + esc(fmtKey(r.day || dayKey(r.at || now()), true)) + (r.inTime ? " · in " + esc(fmtHHMM(r.inTime)) : "") + (r.outTime ? " · out " + esc(fmtHHMM(r.outTime)) : "") + "</div>" +
+                    '<div class="ii-detail">' + esc(fmtKey(r.day || dayKey(r.at || now()), true)) + (punch ? " · punched in " + esc(fmtTime(punch.in)) : "") + (r.inTime ? " · in " + esc(fmtHHMM(r.inTime)) : "") + (r.outTime ? " · out " + esc(fmtHHMM(r.outTime)) : "") + "</div>" +
                     (r.note ? '<div class="ii-note">' + esc(r.note) + "</div>" : "") + reply(r) +
                     (done ? "" : '<div class="ii-actions"><button type="button" class="btn sm primary" data-fix="' + esc(r.ek + "|" + r.id) + '">Fix it</button>' +
                         '<button type="button" class="btn sm ghost" data-decline="fix|' + esc(r.ek + "|" + r.id) + '">Decline</button></div>') + "</div>";
@@ -1878,6 +1881,14 @@
             if (!r) return;
             if (!employees[k]) { toast("That employee isn't on the time clock any more.", true); return; }
             const shift = r.shiftId ? findShift(k, r.shiftId) : null;
+            if (r.kind === "accident" && !shift) {
+                // Already deleted (that week's punches are loaded and it isn't there), or the driver didn't say which punch
+                if (!r.shiftId || (shiftsByEk[k] && rangeStart !== null && keyToEpoch(r.day) >= rangeStart)) {
+                    if (confirm((r.shiftId ? "That punch isn't there any more, so it may already be deleted." : "The driver didn't say which punch. Find it on the timesheet.") +
+                        "\n\nMark this request done?")) finishRequest({ ek: k, id: id }, "done", r.shiftId ? "Punch deleted" : "Fixed").then(() => toast("Marked done."), err => toast("Couldn't save: " + errText(err), true));
+                    return;
+                }
+            }
             if (r.shiftId && !shift && r.kind !== "both") {
                 // Older than the punches loaded: load that week first
                 viewWeek = weekStartKey(r.day, settings.weekStart); syncShiftListeners();
@@ -1894,6 +1905,7 @@
                 $("smOutTime").value = r.outTime;
             }
             $("smNote").value = ("Driver asked: " + (FIX_KINDS[r.kind] || "") + (r.note ? ". " + r.note : "")).slice(0, 300);
+            if (r.kind === "accident") $("smSub").textContent += ". The driver says they punched in by accident: tap Delete punch to remove it.";
             syncOutFields();
         }
 

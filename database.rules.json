@@ -144,7 +144,7 @@
             ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && ((!data.exists() && root.child('timeclock/employees').child($ek).exists() && root.child('timeclock/employees').child($ek).child('active').val() !== false && root.child('timeclock/employees').child($ek).child('removed').val() !== true && newData.child('status').val() === 'open' && !newData.child('reply').exists() && !newData.child('by').exists() && !newData.child('doneAt').exists()) || (!newData.exists() && data.child('status').val() === 'open'))",
             ".validate": "newData.hasChildren(['at', 'kind', 'day', 'status'])",
             "at": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
-            "kind": { ".validate": "newData.val() === 'in' || newData.val() === 'out' || newData.val() === 'both' || newData.val() === 'wrong' || newData.val() === 'other'" },
+            "kind": { ".validate": "newData.val() === 'in' || newData.val() === 'out' || newData.val() === 'both' || newData.val() === 'wrong' || newData.val() === 'accident' || newData.val() === 'other'" },
             "day": { ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)" },
             "inTime": { ".validate": "newData.isString() && newData.val().matches(/^\\d{2}:\\d{2}$/)" },
             "outTime": { ".validate": "newData.isString() && newData.val().matches(/^\\d{2}:\\d{2}$/)" },
