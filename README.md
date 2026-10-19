@@ -476,8 +476,11 @@ sign-up page or by calling Firebase directly with the public web key.
 Authentication before any new account is saved. A new @ec.com account goes through
 only if:
 
-- an admin already added that exact email under **Employees** (and didn't remove it), or
-- it is one of the admin emails (`ADMIN_EMAILS`, the same list as `tc-core.js`).
+- an admin already added that exact email under **Employees** (and didn't remove it).
+
+The admin emails get no exception: the database rules make anyone signed in as one an
+admin, so if an admin's sign-in is ever deleted, another admin adds that email under
+**Employees** before it is made again.
 
 Every other @ec.com sign-up is refused with *"This email can only be added by an E&C
 admin."* and logged as *"Refused a new @ec.com sign-in"*. Customer addresses aren't
