@@ -14,7 +14,7 @@
 const CACHE = "tc-offline-v2";
 const SHELL = [
     "./", "index.html", "admin.html", "tc-core.js", "pwa.js", "firebase-config.js", "push-config.js", "maps-config.js",
-    "clock.webmanifest", "admin.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png", "favicon.ico"
+    "clock.webmanifest", "admin.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-logo.png", "apple-touch-icon.png", "favicon.ico"
 ];
 // The Firebase code the pages import (keep the version the same as in tc-core.js, index.html and admin.html)
 const SDK = "https://www.gstatic.com/firebasejs/12.19.0/";

@@ -99,9 +99,10 @@ the new sign-in, and the old record is deleted. The change log records the move.
 
 ### 3. Employees add the clock to their phone
 
-Have them open `app.eandccourier.ca/timeclock/`, sign in, and tap **Turn on** under
-Reminders. On iPhone they have to *Add to Home Screen* first, then open the clock from
-the home-screen icon. iOS only allows web notifications for home-screen web apps
+Send them the link `app.eandccourier.ca/timeclock/`. On a phone the install steps open
+by themselves; they follow them, open the clock from the new icon, sign in, and tap
+**Turn on** under Reminders. On iPhone they have to install it (*Add to Home Screen*)
+first, then open the clock from the home-screen icon. iOS only allows web notifications for home-screen web apps
 (iOS 16.4 or later).
 
 ## Overtime
@@ -140,12 +141,28 @@ has **Counted in** and **Counted out** columns. The rule is `roundPunch` in `tc-
 ## Installing the app, and how updates reach it
 
 Both pages install as apps: the time clock as **E&C Clock**, the admin panel as
-**Clock Admin**. Each has its own icon.
+**Clock Admin**. Each has its own icon (`apple-touch-icon.png` is the iPhone one).
 
-- **Android, or Chrome/Edge on a computer:** tap **Install** in the top bar, or use the
-  browser menu → *Install app* / *Add to Home screen*.
-- **iPhone/iPad:** open the page in Safari → **Share** → **Add to Home Screen**. The
-  **Install** button shows these steps.
+The yellow **Install** button in the top bar shows until the app is installed:
+
+- **Android (Chrome, Edge):** one tap opens the phone's own install prompt.
+- **iPhone/iPad in Safari:** it opens a few big, short steps with pictures of the
+  buttons to tap, and a bouncing yellow arrow pointing at the first one (••• at the
+  bottom right on iOS 26, Share in the middle of the bottom bar before that). The
+  steps stay on screen while they tap along in Safari.
+- **Other Android browsers:** a short list of the menu steps. Chrome or
+  Firefox on an iPhone get their own steps, with a link to copy into Safari.
+- **Opened inside another app** (the link was tapped in Facebook, Instagram, Gmail
+  and the like): those can't install it, so the steps say to copy the link and open it
+  in Safari (iPhone) or Chrome (Android), with a **Copy** button.
+- **Computer:** the steps for Chrome/Edge, or File → Add to Dock in Safari on a Mac.
+
+On a phone the steps also open by themselves when the page is opened in the browser,
+at most once a day. On Android that only happens while Chrome offers to install it
+(it stops once it's installed). An iPhone can't tell the page it's installed, so the
+steps have an **It's installed** button that stops them opening by themselves (the
+Install button stays). The installed app never shows any of this. On iPhone the
+installed app may ask the person to sign in once more.
 
 **Updates are automatic.** Edit and commit the files on GitHub as usual. There's no
 version number to change, and nobody needs to reinstall or clear anything.
