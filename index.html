@@ -1855,8 +1855,12 @@
         });
 
         // "Fix a punch": the driver asks the office to add or change a punch (admin panel → Inbox)
-        const FIX_KINDS = { in: "I missed my punch in", out: "I missed my punch out", both: "I missed a whole shift", wrong: "A punch time is wrong", other: "Something else" };
+        const FIX_KINDS = { in: "I missed my punch in", out: "I missed my punch out", both: "I missed a whole shift", wrong: "A punch time is wrong",
+            accident: "I punched in by accident", other: "Something else" };
         const fixNeeds = kind => ({ in: kind === "in" || kind === "both" || kind === "wrong", out: kind === "out" || kind === "both" || kind === "wrong" });
+        // The punches on a day the driver can say were by accident (newest first; one still on the clock is the likely one)
+        const punchesOn = day => shifts.filter(x => !x.pending && dayKey(x.in) === day).reverse();
+        const punchLabel = x => "In " + fmtTime(x.in) + (typeof x.out === "number" ? " · out " + fmtTime(x.out) : " · still on the clock");
         function openFixPunch() {
             const today = dayKey(now()), open = current();
             const kind = open && dayKey(open.in) !== today ? "out" : "in"; // still on the clock from an earlier day: likely a missed punch out
@@ -1870,6 +1874,7 @@
                     (kind === "out" ? dayKey(open.in) : today) + '"></div>' +
                     '<div id="fxInWrap"><label class="field-label" for="fxIn">Punch in time</label><input class="input" id="fxIn" type="time"></div>' +
                     '<div id="fxOutWrap"><label class="field-label" for="fxOut">Punch out time</label><input class="input" id="fxOut" type="time"></div>' +
+                    '<div class="full" id="fxShiftWrap"><label class="field-label" for="fxShift">Which punch</label><select class="input" id="fxShift"></select></div>' +
                     '<div class="full"><label class="field-label" for="fxNote">Details</label><textarea class="input textarea" id="fxNote" maxlength="500" placeholder="e.g. My phone died, I started at 7:30"></textarea></div></div>',
                 onSubmit: sendFixPunch,
                 afterOpen: syncFixFields
@@ -1881,8 +1886,12 @@
             $("fxOutWrap").hidden = !need.out;
             $("fxInWrap").querySelector("label").textContent = $("fxKind").value === "wrong" ? "Right punch in time" : "Punch in time";
             $("fxOutWrap").querySelector("label").textContent = $("fxKind").value === "wrong" ? "Right punch out time" : "Punch out time";
+            const accident = $("fxKind").value === "accident", list = accident ? punchesOn($("fxDay").value) : [];
+            $("fxShiftWrap").hidden = !accident;
+            $("fxShift").innerHTML = list.length ? list.map(x => '<option value="' + esc(x.id) + '">' + esc(punchLabel(x)) + "</option>").join("")
+                : '<option value="">No punches on this day</option>';
         }
-        $("formBody").addEventListener("change", e => { if (e.target.id === "fxKind") syncFixFields(); });
+        $("formBody").addEventListener("change", e => { if (e.target.id === "fxKind" || e.target.id === "fxDay") syncFixFields(); });
 
         async function sendFixPunch() {
             const kind = $("fxKind").value, day = $("fxDay").value, note = $("fxNote").value.trim();
@@ -1894,10 +1903,12 @@
             if (kind === "both" && (!inTime || !outTime)) return formFail("Enter the time you started and the time you finished.");
             if (kind === "wrong" && !inTime && !outTime) return formFail("Enter the right time.");
             if (kind === "other" && !note) return formFail("Tell the office what needs fixing.");
+            if (kind === "accident" && !$("fxShift").value) return formFail("There's no punch on that day. Pick the day you punched in by accident.");
             // The shift it's about, when there is one that day
             const onDay = shifts.filter(x => !x.pending && dayKey(x.in) === day);
             const shift = kind === "out" ? (onDay.filter(x => typeof x.out !== "number").pop() || onDay[onDay.length - 1])
-                : kind === "wrong" || kind === "in" ? onDay[0] : null;
+                : kind === "wrong" || kind === "in" ? onDay[0] : kind === "accident" ? onDay.find(x => x.id === $("fxShift").value) : null;
+            if (kind === "accident" && !shift) return formFail("That punch isn't there any more. Pick it again.");
             const req = { at: serverTimestamp(), kind: kind, day: day, note: note, status: "open" };
             if (inTime) req.inTime = inTime;
             if (outTime) req.outTime = outTime;
@@ -2049,7 +2060,8 @@
             const html = items.slice(0, 6).map(it => {
                 const r = it.r;
                 const what = FIX_KINDS[r.kind] || "Fix a punch";
-                const detail = fmtKey(r.day) + (r.inTime ? " · in " + fmtHHMM(r.inTime) : "") + (r.outTime ? " · out " + fmtHHMM(r.outTime) : "") + (r.note ? " · " + r.note : "");
+                const punch = r.kind === "accident" && r.shiftId ? shifts.find(x => x.id === r.shiftId) : null; // the punch, until it's deleted
+                const detail = fmtKey(r.day) + (punch ? " · in " + fmtTime(punch.in) : "") + (r.inTime ? " · in " + fmtHHMM(r.inTime) : "") + (r.outTime ? " · out " + fmtHHMM(r.outTime) : "") + (r.note ? " · " + r.note : "");
                 const st = r.status === "done" ? ["Fixed", "ok"] : r.status === "declined" ? ["Declined", "no"] : ["Waiting", ""];
                 const waiting = r.status === "open";
                 return '<div class="req"><span class="req-what">' + esc(what) + '</span><span class="req-state ' + st[1] + '">' + st[0] + "</span>" +

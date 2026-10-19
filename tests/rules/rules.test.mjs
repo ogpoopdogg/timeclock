@@ -146,6 +146,11 @@ test('E3: requests are private and checked', async () => {
   await assertFails(mattDb().ref(`timeclock/requests/${matt}/r1`).set(fix({ extra: 1 })));
 });
 
+test('E3: an employee can say they punched in by accident', async () => {
+  await assertSucceeds(mattDb().ref(`timeclock/requests/${matt}/r1`).set(fix({ kind: 'accident', inTime: null, shiftId: 's1', note: '' })));
+  await assertFails(mattDb().ref(`timeclock/requests/${matt}/r2`).set(fix({ kind: 'oops' })));
+});
+
 test('A3: the admin answers a request; the employee can no longer cancel it', async () => {
   await assertSucceeds(mattDb().ref(`timeclock/requests/${matt}/r1`).set(fix()));
   await assertSucceeds(adminDb().ref(`timeclock/requests/${matt}/r1`).update({ status: 'done', reply: 'Fixed', by: 'justin@ec.com', doneAt: Date.now() }));

@@ -242,8 +242,9 @@ phone's very first sign-in.
 
 **Employees** have a **Requests** card on the clock:
 
-- **Fix a punch:** for a missed punch in or out, both, a wrong time, or anything else,
-  with the day, the times and a note.
+- **Fix a punch:** for a missed punch in or out, both, a wrong time, a punch in by
+  accident (the driver picks which punch that day), or anything else, with the day, the
+  times and a note.
 - Each request shows whether it's waiting, done or declined, with the admin's reply. A
   request can be cancelled while it's still waiting.
 - **Vehicle Check:** after picking a vehicle, the app asks if anything is wrong with it
@@ -260,7 +261,9 @@ phone's very first sign-in.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
 **Admin → Inbox** lists punch fixes, with a count on the tab. **Fix it** opens the punch
-editor already filled in from the request, and saving marks the request done. **Show
+editor already filled in from the request, and saving marks the request done. For a
+punch in by accident it opens that punch, and **Delete punch** (after a confirm) removes the
+whole shift and marks the request done. **Show
 handled** shows the finished ones. The live board and timesheets also tag each shift *Oil
 checked*, *Oil not checked*, or *Oil not due* (the vehicle's check wasn't due).
 
