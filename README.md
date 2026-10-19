@@ -146,8 +146,11 @@ Both pages install as apps: the time clock as **E&C Clock**, the admin panel as
 The yellow **Install** button in the top bar shows until the app is installed:
 
 - **Android (Chrome, Edge):** one tap opens the phone's own install prompt.
-- **iPhone/iPad, and other Android browsers:** it opens a short list of steps with
-  pictures of the buttons to tap (Share → Add to Home Screen on iPhone). Chrome or
+- **iPhone/iPad in Safari:** it opens a few big, short steps with pictures of the
+  buttons to tap, and a bouncing yellow arrow pointing at the first one (••• at the
+  bottom right on iOS 26, Share in the middle of the bottom bar before that). The
+  steps stay on screen while they tap along in Safari.
+- **Other Android browsers:** a short list of the menu steps. Chrome or
   Firefox on an iPhone get their own steps, with a link to copy into Safari.
 - **Opened inside another app** (the link was tapped in Facebook, Instagram, Gmail
   and the like): those can't install it, so the steps say to copy the link and open it

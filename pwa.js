@@ -47,6 +47,12 @@ export function installKind(ua, platform, touchPoints) {
     return "desktop";
 }
 
+// Safari's own version number (26 on iOS 26: Safari 26 no longer gives the real iOS version in its user agent)
+export function safariVersion(ua) {
+    const m = /Version\/(\d+)/.exec(ua);
+    return m ? Number(m[1]) : 0;
+}
+
 /**
  * installButton: the <button> shown until the app is installed
  * toast(text, warn): shows a short message
@@ -167,6 +173,25 @@ const SHEET_CSS = `
     background: rgba(255, 255, 255, 0.1); color: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .pwa-btn svg { width: 18px; height: 18px; }
 .pwa-btn.go { background: var(--yellow, #ffcc00); color: #111; }
+.pwa-sheet.pwa-guide { bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); width: min(500px, calc(100vw - 20px)); max-height: calc(100vh - 110px);
+    border-radius: 24px; padding-bottom: 0; }
+.pwa-guide .pwa-head { padding-top: 18px; }
+.pwa-guide .pwa-head img { width: 48px; height: 48px; border-radius: 12px; }
+.pwa-guide .pwa-head h2 { font-size: 1.5rem; }
+.pwa-guide .pwa-foot .pwa-btn { white-space: nowrap; font-size: 1rem; padding: 0 10px; }
+.pwa-guide .pwa-steps li { font-size: 1.2rem; padding-top: 10px; padding-bottom: 10px; }
+.pwa-guide .pwa-key { width: 36px; height: 36px; }
+.pwa-guide .pwa-key svg { width: 24px; height: 24px; }
+.pwa-arrow { position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 4px); z-index: 202; display: none; flex-direction: column; align-items: center;
+    color: var(--yellow, #ffcc00); font-weight: 800; font-size: 1rem; white-space: nowrap; pointer-events: none; animation: pwaBounce 1s ease-in-out infinite;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
+.pwa-arrow.show { display: flex; }
+.pwa-arrow.middle { left: 50%; transform: translateX(-50%); animation-name: pwaBounceMiddle; }
+.pwa-arrow.right { right: 8px; align-items: flex-end; }
+.pwa-arrow svg { width: 48px; height: 48px; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7)); }
+@keyframes pwaBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+@keyframes pwaBounceMiddle { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 10px); } }
+@media (prefers-reduced-motion: reduce) { .pwa-arrow { animation: none; } }
 .pwa-foot { display: flex; gap: 10px; padding: 12px 22px 18px; border-top: 1px solid rgba(255, 255, 255, 0.09); }
 .pwa-foot .pwa-btn { flex: 1; }
 `;
@@ -175,7 +200,7 @@ function installSheet(kind, getPrompt, runPrompt, onSaidInstalled) {
     const titleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
     const app = escapeHtml(titleMeta ? titleMeta.getAttribute("content") : document.title);
     const link = location.origin + location.pathname;
-    let backdrop = null, sheet = null, shown = false, lastFocus = null;
+    let backdrop = null, sheet = null, arrow = null, shown = false, lastFocus = null;
 
     const copyRow = '<div class="pwa-link"><input type="text" readonly value="' + escapeHtml(link) + '" aria-label="Link to this page">' +
         '<button type="button" class="pwa-btn go" data-copy><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS.copy + '</svg>Copy</button></div>';
@@ -183,15 +208,25 @@ function installSheet(kind, getPrompt, runPrompt, onSaidInstalled) {
     const openIt = "Open <b>" + app + "</b> from your Home Screen.<small>Sign in again if it asks.</small>";
 
     function content() {
-        const iosSteps = [
-            "Tap the <b>Share</b> button " + icon("share") + "<small>Don't see it? Tap " + icon("more") + " first.</small>",
-            "Scroll down and tap <b>Add to Home Screen</b> " + icon("add") + "<small>Not in the list? Tap <b>View More</b>.</small>",
-            "If you see <b>Open as Web App</b>, leave it on. Then tap <b>Add</b>.",
-            openIt
-        ];
         switch (kind) {
-            case "ios-safari":
-                return { sub: "Put it on your Home Screen so it opens like an app. It only takes a few taps.", body: steps(iosSteps) };
+            case "ios-safari": {
+                // Big, short steps while a yellow arrow points at the button to start with. Safari's buttons are
+                // outside the page, so the steps stay on screen while they tap along. Since Safari 26 (iOS 26)
+                // the Share button sits behind ••• at the bottom right; before that it's in the middle of the bottom bar.
+                const newSafari = safariVersion(navigator.userAgent) >= 26;
+                const tail = [
+                    "Tap <b>Add to Home Screen</b> " + icon("add") + "<small>Don't see it? Scroll down, or tap <b>View More</b>.</small>",
+                    "Tap <b>Add</b>",
+                    openIt
+                ];
+                return {
+                    guide: newSafari ? "right" : "middle",
+                    title: "Add " + app + " to your Home Screen",
+                    body: steps((newSafari
+                        ? ["Tap " + icon("more") + " at the bottom of the screen", "Tap <b>Share</b> " + icon("share")]
+                        : ["Tap " + icon("share") + " at the bottom of the screen"]).concat(tail))
+                };
+            }
             case "ios-other":
                 return {
                     sub: "Put it on your Home Screen so it opens like an app.",
@@ -263,7 +298,11 @@ function installSheet(kind, getPrompt, runPrompt, onSaidInstalled) {
             else if (btn.hasAttribute("data-install")) { close(); if (getPrompt()) await runPrompt(); }
             else if (btn.hasAttribute("data-copy")) copy(btn);
         });
-        document.body.append(backdrop, sheet);
+        arrow = document.createElement("div");
+        arrow.className = "pwa-arrow";
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.innerHTML = 'Start here<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 3h4v10h5l-7 8-7-8h5z"/></svg>';
+        document.body.append(backdrop, sheet, arrow);
     }
 
     async function copy(btn) {
@@ -281,17 +320,19 @@ function installSheet(kind, getPrompt, runPrompt, onSaidInstalled) {
         const c = content();
         const ios = kind.startsWith("ios");
         sheet.innerHTML =
-            '<div class="pwa-head"><img src="apple-touch-icon.png" alt="" width="60" height="60"><div><h2 id="pwaTitle">Install ' + app + "</h2><p>" + c.sub + "</p></div></div>" +
+            '<div class="pwa-head"><img src="apple-touch-icon.png" alt="" width="60" height="60"><div><h2 id="pwaTitle">' + (c.title || "Install " + app) + "</h2>" + (c.sub ? "<p>" + c.sub + "</p>" : "") + "</div></div>" +
             (c.body ? '<div class="pwa-body">' + c.body + "</div>" : "") +
             '<div class="pwa-foot">' +
             (c.install ? '<button type="button" class="pwa-btn" data-close>Not now</button><button type="button" class="pwa-btn go" data-install>Install</button>'
-                : (ios ? '<button type="button" class="pwa-btn" data-installed>It\'s installed</button>' : "") + '<button type="button" class="pwa-btn go" data-close>OK</button>') +
+                : (ios ? '<button type="button" class="pwa-btn" data-installed>It\'s installed</button>' : "") + '<button type="button" class="pwa-btn go" data-close>' + (c.guide ? "Close" : "OK") + "</button>") +
             "</div>";
         lastFocus = document.activeElement;
         shown = true;
         sheet.setAttribute("aria-hidden", "false");
         backdrop.classList.add("show");
         sheet.classList.add("show");
+        sheet.classList.toggle("pwa-guide", !!c.guide);
+        arrow.className = "pwa-arrow" + (c.guide ? " show " + c.guide : "");
         sheet.focus({ preventScroll: true }); // so Escape closes it
     }
 
@@ -301,6 +342,7 @@ function installSheet(kind, getPrompt, runPrompt, onSaidInstalled) {
         sheet.setAttribute("aria-hidden", "true");
         backdrop.classList.remove("show");
         sheet.classList.remove("show");
+        arrow.classList.remove("show");
         if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
     }
 

@@ -5,7 +5,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installKind } from '../pwa.js';
+import { installKind, safariVersion } from '../pwa.js';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const UA = {
@@ -46,6 +46,14 @@ test('Android: browsers, and apps that open links inside themselves', () => {
   assert.strictEqual(installKind(UA.androidSamsung, 'Linux armv8l', 5), 'android');
   assert.strictEqual(installKind(UA.androidWebView, 'Linux armv8l', 5), 'android-inapp');
   assert.strictEqual(installKind(UA.androidInstagram, 'Linux armv8l', 5), 'android-inapp');
+});
+
+test('Safari 26 is told apart from older Safari (its user agent no longer gives the real iOS version)', () => {
+  const ios26 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
+  assert.strictEqual(installKind(ios26, 'iPhone', 5), 'ios-safari');
+  assert.strictEqual(safariVersion(ios26), 26);
+  assert.strictEqual(safariVersion(UA.iphoneSafari), 18);
+  assert.strictEqual(safariVersion(UA.iphoneWebView), 0);
 });
 
 test('both pages give iPhones a home-screen icon and name, and the offline copy includes the icon', () => {
