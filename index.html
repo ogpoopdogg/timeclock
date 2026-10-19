@@ -422,20 +422,10 @@
 
         .empty { color: var(--dim); font-size: 0.95rem; padding: 6px 0; }
 
-        .remind-row { display: flex; align-items: center; gap: 14px; }
-        .remind-icon {
-            width: 44px; height: 44px; border-radius: 12px; flex: none; display: grid; place-items: center;
-            color: var(--yellow); background: rgba(255, 204, 0, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.25);
-        }
-        .remind-icon svg { width: 22px; height: 22px; }
-        .remind-text { flex: 1; min-width: 0; font-size: 0.93rem; color: var(--muted); }
-        .remind-text strong { display: block; color: var(--text); font-weight: 600; font-size: 1rem; }
-        .remind-btns { display: flex; flex-direction: column; gap: 6px; flex: none; }
-
         .lock-note { display: flex; gap: 10px; align-items: flex-start; color: var(--dim); font-size: 0.88rem; padding: 0 4px; }
         .lock-note svg { width: 16px; height: 16px; flex: none; margin-top: 3px; }
 
-        /* ---------- Banner (late reminder inside the page) ---------- */
+        /* ---------- Banner (vehicle swap needed, inside the page) ---------- */
         .banner {
             position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 80px); z-index: 60; /* below the top bar, so Sign out stays reachable */
             width: min(560px, calc(100vw - 24px)); transform: translate(-50%, -140%);
@@ -758,20 +748,6 @@
                     <p class="pay-sub" id="paySub"></p>
                 </section>
 
-                <section class="card" aria-labelledby="remindTitle">
-                    <h2 class="card-title" id="remindTitle" style="margin-bottom:12px">Reminders</h2>
-                    <div class="remind-row">
-                        <div class="remind-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-                        </div>
-                        <div class="remind-text" id="remindText"><strong>Punch-in reminder</strong></div>
-                        <div class="remind-btns">
-                            <button type="button" class="chip-btn" id="remindBtn" hidden>Turn on</button>
-                            <button type="button" class="chip-btn" id="remindTestBtn" hidden>Send test</button>
-                        </div>
-                    </div>
-                </section>
-
                 <section class="card" aria-labelledby="reqTitle">
                     <h2 class="card-title" id="reqTitle" style="margin-bottom:12px">Requests</h2>
                     <div class="req-btns">
@@ -866,28 +842,21 @@
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
         const { ref, onValue, off, get, set, update, push, remove, query, orderByChild, startAt, runTransaction, serverTimestamp } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js");
-        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
-        const { firebaseConfig } = await import("./firebase-config.js");
-        const { WEB_APP_ID, VAPID_KEY } = await import("./push-config.js");
         const { setupPwa } = await import("./pwa.js");
-        let pushApp = null;
 
         const $ = id => document.getElementById(id);
         const HOLD_MS = 1500;               // how long the button must be held
         const HISTORY_DAYS = 120;           // punches loaded at first; going back further in "My week" loads more
         const HISTORY_MAX_DAYS = 3 * 366;   // how far back "My week" can go
         const SEND_WAIT_MS = 4000;          // a punch not confirmed by then is treated as saved on this phone
-        const ICON = "icon-192.png";
 
         // ---------- State ----------
         let user = null, ek = null, emp = null, settings = settingsWithDefaults(null);
         let shifts = [], rawShifts = [], claims = {}, serverOffset = 0;
         let requests = {};                  // the driver's own "Fix a punch" requests
         let shiftsSince = 0, shiftsUnsub = null;
-        let prefs = null, prefsLoaded = false;   // timeclock/prefs/{ek}: the driver's saved reminder choice
         let oilPlans = null, oilLast = null;     // the oil check schedule and the last check of each vehicle (see "Oil check")
         let locSaving = 0;                  // locations still being written (don't reload the app meanwhile)
-        let swapLink = new URLSearchParams(location.search).has("swap"); // opened from a "van swap" notification
         let viewWeek = null;                // week start key shown in "My week"
         let unsubs = [];
         let empLoaded = false, shiftsLoaded = false;
@@ -935,8 +904,6 @@
         async function doSignOut() {
             if (current() && !confirm("You're still punched in. Sign out anyway? (You stay on the clock.)")) return;
             clearOfflineCopy();
-            // With no signal the database never answers, so don't wait for it (signing out itself works offline)
-            if (online) await Promise.race([forgetThisPhone(), new Promise(r => setTimeout(r, 3000))]);
             await signOut(auth);
         }
         $("signOutBtn").addEventListener("click", doSignOut);
@@ -954,8 +921,6 @@
             user = u; claims = {}; empLoaded = shiftsLoaded = false;
             if (!keep) { emp = null; shifts = []; rawShifts = []; offlineStart = false; online = true; }
             requests = {}; netSeenAt = 0;
-            if (!keep) { prefs = null; prefsLoaded = false; }
-            pushState = "off"; pushFor = null; pushKey = null;
             if (!keep) { closeSheet(true); closeForm(true); }
             if (!u) { ek = null; clearOfflineCopy(); renderNet(); show("signinScreen"); return; }
             ek = emailKey(u.email);
@@ -980,9 +945,6 @@
             listen(ref(db, P.claims), s => { claims = s.val() || {}; if (sheetOpen) renderSheet(); render(); }, () => {});
             // Database rules not updated yet: these just stay empty
             listen(ref(db, P.requests + "/" + ek), s => { requests = s.val() || {}; renderRequests(); }, () => {});
-            listen(ref(db, P.prefs + "/" + ek), s => { prefs = s.val() || {}; prefsLoaded = true; saveOfflineCopy(); adoptOldReminder(); render(); scheduleReminder(); },
-                // Database rules not updated yet: behave as before (on when the phone allows notifications)
-                () => { prefs = { punchReminder: canNotify && Notification.permission === "granted" }; prefsLoaded = true; render(); });
         });
 
         // The driver's punches from shiftsSince on (going back in "My week" moves it earlier)
@@ -1024,15 +986,12 @@
             }
             saveOfflineCopy();
             render();
-            scheduleReminder();
-            if (pushFor !== ek) { pushFor = ek; setupPush(); }
-            if (swapLink) openSwapFromNotification();
             flushPending();
         }
 
         // ---------- Opening instantly ----------
         // The phone keeps a copy of what the clock screen shows (who is signed in, their punches of the last few weeks,
-        // the settings and their reminder choice). The clock opens from that copy straight away, and the server's data
+        // and the settings). The clock opens from that copy straight away, and the server's data
         // replaces it as soon as it arrives. With no signal the clock still opens, so a driver can punch: the punch is
         // saved on the phone and sent when there's signal (see "Punches saved on this phone" below).
         const OFFLINE_KEY = "tc_offline";
@@ -1047,7 +1006,7 @@
             const recent = rawShifts.filter(x => x.in >= since || typeof x.out !== "number");
             try {
                 localStorage.setItem(OFFLINE_KEY, JSON.stringify({ ek: ek, email: user.email, emp: emp, shifts: recent,
-                    settings: settings, prefs: prefsLoaded ? prefs : null, oilPlans: oilPlans, oilLast: oilLast }));
+                    settings: settings, oilPlans: oilPlans, oilLast: oilLast }));
             } catch (e) {}
         }
         function loadOfflineCopy() {
@@ -1065,7 +1024,6 @@
             // A copy saved before this version only has the open shift
             if (!shiftsLoaded) rawShifts = Array.isArray(copy.shifts) ? copy.shifts.filter(x => x && x.id && typeof x.in === "number") : copy.open ? [copy.open] : [];
             if (!settingsLoaded && copy.settings) settings = settingsWithDefaults(copy.settings);
-            if (!prefsLoaded && copy.prefs) { prefs = copy.prefs; prefsLoaded = true; }
             if (!oilPlans && copy.oilPlans) oilPlans = copy.oilPlans;
             if (!oilLast && copy.oilLast) oilLast = copy.oilLast;
             offlineStart = true;
@@ -1117,7 +1075,6 @@
             tickClock();
             renderWeek();
             renderPayWeek();
-            renderReminderCard();
             renderRequests();
         }
 
@@ -1582,7 +1539,6 @@
 
         async function openSheet() {
             if (!current()) return;
-            swapLink = false;
             sheetOpen = true;
             $("sheetBackdrop").classList.add("show");
             const sheet = $("sheet");
@@ -2090,208 +2046,14 @@
             } else if (bannerMode === "swap") hideBanner();
         }
 
-        // Tapping a "your van was taken" notification opens the clock at …/?swap=1, or messages the open clock (sw.js)
-        function openSwapFromNotification() {
-            swapLink = false;
-            try { if (location.search) history.replaceState(null, "", location.pathname + location.hash); } catch (e) {}
-            if (current() && !sheetOpen) openSheet();
-        }
-        if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
-            if (!e.data || e.data.type !== "tc-open" || !/[?&]swap/.test(e.data.url || "")) return;
-            swapLink = true;
-            if (user && emp && !$("clockScreen").hidden) openSwapFromNotification();
-        });
-
-        // ---------- Punch-in reminder ----------
-        // Fires {reminderMinutes} after today's scheduled start (set in the admin panel) if there is no punch today.
-        let swReg = null, reminderTimer = null;
         // Installable app + automatic updates (pwa.js). Never reload mid-punch or while picking a vehicle.
         setupPwa({
             installButton: $("installBtn"),
             toast: toast,
             isBusy: () => holding || busy || sheetOpen || formOpen || !!picking || locSaving > 0 || flushing || $("success").classList.contains("show")
-        }).registration.then(r => { swReg = r; });
-        const canNotify = "Notification" in window;
-        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-        const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-
-        function reminderInfo() {
-            if (!emp) return null;
-            const today = dayKey(now());
-            const sched = scheduleFor(emp, today);
-            if (!sched) return null;
-            return { today: today, start: sched.start, at: keyToEpoch(today, sched.start) + settings.reminderMinutes * 60000 };
-        }
-
-        // The driver's choice is saved in Firebase (timeclock/prefs/{ek}/punchReminder), so it stays the way they
-        // left it on every phone and after reinstalling, until they change it. Before this was saved, "on" meant
-        // notifications were allowed on the phone; adoptOldReminder saves that as "on" the first time.
-        function reminderWanted() { return !!prefs && prefs.punchReminder === true; }
-        function adoptOldReminder() {
-            if (!prefsLoaded || typeof prefs.punchReminder === "boolean") return;
-            if (canNotify && Notification.permission === "granted") savePunchReminder(true).catch(() => {});
-        }
-        async function savePunchReminder(on) {
-            prefs = Object.assign({}, prefs, { punchReminder: on });
-            renderReminderCard();
-            await set(ref(db, P.prefs + "/" + ek + "/punchReminder"), on);
-        }
-
-        function renderReminderCard() {
-            const info = reminderInfo();
-            const mins = settings.reminderMinutes;
-            const btn = $("remindBtn");
-            const on = reminderWanted();
-            let text = "<strong>Punch-in reminder" + (prefsLoaded ? (on ? " · On" : " · Off") : "") + "</strong>";
-            if (!prefsLoaded) {
-                text += "Loading your setting…";
-            } else if (!on) {
-                text += "You won't be reminded to punch in. Vehicle swap alerts still come through.";
-            } else {
-                text += info ? "Today at " + esc(fmtTime(info.at)) + " if you haven't punched in (" + mins + " min after your " + esc(fmtHHMM(info.start)) + " start)."
-                    : "You'll get a reminder " + mins + " minutes after your scheduled start on work days.";
-            }
-            btn.hidden = !prefsLoaded;
-            btn.classList.toggle("on", on);
-            btn.textContent = on ? "Turn off" : "Turn on";
-            if (!canNotify) {
-                text += isIOS && !standalone ? " On iPhone, install the clock first (tap Install at the top), then open it from your Home Screen to turn on notifications."
-                    : " This browser can't show notifications.";
-            } else if (Notification.permission === "denied") {
-                text += " Notifications are blocked for this site — allow them in your browser settings.";
-            } else if (Notification.permission !== "granted") {
-                text += on ? " This phone hasn't allowed notifications yet." : "";
-                if (on) btn.textContent = "Allow";
-            } else if (on) {
-                text += PUSH_TEXT[pushState] || "";
-            }
-            $("remindTestBtn").hidden = pushState !== "on";
-            const el = $("remindText");
-            if (el.dataset.html !== text) { el.innerHTML = text; el.dataset.html = text; }
-        }
-
-        $("remindBtn").addEventListener("click", async () => {
-            const turningOff = reminderWanted() && (!canNotify || Notification.permission !== "default");
-            if (turningOff) {
-                try { await savePunchReminder(false); toast("Punch-in reminder off. You'll still get vehicle swap alerts."); }
-                catch (err) { prefs.punchReminder = true; renderReminderCard(); toast("Couldn't save: " + errText(err), true); }
-                return;
-            }
-            // Ask the phone first, while this tap still counts as the driver's action (iPhone requires that)
-            if (canNotify && Notification.permission === "default") { try { await Notification.requestPermission(); } catch (e) {} }
-            try { await savePunchReminder(true); }
-            catch (err) { prefs.punchReminder = false; renderReminderCard(); toast("Couldn't save: " + errText(err), true); return; }
-            scheduleReminder();
-            if (canNotify && Notification.permission === "granted") {
-                await setupPush();
-                toast(pushState === "on" ? "Reminders are on. They reach this phone even when the time clock is closed."
-                    : "Reminders are on. Keep the time clock open (or on your home screen) so it can remind you.");
-            } else {
-                toast("Reminder saved as on. Allow notifications for this site so the phone can show it.", true);
-            }
         });
 
-        // ---------- Closed-app reminders (web push through Firebase Cloud Messaging) ----------
-        // The server (functions/index.js) sends the reminder to every phone saved under
-        // timeclock/push_tokens/{ek}; this phone's service worker (sw.js) shows it.
-        let pushState = "off", pushFor = null, pushKey = null, pushError = "";
-        const PUSH_TEXT = {
-            on: " This phone gets it even when the time clock is closed.",
-            unconfigured: " Keep the time clock open (or on your home screen) so it can remind you.",
-            unsupported: " This browser can only remind you while the time clock is open.",
-            error: " Keep the time clock open so it can remind you."
-        };
-
-        async function tokenKey(token) {
-            const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-            return Array.from(new Uint8Array(hash).slice(0, 12), b => b.toString(16).padStart(2, "0")).join("");
-        }
-
-        async function setupPush() {
-            const forEk = ek;
-            if (!WEB_APP_ID || !VAPID_KEY) { pushState = "unconfigured"; renderReminderCard(); return; }
-            if (!canNotify || Notification.permission !== "granted" || !("serviceWorker" in navigator)) { pushState = "off"; renderReminderCard(); return; }
-            pushState = "pending";
-            try {
-                const m = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js");
-                if (!(await m.isSupported())) { pushState = "unsupported"; return; }
-                if (!pushApp) pushApp = initializeApp(Object.assign({}, firebaseConfig, { appId: WEB_APP_ID }), "tc-push");
-                const reg = swReg || await navigator.serviceWorker.ready;
-                const token = await m.getToken(m.getMessaging(pushApp), { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
-                if (!token) throw new Error("No push token was issued.");
-                if (forEk !== ek) return; // signed out meanwhile
-                const key = await tokenKey(token);
-                const storeKey = "tc_push_key_" + ek;
-                let prev = null;
-                try { prev = localStorage.getItem(storeKey); } catch (e) {}
-                if (prev && prev !== key) remove(ref(db, P.pushTokens + "/" + ek + "/" + prev)).catch(() => {});
-                await set(ref(db, P.pushTokens + "/" + ek + "/" + key), { token: token, at: serverTimestamp(), device: navigator.userAgent.slice(0, 160) });
-                try { localStorage.setItem(storeKey, key); } catch (e) {}
-                pushKey = key;
-                pushState = "on";
-            } catch (err) {
-                pushState = "error";
-                pushError = errText(err);
-                console.warn("Closed-app reminders not available:", err);
-            } finally {
-                renderReminderCard();
-            }
-        }
-
-        // On sign-out, stop this phone getting this person's reminders (shared phones)
-        async function forgetThisPhone() {
-            if (!pushKey || !ek) return;
-            await remove(ref(db, P.pushTokens + "/" + ek + "/" + pushKey)).catch(() => {});
-            try { localStorage.removeItem("tc_push_key_" + ek); } catch (e) {}
-        }
-
-        $("remindTestBtn").addEventListener("click", async () => {
-            const btn = $("remindTestBtn");
-            btn.disabled = true;
-            try {
-                await set(ref(db, P.pushTests + "/" + ek), serverTimestamp());
-                toast("Test sent. Close the time clock now — the notification should arrive within a few seconds.");
-            } catch (err) { toast("Couldn't send a test: " + errText(err), true); }
-            setTimeout(() => { btn.disabled = false; }, 5000);
-        });
-
-        function scheduleReminder() {
-            clearTimeout(reminderTimer);
-            const info = reminderInfo();
-            if (!info) return;
-            const wait = info.at - now();
-            if (wait > 0) reminderTimer = setTimeout(checkReminder, Math.min(wait + 500, 2147483000));
-            else checkReminder();
-        }
-
-        function checkReminder() {
-            const info = reminderInfo();
-            if (!info || !user || !emp || emp.active === false || !reminderWanted()) { if (bannerMode === "punch") hideBanner(); return; }
-            const t = now();
-            if (t < info.at) return;
-            if (current() || shifts.some(s => dayKey(s.in) === info.today)) { if (bannerMode === "punch") hideBanner(); return; }
-            const text = "Your shift started at " + fmtHHMM(info.start) + ". Hold the button to punch in.";
-            if (bannerDismissedFor !== info.today) showBanner("You haven't punched in yet", text, "punch");
-            const key = "tc_reminded_" + ek + "_" + info.today;
-            let done = false;
-            try { done = localStorage.getItem(key) === "1"; } catch (e) {}
-            if (done) return;
-            try { localStorage.setItem(key, "1"); } catch (e) {}
-            notify("Time to punch in", text);
-        }
-
-        async function notify(title, body) {
-            if (!canNotify || Notification.permission !== "granted") return;
-            const opts = { body: body, icon: ICON, badge: ICON, tag: "tc-punch-reminder", renotify: true,
-                requireInteraction: true, vibrate: [200, 100, 200], data: { url: location.href } };
-            try {
-                const reg = swReg || (navigator.serviceWorker ? await navigator.serviceWorker.ready : null);
-                if (reg) { await reg.showNotification(title, opts); return; }
-            } catch (e) { console.warn("SW notification failed:", e); }
-            try { new Notification(title, opts); } catch (e) { console.warn("Notification failed:", e); }
-        }
-
-        let bannerMode = null; // "punch" (late punch-in) or "swap" (van taken)
+        let bannerMode = null; // "swap" (van taken) while the banner shows
         function showBanner(title, text, mode) {
             bannerMode = mode;
             $("bannerText").innerHTML = "<strong>" + esc(title) + "</strong>" + esc(text);
@@ -2299,18 +2061,14 @@
             $("banner").classList.add("show");
         }
         function hideBanner() { bannerMode = null; $("banner").classList.remove("show"); }
-        let bannerDismissedFor = null;
         $("bannerClose").addEventListener("click", () => {
             if (bannerMode === "swap") swapBannerDismissed = swapBannerFor;
-            else bannerDismissedFor = dayKey(now());
             hideBanner();
         });
         $("bannerText").addEventListener("click", () => { if (bannerMode === "swap") { hideBanner(); swapBannerDismissed = swapBannerFor; openSheet(); } });
 
-        // Timers are paused in background tabs, so check again whenever the page comes back and every 30 s
-        setInterval(checkReminder, 30000);
         document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "visible") { render(); scheduleReminder(); }
+            if (document.visibilityState === "visible") render();
         });
     </script>
 </body>

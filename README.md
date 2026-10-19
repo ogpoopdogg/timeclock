@@ -34,8 +34,6 @@ rules** actually stop an employee from changing their own punches.
   shop, not driving).
 - Each punch and van swap can save where the phone was, once, within 5 minutes of the
   punch. Only the admin panel writes the street address.
-- Each employee can read and change only their own punch-in reminder setting
-  (`timeclock/prefs`).
 - An employee can only have one shift open at a time. Each punch in also writes
   `timeclock/open/{ek}` (the open shift's id), and a punch in is refused while that
   shift is still open.
@@ -64,7 +62,7 @@ in that folder; needs Java 11 or later). GitHub runs them on every push.
 **Order when updating:** publish the new rules in the Firebase console soon after the
 pages update. Until then, punches still work, but Fix a punch, vehicle problem
 reports and oil checks show an error when sent. If `functions/` changed, deploy the functions
-too (see *Reminders when the app is closed → 3*).
+too (see *Server functions → Deploying*).
 
 Firebase console → **Realtime Database** → **Rules**: merge the `timeclock` block and
 the `developer/dispatch_dashboard/drivers` and `driver_nicknames` entries into your
@@ -100,10 +98,7 @@ the new sign-in, and the old record is deleted. The change log records the move.
 ### 3. Employees add the clock to their phone
 
 Send them the link `app.eandccourier.ca/timeclock/`. On a phone the install steps open
-by themselves; they follow them, open the clock from the new icon, sign in, and tap
-**Turn on** under Reminders. On iPhone they have to install it (*Add to Home Screen*)
-first, then open the clock from the home-screen icon. iOS only allows web notifications for home-screen web apps
-(iOS 16.4 or later).
+by themselves; they follow them, open the clock from the new icon, and sign in.
 
 ## Overtime
 
@@ -205,15 +200,12 @@ open (or the next check) picks it up.
   opens the van list. Vans other drivers have can be picked too. The app asks "Van 7 is
   assigned to Matt. Take it?", then:
   - The van moves to the driver who took it (and its RouteWatcher nickname with it).
-  - The server (`timeclockVanTaken`) unassigns the driver who had it and sends them a
-    notification right away: *"Dave took van 7. Are you in van 3 now? …"* (van 3 being
-    the one Dave left). Tapping it opens the van list with van 3 first, marked
-    *Likely yours*, so a straight swap is one tap.
-  - If they still haven't picked a van, they're reminded every 10 minutes, 3 times at
-    most. The reminders stop as soon as they pick a van or punch out. Van swap
-    alerts are sent even if they turned the punch-in reminder off.
-  - While they have no van, their clock shows a red "Dave took van 7" bar and a banner,
-    and the admin live board shows **Needs van swap**.
+  - The server (`timeclockVanTaken`) unassigns the driver who had it. There is no phone
+    notification (removed October 2026): the next time they open the clock, it shows a
+    red "Dave took van 7" bar and a *Vehicle swap needed* banner. Tapping the banner
+    opens the van list with the van Dave left first, marked *Likely yours*, so a
+    straight swap is one tap.
+  - The admin live board shows **Needs van swap** until they pick a van or punch out.
   - The app can't tell which van a driver is sitting in. It only knows what drivers pick.
     That's why the bumped driver is asked rather than moved automatically.
 - **Van history.** Every van pick, swap, move to the shop and "taken by" is saved on the shift with its time
@@ -221,16 +213,9 @@ open (or the next check) picks it up.
   **Van changes** column.
 - **Punch out** frees the GPS and removes the nickname the driver gave it (only if
   nobody has changed it since, and only if another driver hasn't taken the van).
-- **Reminder.** If an employee is scheduled today and hasn't punched in by
-  *start time + reminder minutes* (10 by default, set in **Settings**), the clock shows
-  a phone notification and an in-page banner.
-- **Reminder on/off is saved.** The **Turn on / Turn off** choice is saved in Firebase
-  (`timeclock/prefs/{ek}/punchReminder`), not on the phone. It stays the way the driver
-  left it until they change it, after reinstalling the app, signing out or switching
-  phones. On a new phone the card says the reminder is on and shows **Allow**, because
-  each phone still has to allow notifications once. Drivers who turned reminders on
-  before this was added are saved as "on" the next time they open the clock.
-  **Admin → Employees** shows *Reminder off* for anyone who turned it off.
+- **Late.** If an employee is scheduled today and hasn't punched in by *start time +
+  late minutes* (10 by default, **Settings → Late after**), the admin live board shows
+  them as **Late**. There is no punch-in reminder on the phone (removed October 2026).
 - **Admin edits** are marked "Edited by admin" on the employee's own screen, and each
   one is saved to the change log (`timeclock/audit`) with the reason.
 
@@ -249,8 +234,8 @@ none, the vehicle picker says so, and the list loads by itself when the signal i
 no signal too.
 
 The clock **opens instantly**, with or without signal. The phone keeps a copy of what the
-clock screen shows: who is signed in, their punches of the last three weeks, the settings
-and their reminder choice (`tc_offline` in the browser's storage, cleared on sign-out).
+clock screen shows: who is signed in, their punches of the last three weeks, and the
+settings (`tc_offline` in the browser's storage, cleared on sign-out).
 The clock shows from that copy straight away, and the server's data replaces it as soon as
 it arrives. With no signal a driver can still punch. The loading spinner only shows on a
 phone's very first sign-in.
@@ -362,51 +347,26 @@ before you rely on them:
 - These requests count toward the same key and Google Cloud project as RouteWatcher's
   maps.
 
-## Reminders when the app is closed
+## Server functions
 
-`functions/` sends each employee **one** reminder, only on days they're scheduled,
-and only if they haven't punched in by their start time plus the reminder delay.
-It uses one-shot timers ([Cloud Tasks](https://cloud.google.com/tasks/docs)) instead
-of checking all day:
+`functions/` has two functions:
 
-- `timeclockPlanReminders` runs once a day at 12:01 AM (Brandon time) and sets one
-  timer per employee scheduled that day, for exactly start + reminder delay.
-- `timeclockPunchReminder` is what each timer runs. If the person hasn't punched in,
-  their phones get the notification. Otherwise nothing is sent.
-- `timeclockReplanEmployee` and `timeclockReplanAll` move a timer when you change
-  someone's schedule, or the reminder delay, during the day. A timer whose time no
-  longer matches the schedule does nothing when it fires.
-- `timeclockTestPush` powers the **Send test** button.
-- `timeclockVanTaken` and `timeclockVanSwapReminder` handle van swaps (see
-  *How it works → Van swap*). They use the same Cloud Tasks timers.
+- `timeclockVanTaken` unassigns a driver whose vehicle another driver took (see
+  *How it works → Van swap*).
+- `timeclockBeforeUserCreated` refuses @ec.com sign-ins an admin didn't add (see
+  *Only admins can make @ec.com sign-ins* below).
 
-Each person gets at most one reminder per day. If a schedule is changed after the
-reminder time has already passed, the reminder is sent right away, unless it's more
-than 2 hours late.
+**There are no phone notifications any more** (removed October 2026): no punch-in
+reminder and no vehicle swap alerts. Their functions (`timeclockPlanReminders`,
+`timeclockPunchReminder`, `timeclockReplanEmployee`, `timeclockReplanAll`,
+`timeclockTestPush`, `timeclockVanSwapReminder`) were deleted from the project; see
+*Deleting the old notification functions* below. The data they used
+(`timeclock/prefs`, `timeclock/push_tokens`, `timeclock/push_tests`,
+`timeclock/reminders_sent`, `timeclock/swap_reminders_sent`) is no longer read, and can
+be deleted in the Firebase console. Their entries in `database.rules.json` are harmless
+and were left as they are, so the rules didn't need publishing again.
 
-Until the steps below are done, phones only get the reminder while the time clock is
-open. Nothing else changes.
-
-### 1. Get the two keys from Firebase
-
-Firebase console → project **eandccourier-36fcc** → ⚙ **Project settings**:
-
-1. **General** → *Your apps*. If there's no **Web** app (`</>`), click *Add app* → Web,
-   name it `E&C Time Clock`, and leave Hosting unticked. Copy its `appId`
-   (it looks like `1:1067680083511:web:…`).
-2. **Cloud Messaging** → *Web configuration* → *Web Push certificates* →
-   **Generate key pair**. Copy the key.
-
-Paste both into `push-config.js` and commit the change.
-
-### 2. Add the database rules
-
-`database.rules.json` now also has `timeclock/push_tokens`, `timeclock/push_tests`,
-`timeclock/prefs` (the reminder on/off choice), the location and van-history fields on
-shifts, and the van-swap rule on `timeclock/vehicle_claims`. Merge them in the same way
-as the rest (see step 1 above).
-
-### 3. Deploy the functions (once, and again whenever `functions/` changes)
+### Deploying (once, and again whenever `functions/` changes)
 
 The easiest way, with nothing to install, is **Google Cloud Shell**
 (<https://shell.cloud.google.com>), signed in with the Google account that owns the
@@ -422,69 +382,29 @@ npx firebase-tools deploy --only functions:timeclock --project eandccourier-36fc
 `firebase.json` puts these functions in their own *codebase* called `timeclock`, and
 the command above deploys only that codebase. The dispatch app's functions
 (`notifyStaffOnRequest`, `sendTestPush`) and `fleetHuntHistory`, `pajApi` and
-`pollNow` in the same project are left alone. If the CLI ever asks whether to delete
-other functions, answer **No**.
+`pollNow` in the same project are left alone. If the CLI asks whether to delete any
+function **not** listed under *Deleting the old notification functions*, answer **No**.
 
-The first deploy may ask to turn on the **Cloud Scheduler** and **Cloud Tasks** APIs.
-Say yes to both: the daily planner runs on Cloud Scheduler, and the timers on Cloud
-Tasks.
+### Deleting the old notification functions (once, October 2026)
 
-#### After the first night: check the timers were set
-
-Firebase console → **Functions** → **Logs** (or Google Cloud console → *Logging*).
-After 12:01 AM, `timeclockPlanReminders` should log *"Punch-in reminder timers"*,
-with *"set for …"* next to everyone scheduled that day.
-
-If it logs a **permission denied** error instead, the functions' service account
-can't create timers yet. Whether this happens depends on how the project's default
-permissions were set up, which can't be seen from this repo. Fix it once, in Cloud Shell:
+In Cloud Shell, from the `timeclock` folder, after pulling the latest code
+(`git pull`, then `cd functions && npm install && cd ..`):
 
 ```sh
-PROJECT=eandccourier-36fcc
-SA="$(gcloud projects describe $PROJECT --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
-for ROLE in roles/cloudtasks.enqueuer roles/iam.serviceAccountUser roles/run.invoker roles/cloudfunctions.invoker; do
-  gcloud projects add-iam-policy-binding $PROJECT --member="serviceAccount:$SA" --role="$ROLE" --condition=None
-done
+npx firebase-tools functions:delete timeclockPlanReminders timeclockPunchReminder timeclockReplanEmployee timeclockReplanAll timeclockTestPush timeclockVanSwapReminder --region us-central1 --project eandccourier-36fcc
 ```
 
-Why each one:
-- **Cloud Tasks Enqueuer** lets the planner create timers.
-- **Service Account User** lets each timer call the reminder function as that account.
-- The two **Invoker** roles let the timer start the function. The `firebase-functions`
-  library lists the Enqueuer and Invoker roles as the permissions task functions need.
+Answer **y** when it asks. Then deploy as above, so `timeclockVanTaken` gets its new
+code.
 
-#### Running cost (estimate from Google's published prices, October 2026, USD)
+### Running cost
 
-Runs scale with the number of reminders, not with time. For example, with 10
-employees each scheduled 22 days a month, that's 30 planner runs + 220 timers =
-**about 250 runs a month**. Each function has 1 vCPU and 256 MiB of memory.
-
-| Piece | Free allowance | Price after that | This feature (10 employees) |
-| --- | --- | --- | --- |
-| Function runs ([Cloud Run](https://cloud.google.com/run/pricing)) | 180,000 vCPU-s, 360,000 GiB-s, 2M requests a month, per billing account | $0.000024/vCPU-s, $0.0000025/GiB-s, $0.40/million requests | 125–750 vCPU-s (0.5–3 s per run): $0.003–$0.02 if no free allowance is left |
-| Timers ([Cloud Tasks](https://cloud.google.com/tasks/pricing)) | 1,000,000 operations a month, per billing account | $0.40 per million | about 440 (create + deliver): $0 |
-| Daily planner ([Cloud Scheduler](https://cloud.google.com/scheduler/pricing)) | 3 jobs per billing account | $0.10 per job per 31 days | 1 job: $0, or $0.10 if the account already has 3+ jobs |
-| Database reads ([Firebase](https://firebase.google.com/pricing)) | ~10 GB/month (360 MB/day) | $1/GB | well under 0.01 GB |
-| Push notifications (FCM) | No-cost product | — | $0 |
-
-On its own, this feature fits inside the free allowances. Even if the other apps on
-the billing account have used them all, the worst case is about **$0.12 USD a month**,
-almost all of it the scheduler's $0.10. To see the real numbers, check Google Cloud
+`timeclockVanTaken` runs once per vehicle swap, and `timeclockBeforeUserCreated` once
+per new sign-in. Each has 1 vCPU and 256 MiB of memory. A few runs a day fit well
+inside the free allowance of [Cloud Run](https://cloud.google.com/run/pricing) (180,000
+vCPU-seconds and 2 million requests a month per billing account). There is no Cloud
+Scheduler job or Cloud Tasks timer any more. To see the real numbers, check Google Cloud
 console → **Billing → Reports**, filtered by service.
-
-### 4. Turn it on for each phone
-
-Each employee opens the time clock and taps **Turn on** under Reminders. Phones that
-already allowed notifications register by themselves the next time the clock opens.
-The card then says *"This phone gets it even when the time clock is closed"*, and
-**Send test** sends a notification through the server.
-
-**Admin → Employees** shows *1 phone* (or more) next to everyone who will get
-closed-app reminders, and *No phone alerts* for everyone who won't.
-
-On iPhone, the clock must be added to the Home Screen and opened from there (iOS 16.4
-or later). The page checks whether the browser supports this kind of push, and falls
-back to the open-app reminder if it doesn't.
 
 ## Only admins can make @ec.com sign-ins
 

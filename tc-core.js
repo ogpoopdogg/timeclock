@@ -1,7 +1,8 @@
 // Shared code for the E&C time clock (employee page and admin panel).
 //
 // Database layout (Firebase Realtime Database, project eandccourier-36fcc):
-//   timeclock/settings                 { reminderMinutes, weekStart }
+//   timeclock/settings                 { reminderMinutes, weekStart }  reminderMinutes: someone not punched in by then
+//                                        (minutes after their scheduled start) shows as Late on the admin live board
 //   timeclock/employees/{ek}           { email, name, active, removed, schedule: { sun..sat: { start, end } } }
 //       removed                          true once the admin removes them: they can't punch in and are hidden from the
 //                                        live board, but their punches still show on timesheets and exports
@@ -23,11 +24,7 @@
 //       oil                              the oil check: { done, at, how, seenBy, seenAt } or { due: false, at } when
 //                                        the vehicle's oil check wasn't due that shift (see oilState(), oilDue())
 //   timeclock/vehicle_claims/{gpsId}   { ek, email, name, nickname, shiftId, vehicleName, at, fromId, fromName }
-//   timeclock/prefs/{ek}               { punchReminder: true | false }  the driver's own choice, kept across phones
 //   timeclock/audit/{id}               admin edit history
-//   timeclock/push_tokens/{ek}/{key}   { token, at, device }  phones that get closed-app reminders
-//   timeclock/push_tests/{ek}          written to ask the server for a test notification
-//   timeclock/reminders_sent/{day}/{ek} written by the server (functions/) once a reminder is handled
 //   timeclock/open/{ek}                the id of the employee's newest shift, written with each punch in, so the
 //                                        database rules can refuse a second open shift
 //   timeclock/requests/{ek}/{id}       "Fix my punch" requests: { at, kind, day, inTime, outTime, shiftId, note,
@@ -64,9 +61,6 @@ export const P = {
     shifts: "timeclock/shifts",
     claims: "timeclock/vehicle_claims",
     audit: "timeclock/audit",
-    pushTokens: "timeclock/push_tokens",
-    pushTests: "timeclock/push_tests",
-    prefs: "timeclock/prefs",
     open: "timeclock/open",
     requests: "timeclock/requests",
     vanReports: "timeclock/van_reports",
