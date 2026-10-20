@@ -836,7 +836,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
             vanKey, oilPlanFor, oilDue, punchForFix,
-            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords
+            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
@@ -894,6 +894,7 @@
             try {
                 await signInWithEmailAndPassword(auth, email, password);
             } catch (err) {
+                reportFailedSignIn(email, err);
                 msg.textContent = AUTH_MESSAGES[err && err.code] || "Sign-in failed. Please try again.";
                 form.classList.remove("shake"); void form.offsetWidth; form.classList.add("shake");
                 form.password.value = ""; form.password.focus();
@@ -971,6 +972,7 @@
             if (!user || !empLoaded) return;
             if (emp && emp.removed) emp = null; // removed by the admin: same as never added
             if (!emp || emp.active === false) {
+                reportRefusedSignIn(user, emp ? "Time clock turned off for this employee" : "Not on the time clock");
                 clearOfflineCopy();
                 offlineStart = false;
                 showNotice(emp ? "Your time clock is turned off" : "Not set up yet",

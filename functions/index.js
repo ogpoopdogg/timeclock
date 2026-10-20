@@ -10,7 +10,9 @@
      account is saved. It refuses a new @ec.com account unless an admin already put
      that email on the time clock, so nobody can make themselves a staff sign-in
      through Request Pickup or by calling Firebase directly. Needs Firebase
-     Authentication with Identity Platform (see README).
+     Authentication with Identity Platform (see README). Every new account, allowed or
+     refused, is written to the security log (security_log/events) with its IP address
+     and browser, for the Security section of the usage page.
 
    There are no phone notifications: the punch-in reminder and the vehicle swap
    alerts were removed in October 2026.
@@ -60,10 +62,24 @@ exports.timeclockBeforeUserCreated = beforeUserCreated(
   { region: REGION, memory: MEMORY },
   async (event) => {
     const email = event.data && event.data.email;
-    if (!G.isStaffEmail(email)) return;
-    const employee = (await admin.database().ref(`timeclock/employees/${G.emailKey(email)}`).once('value')).val();
-    if (G.signupAllowed(email, employee)) return;
+    let allowed = true;
+    if (G.isStaffEmail(email)) {
+      const employee = (await admin.database().ref(`timeclock/employees/${G.emailKey(email)}`).once('value')).val();
+      allowed = G.signupAllowed(email, employee);
+    }
+    await logSignup(event, allowed);
+    if (allowed) return;
     logger.warn('Refused a new @ec.com sign-in that is not on the time clock', { email: G.normEmail(email) });
     throw new HttpsError('permission-denied', 'This email can only be added by an E&C admin.');
   }
 );
+
+// A log that can't be saved never changes the answer: it goes to the functions log instead
+async function logSignup(event, allowed) {
+  const entry = G.signupLogEntry(event, allowed, Date.now());
+  try {
+    await admin.database().ref(G.SECURITY_EVENTS).push(entry);
+  } catch (err) {
+    logger.error('Security log not saved', { entry, message: err && err.message });
+  }
+}

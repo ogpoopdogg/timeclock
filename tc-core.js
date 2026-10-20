@@ -511,6 +511,42 @@ export function errText(err) {
     return (err && err.message) || "Something went wrong.";
 }
 
+// ---------- Security log ----------
+// Failed and refused sign-ins are reported to the E&C security log (the Security section of the usage
+// page). Firebase runs no server code when a password is wrong, so the page has to say so. The server
+// adds the real IP address, and checks the sign-in token sent with a refusal, so a refusal can't be
+// sent in someone else's name. A report never blocks or slows a sign-in, and is dropped if it can't be sent.
+export const SECURITY_REPORT_URL = "https://us-central1-eandccourier-36fcc.cloudfunctions.net/auditSignInReport";
+const REPORT_QUIET = new Set(["auth/network-request-failed"]); // nothing reaches the server anyway
+
+function sendReport(report) {
+    try {
+        const body = JSON.stringify(Object.assign({ app: "timeclock", at: Date.now(), page: location.pathname }, report));
+        // text/plain needs no CORS preflight, and a beacon is still sent when the page closes
+        if (navigator.sendBeacon && navigator.sendBeacon(SECURITY_REPORT_URL, new Blob([body], { type: "text/plain" }))) return;
+        fetch(SECURITY_REPORT_URL, { method: "POST", mode: "no-cors", keepalive: true, body }).catch(() => {});
+    } catch (e) { /* never get in the way of signing in */ }
+}
+
+/** Reports a sign-in Firebase refused (wrong password, unknown email, too many tries…).
+    app: the app reporting it, when it isn't the time clock (Garage loads this file too). */
+export function reportFailedSignIn(email, err, app) {
+    const code = String((err && err.code) || "unknown");
+    if (REPORT_QUIET.has(code)) return;
+    sendReport(Object.assign({ kind: "failed", email: normEmail(email).slice(0, 200), code }, app ? { app } : {}));
+}
+
+const reportedRefusals = new Set();
+/** Reports a signed-in account this page turned away (once per account and reason per page load). */
+export async function reportRefusedSignIn(user, reason, app) {
+    const key = (user && user.uid) + "|" + reason;
+    if (!user || reportedRefusals.has(key)) return;
+    reportedRefusals.add(key);
+    let idToken = null;
+    try { idToken = await user.getIdToken(); } catch (e) { /* sent without it; the server marks it unverified */ }
+    sendReport(Object.assign({ kind: "refused", email: normEmail(user.email).slice(0, 200), reason, idToken }, app ? { app } : {}));
+}
+
 export const AUTH_MESSAGES = {
     "auth/invalid-credential": "Incorrect email or password.",
     "auth/wrong-password": "Incorrect email or password.",
