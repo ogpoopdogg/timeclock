@@ -222,6 +222,25 @@ export function openShift(list) {
     return null;
 }
 
+// The punch a "Fix a punch" request is about (list sorted by punch in). A driver who punched out after midnight may pick
+// the day they punched out, so with no punch starting that day, one from the day before that ran into it counts too
+// (not for a missed punch in). A missed punch out takes the one still on the clock; the others take the first of the day.
+export function punchForFix(list, day, kind) {
+    let onDay = list.filter(s => dayKey(s.in) === day);
+    if (!onDay.length && kind !== "in") {
+        const prev = addDaysKey(day, -1);
+        onDay = list.filter(s => dayKey(s.in) === prev && (typeof s.out !== "number" || dayKey(s.out) === day));
+    }
+    if (!onDay.length) return null;
+    return kind === "out" ? (onDay.filter(s => typeof s.out !== "number").pop() || onDay[onDay.length - 1]) : onDay[0];
+}
+
+// The other punches that share time with a punch from inTs to outTs (null: still on the clock), so hours aren't counted twice
+export function overlapping(list, inTs, outTs, exceptId, now) {
+    const end = typeof outTs === "number" ? outTs : now;
+    return list.filter(s => s.id !== exceptId && s.in < end && (typeof s.out === "number" ? s.out : now) > inTs);
+}
+
 // Overtime: hours past 8 in a day. There is no weekly overtime.
 export const DAILY_OT_MS = 8 * 3600000;
 

@@ -263,7 +263,11 @@ phone's very first sign-in.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
 **Admin → Inbox** lists punch fixes, with a count on the tab. **Fix it** opens the punch
-editor already filled in from the request, and saving marks the request done. For a
+editor already filled in from the request, and saving marks the request done. It opens
+the driver's own punch for that day (or the one from the day before that ran past midnight),
+so the fix changes that punch instead of adding a second one; only *Missed a whole shift*
+adds a new punch. Saving a punch that overlaps another of that employee's punches asks
+first, since both would count the same hours. For a
 punch in by accident it opens that punch, and **Delete punch** (after a confirm) removes the
 whole shift and marks the request done. **Show
 handled** shows the finished ones. The live board and timesheets also tag each shift *Oil

@@ -866,7 +866,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, sentLate, farFromShop, fmtDistance, rangeDays, vanTime
+            oilState, sentLate, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -1651,6 +1651,10 @@
             if (r.out === null && openShift(shiftsOf(k).filter(s => !smCtx.shift || s.id !== smCtx.shift.id))) {
                 $("smMsg").textContent = "This employee already has an open punch. Close that one first."; return;
             }
+            const clash = overlapping(shiftsOf(k), r.in, r.out, smCtx.shift && smCtx.shift.id, now())[0];
+            if (clash && !confirm("This overlaps another punch for " + empName(k) + ": " + fmtKey(dayKey(clash.in)) + ", " + fmtTime(clash.in) +
+                (typeof clash.out === "number" ? " → " + fmtTime(clash.out) + (dayKey(clash.out) !== dayKey(clash.in) ? " (" + fmtKey(dayKey(clash.out)) + ")" : "") : " (still on the clock)") +
+                ".\n\nSaving both counts those hours twice. To change that punch, cancel and tap Edit on it instead.\n\nSave anyway?")) return;
             const btn = $("smSave");
             btn.disabled = true;
             try {
@@ -1878,7 +1882,7 @@
             const r = requestsAll[k] && requestsAll[k][id];
             if (!r) return;
             if (!employees[k]) { toast("That employee isn't on the time clock any more.", true); return; }
-            const shift = r.shiftId ? findShift(k, r.shiftId) : null;
+            let shift = r.shiftId ? findShift(k, r.shiftId) : null;
             if (r.kind === "accident" && !shift) {
                 // Already deleted (that week's punches are loaded and it isn't there), or the driver didn't say which punch
                 if (!r.shiftId || (shiftsByEk[k] && rangeStart !== null && keyToEpoch(r.day) >= rangeStart)) {
@@ -1891,6 +1895,15 @@
                 // Older than the punches loaded: load that week first
                 viewWeek = weekStartKey(r.day, settings.weekStart); syncShiftListeners();
                 toast("Loading that week's punches… tap Fix it again in a moment."); return;
+            }
+            if (!r.shiftId && r.kind !== "both" && r.kind !== "accident" && r.day) {
+                // Sent without a punch (none started that day, or "Something else"): fix the driver's punch on that day,
+                // so saving changes it instead of adding a second punch that counts the same hours again
+                if (rangeStart === null || keyToEpoch(addDaysKey(r.day, -1)) < rangeStart) {
+                    viewWeek = weekStartKey(r.day, settings.weekStart); syncShiftListeners();
+                    toast("Loading that week's punches… tap Fix it again in a moment."); return;
+                }
+                shift = punchForFix(shiftsOf(k), r.day, r.kind);
             }
             const useShift = shift && r.kind !== "both";
             openShiftModal(k, useShift ? shift.id : null, { ek: k, id: id });
