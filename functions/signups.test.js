@@ -35,3 +35,34 @@ test('an admin email is refused unless it is on the time clock', () => {
 test('emailKey matches the time clock record key', () => {
   assert.strictEqual(G.emailKey(' Matt.Smith@EC.com '), 'matt,smith@ec,com');
 });
+
+test('the security log entry for a refused @ec.com sign-up', () => {
+  const event = {
+    data: { uid: 'u1', email: ' GREWS@EC.COM ', providerData: [{ providerId: 'password' }] },
+    ipAddress: '203.0.113.9',
+    userAgent: 'Mozilla/5.0',
+    additionalUserInfo: { providerId: 'password', isNewUser: true }
+  };
+  assert.deepStrictEqual(G.signupLogEntry(event, false, 1000), {
+    at: 1000, type: 'signup', ok: false, reason: 'Not on the time clock',
+    email: 'grews@ec.com', phone: null, uid: 'u1', provider: 'password',
+    ip: '203.0.113.9', ua: 'Mozilla/5.0', staff: true
+  });
+});
+
+test('the security log entry for an allowed customer sign-up', () => {
+  const e = G.signupLogEntry({ data: { uid: 'u2', email: 'a@gmail.com', providerData: [{ providerId: 'google.com' }] } }, true, 5);
+  assert.strictEqual(e.ok, true);
+  assert.strictEqual(e.reason, null);
+  assert.strictEqual(e.provider, 'google.com');
+  assert.strictEqual(e.staff, false);
+  assert.strictEqual(e.ip, null);
+});
+
+test('a phone-only sign-up and long text are saved safely', () => {
+  const e = G.signupLogEntry({ data: { uid: 'u3', phoneNumber: '+12045550100' }, userAgent: 'x'.repeat(1000) }, true, 5);
+  assert.strictEqual(e.email, null);
+  assert.strictEqual(e.phone, '+12045550100');
+  assert.strictEqual(e.ua.length, 300);
+  assert.strictEqual(G.signupLogEntry(undefined, true, 5).email, null);
+});

@@ -410,6 +410,22 @@ vCPU-seconds and 2 million requests a month per billing account). There is no Cl
 Scheduler job or Cloud Tasks timer any more. To see the real numbers, check Google Cloud
 console → **Billing → Reports**, filtered by service.
 
+## Failed and refused sign-ins
+
+Both pages report sign-ins that didn't get through to the E&C security log (the
+Security section of the usage page), because Firebase runs no server code when a
+password is wrong:
+
+- a wrong password, unknown email, disabled account or too many tries (the Firebase
+  error code is sent, never the password);
+- an email that isn't an admin typed into the admin panel's sign-in;
+- a signed-in account turned away: not on the time clock, turned off, or not an admin
+  (admin panel). It's sent with the account's sign-in token so the server can check who
+  it really was.
+
+The reports go to the `auditSignInReport` function in the usage repo. Until that is
+deployed they fail quietly, and nothing about signing in changes either way.
+
 ## Only admins can make @ec.com sign-ins
 
 @ec.com addresses aren't real inboxes, so nobody can prove they own one by email.
@@ -429,6 +445,11 @@ admin, so if an admin's sign-in is ever deleted, another admin adds that email u
 Every other @ec.com sign-up is refused with *"This email can only be added by an E&C
 admin."* and logged as *"Refused a new @ec.com sign-in"*. Customer addresses aren't
 affected, and accounts that already exist keep working.
+
+Every new account, allowed or refused, is also saved to the E&C security log
+(`security_log/events`, type `signup`) with its email, sign-in method, IP address and
+browser, for the Security section of the usage page. If the log can't be saved the
+sign-up goes ahead as normal and the entry is written to the functions log instead.
 
 **Adding someone works as before.** **Add employee** saves their record first and then
 creates the sign-in, so the check lets it through. Staff who aren't on the time clock

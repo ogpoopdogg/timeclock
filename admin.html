@@ -865,7 +865,7 @@
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
-            AUTH_MESSAGES, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
+            AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             oilState, sentLate, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
@@ -930,10 +930,10 @@
             const msg = $("gateMsg"), btn = $("gateBtn");
             const email = $("gEmail").value.trim(), pass = $("gPass").value;
             if (!email || !pass) { msg.textContent = "Enter your email and password."; return; }
-            if (!isAdminEmail(email)) { msg.textContent = "This account isn't the time clock administrator."; return; }
+            if (!isAdminEmail(email)) { reportFailedSignIn(email, { code: "app/not-admin-email" }); msg.textContent = "This account isn't the time clock administrator."; return; }
             msg.textContent = ""; btn.disabled = true; btn.textContent = "Signing in…";
             try { await signInWithEmailAndPassword(auth, email, pass); }
-            catch (err) { msg.textContent = AUTH_MESSAGES[err && err.code] || "Sign-in failed. Please try again."; $("gPass").value = ""; }
+            catch (err) { reportFailedSignIn(email, err); msg.textContent = AUTH_MESSAGES[err && err.code] || "Sign-in failed. Please try again."; $("gPass").value = ""; }
             btn.disabled = false; btn.textContent = "Sign in";
         });
         $("gateSwitch").addEventListener("click", () => signOut(auth));
@@ -957,6 +957,7 @@
                 return;
             }
             if (!isAdminEmail(u.email)) {
+                reportRefusedSignIn(u, "Not a time clock admin");
                 $("gateTitle").textContent = "Admin only";
                 $("gateSub").textContent = "You're signed in as " + u.email + ". Employees punch in at the time clock and can't change times here.";
                 $("gateFields").hidden = true; $("gateSwitch").hidden = false;
