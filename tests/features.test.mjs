@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, punchForFix, overlapping } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -165,4 +165,37 @@ test('once a GPS unit is named after a van without GPS, the GPS unit replaces it
   assert.deepEqual(vehicleList({}, vans).map(v => v.id), ['van_a']);
   assert.deepEqual(vehicleList({ g12: { name: '12', deviceId: 'x' } }, vans).map(v => v.id), ['g12']);
   assert.deepEqual(vehicleList({ g12: { name: 'VAN 12', deviceId: 'x' } }, vans).map(v => v.id), ['g12']);
+});
+
+test('fix a punch: a punch that ran past midnight is found from the day it ended', () => {
+  const sun = keyToEpoch('2026-10-18', '15:00'), mon = keyToEpoch('2026-10-19', '00:40');
+  const late = { id: 'late', in: sun, out: mon };
+  const list = [late];
+  // Picked the day they punched out: still the same punch, not a new one
+  assert.strictEqual(punchForFix(list, '2026-10-19', 'out'), late);
+  assert.strictEqual(punchForFix(list, '2026-10-19', 'wrong'), late);
+  assert.strictEqual(punchForFix(list, '2026-10-18', 'wrong'), late);
+  // A missed punch in on Monday isn't Sunday's punch
+  assert.strictEqual(punchForFix(list, '2026-10-19', 'in'), null);
+  // A punch that started that day wins over the overnight one
+  const monShift = { id: 'mon', in: keyToEpoch('2026-10-19', '09:00'), out: keyToEpoch('2026-10-19', '17:00') };
+  assert.strictEqual(punchForFix([late, monShift], '2026-10-19', 'wrong'), monShift);
+  // Still on the clock from the day before
+  const open = { id: 'open', in: sun };
+  assert.strictEqual(punchForFix([open], '2026-10-19', 'out'), open);
+  // Nothing near that day
+  assert.strictEqual(punchForFix(list, '2026-10-21', 'out'), null);
+});
+
+test('fix a punch: a punch that shares time with another is caught', () => {
+  const a = { id: 'a', in: t0, out: t0 + 16 * H }; // 8:00 to 0:00
+  const b = { id: 'b', in: t0 + 10 * H, out: t0 + 11 * H };
+  assert.deepStrictEqual(overlapping([a, b], t0, t0 + 9 * H, null, t0 + 20 * H).map(s => s.id), ['a']);
+  // Editing a punch doesn't clash with itself
+  assert.deepStrictEqual(overlapping([a], t0, t0 + 9 * H, 'a', t0 + 20 * H), []);
+  // Back to back is fine
+  assert.deepStrictEqual(overlapping([a], t0 + 16 * H, t0 + 18 * H, null, t0 + 20 * H), []);
+  // One still on the clock runs until now
+  assert.deepStrictEqual(overlapping([{ id: 'o', in: t0 }], t0 + 2 * H, t0 + 3 * H, null, t0 + 5 * H).map(s => s.id), ['o']);
+  assert.deepStrictEqual(overlapping([{ id: 'o', in: t0 + 4 * H }], t0, null, null, t0 + 5 * H).map(s => s.id), ['o']);
 });

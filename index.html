@@ -835,7 +835,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue,
+            vanKey, oilPlanFor, oilDue, punchForFix,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -1860,10 +1860,10 @@
             if (kind === "wrong" && !inTime && !outTime) return formFail("Enter the right time.");
             if (kind === "other" && !note) return formFail("Tell the office what needs fixing.");
             if (kind === "accident" && !$("fxShift").value) return formFail("There's no punch on that day. Pick the day you punched in by accident.");
-            // The shift it's about, when there is one that day
-            const onDay = shifts.filter(x => !x.pending && dayKey(x.in) === day);
-            const shift = kind === "out" ? (onDay.filter(x => typeof x.out !== "number").pop() || onDay[onDay.length - 1])
-                : kind === "wrong" || kind === "in" ? onDay[0] : kind === "accident" ? onDay.find(x => x.id === $("fxShift").value) : null;
+            // The shift it's about, when there is one that day (or one from the day before that ran past midnight)
+            const saved = shifts.filter(x => !x.pending);
+            const shift = kind === "out" || kind === "wrong" || kind === "in" ? punchForFix(saved, day, kind)
+                : kind === "accident" ? saved.find(x => x.id === $("fxShift").value && dayKey(x.in) === day) : null;
             if (kind === "accident" && !shift) return formFail("That punch isn't there any more. Pick it again.");
             const req = { at: serverTimestamp(), kind: kind, day: day, note: note, status: "open" };
             if (inTime) req.inTime = inTime;
