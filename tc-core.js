@@ -528,22 +528,23 @@ function sendReport(report) {
     } catch (e) { /* never get in the way of signing in */ }
 }
 
-/** Reports a sign-in Firebase refused (wrong password, unknown email, too many tries…). */
-export function reportFailedSignIn(email, err) {
+/** Reports a sign-in Firebase refused (wrong password, unknown email, too many tries…).
+    app: the app reporting it, when it isn't the time clock (Garage loads this file too). */
+export function reportFailedSignIn(email, err, app) {
     const code = String((err && err.code) || "unknown");
     if (REPORT_QUIET.has(code)) return;
-    sendReport({ kind: "failed", email: normEmail(email).slice(0, 200), code });
+    sendReport(Object.assign({ kind: "failed", email: normEmail(email).slice(0, 200), code }, app ? { app } : {}));
 }
 
 const reportedRefusals = new Set();
 /** Reports a signed-in account this page turned away (once per account and reason per page load). */
-export async function reportRefusedSignIn(user, reason) {
+export async function reportRefusedSignIn(user, reason, app) {
     const key = (user && user.uid) + "|" + reason;
     if (!user || reportedRefusals.has(key)) return;
     reportedRefusals.add(key);
     let idToken = null;
     try { idToken = await user.getIdToken(); } catch (e) { /* sent without it; the server marks it unverified */ }
-    sendReport({ kind: "refused", email: normEmail(user.email).slice(0, 200), reason, idToken });
+    sendReport(Object.assign({ kind: "refused", email: normEmail(user.email).slice(0, 200), reason, idToken }, app ? { app } : {}));
 }
 
 export const AUTH_MESSAGES = {
