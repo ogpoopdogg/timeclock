@@ -18,7 +18,9 @@
 //                                           | "admin" (changed by an admin: the van, or none when vehicleId is missing)
 //       tap / outTap                     the phone's time when the punch button was pressed (server-corrected). The
 //                                        punch itself is the server's time when it arrived, so a punch sent late
-//                                        (no signal) shows both; see sentLate()
+//                                        (no signal) shows both; see sentLate(). A late punch out counts from outTap
+//                                        (countedOut()); a late punch in waits for the office (lateSeen, or "Use the phone's time")
+//       lateSeen                         the office kept the server's time for a late punch in: { by, at }
 //       swapHint                         set by the server when another driver takes this driver's van:
 //                                        { at, by, vehicleId, vehicleName, suggestId, suggestName }
 //       oil                              the oil check: { done, at, how, seenBy, seenAt } or { due: false, at } when
@@ -213,7 +215,7 @@ export function roundPunch(ts) {
 }
 
 export function shiftMs(s, now) {
-    const end = typeof s.out === "number" ? s.out : now;
+    const end = typeof s.out === "number" ? countedOut(s) : now;
     return Math.max(0, roundPunch(end) - roundPunch(s.in));
 }
 
@@ -352,6 +354,13 @@ export function sentLate(s) {
     const late = (at, tap) => typeof at === "number" && typeof tap === "number" && at - tap > SENT_LATE_MS ? tap : null;
     return { in: late(s && s.in, s && s.tap), out: late(s && s.out, s && s.outTap) };
 }
+// The punch out the hours count from: a punch out that arrived late counts from when it was pressed (never before the
+// punch in). That can only lower the hours, so it can't be used to gain time. A late punch in counts from when it
+// arrived until the office says otherwise (Admin → Inbox → Late punches), because a phone's time could be changed.
+export function countedOut(s) {
+    const tap = sentLate(s).out;
+    return tap === null ? s.out : Math.max(s.in, tap);
+}
 
 // ---------- Distances ----------
 // Metres between two { lat, lng } points (haversine)
@@ -419,7 +428,7 @@ export function vanHistory(shift) {
 // whole shift, so its van gets all of it. Shifts with no history count the shift's van for the whole shift.
 export function vanTime(shift, now) {
     if (!shift || typeof shift.in !== "number") return [];
-    const end = typeof shift.out === "number" ? shift.out : now;
+    const end = typeof shift.out === "number" ? countedOut(shift) : now;
     const list = vanHistory(shift);
     const fix = list.filter(v => v.how === "admin" && v.at >= end).pop();
     const whole = (id, name) => id ? [{ vehicleId: id, vehicleName: name || id, ms: Math.max(0, end - shift.in) }] : [];

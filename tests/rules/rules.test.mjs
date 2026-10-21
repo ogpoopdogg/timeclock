@@ -95,6 +95,13 @@ test('B3: the time pressed on the phone goes with the punch, but not from more t
   await assertFails(punchIn(mattDb(), matt, 's1', { tap: Date.now() - 8 * DAY }));
 });
 
+test('late punch in: only an admin can keep the server\'s time or move it to the time pressed', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1', { tap: Date.now() - 2 * 3600000 }));
+  await assertFails(mattDb().ref(`timeclock/shifts/${matt}/s1/lateSeen`).set({ by: 'matt@ec.com', at: NOW }));
+  await assertSucceeds(adminDb().ref(`timeclock/shifts/${matt}/s1/lateSeen`).set({ by: 'justin@ec.com', at: NOW }));
+  await assertSucceeds(adminDb().ref(`timeclock/shifts/${matt}/s1`).update({ in: Date.now() - 2 * 3600000, edited: { by: 'justin@ec.com', at: NOW, note: 'x' } }));
+});
+
 test('B3: the punch-out phone time can be added once, just after the punch out', async () => {
   const db = mattDb();
   await assertSucceeds(punchIn(db, matt, 's1'));

@@ -427,6 +427,8 @@
         .inbox-col h3 { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
         .inbox-col h3 .tab-count { background: rgba(255, 204, 0, 0.16); color: var(--yellow); }
         .inbox-list { display: flex; flex-direction: column; gap: 10px; }
+        .inbox-col .ib-late-head { margin-top: 22px; }
+        .inbox-col .ib-late-hint { margin: -4px 0 10px; color: var(--muted); font-size: 0.88rem; }
         .inbox-item {
             padding: 14px; border-radius: 14px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
             animation: panelIn 0.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms);
@@ -610,11 +612,14 @@
         <!-- Inbox -->
         <section class="panel" id="panel-inbox" role="tabpanel" hidden>
             <div class="panel-head">
-                <div><h1 class="panel-title">Inbox</h1><p class="panel-sub">Punch fixes drivers asked for.</p></div>
+                <div><h1 class="panel-title">Inbox</h1><p class="panel-sub">Punch fixes drivers asked for, and punches sent late with no signal.</p></div>
                 <div class="panel-actions"><label class="switch"><input type="checkbox" id="inboxHandled"><span class="track"></span>Show handled</label></div>
             </div>
             <div class="inbox-grid">
-                <div class="inbox-col"><h3>Punch fixes <span class="tab-count" id="ibFixCount">0</span></h3><div class="inbox-list" id="ibFixes"></div></div>
+                <div class="inbox-col"><h3>Punch fixes <span class="tab-count" id="ibFixCount">0</span></h3><div class="inbox-list" id="ibFixes"></div>
+                    <h3 class="ib-late-head">Late punches <span class="tab-count" id="ibLateCount">0</span></h3>
+                    <p class="hint ib-late-hint">Punch ins made with no signal reach the server late, and count from when they arrived until you choose here.</p>
+                    <div class="inbox-list" id="ibLate"></div></div>
                 <div class="inbox-col"><h3>Vehicle checks</h3><div class="card"><p class="hint">Problems drivers report at Vehicle Check and the oil checks are in Garage now, with everything else about each vehicle.</p><a class="btn primary" href="../garage/garage.html#look">Open Garage</a></div></div>
             </div>
         </section>
@@ -866,7 +871,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, sentLate, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping
+            oilState, sentLate, countedOut, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -1226,8 +1231,8 @@
                     const split = byShift[s.id];
                     if (split && split.overtime >= 60000) tags.push('<span class="tag ot">OT ' + esc(fmtHours(split.overtime)) + "</span>");
                     const late = sentLate(s);
-                    if (late.in) tags.push('<span class="tag late" title="No signal: the punch in reached the server at ' + esc(fmtTime(s.in)) + '">Punch in sent late · pressed ' + esc(fmtTime(late.in)) + "</span>");
-                    if (late.out) tags.push('<span class="tag late" title="No signal: the punch out reached the server at ' + esc(fmtTime(s.out)) + '">Punch out sent late · pressed ' + esc(fmtTime(late.out)) + "</span>");
+                    if (late.in) tags.push('<span class="tag late" title="No signal: the punch in reached the server at ' + esc(fmtTime(s.in)) + '. It counts from then until you choose in the Inbox (Late punches).">Punch in sent late · pressed ' + esc(fmtTime(late.in)) + "</span>");
+                    if (late.out) tags.push('<span class="tag late" title="No signal: the punch out reached the server at ' + esc(fmtTime(s.out)) + '. The hours count to when it was pressed.">Punch out sent late · counted from ' + esc(fmtTime(late.out)) + "</span>");
                     const oil = oilTag(s);
                     if (oil) tags.push(oil);
                     if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
@@ -1236,7 +1241,7 @@
                     return '<tr data-row="' + esc(e.ek + "/" + s.id) + '">' +
                         '<td class="day">' + esc(fmtKey(dayKey(s.in))) + "</td>" +
                         '<td data-l="In" class="when">' + esc(fmtTime(s.in)) + countedLine(s.in) + locLine(e.ek, s.id, "in", s.inLoc, s.inAddr, s.inAddrErr) + "</td>" +
-                        '<td data-l="Out" class="when">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "") + countedLine(s.out) +
+                        '<td data-l="Out" class="when">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "") + countedLine(s.out, countedOut(s)) +
                             locLine(e.ek, s.id, "out", s.outLoc, s.outAddr, s.outAddrErr)) + "</td>" +
                         '<td class="num">' + esc(fmtHours(shiftMs(s, t))) + "</td>" +
                         '<td data-l="GPS" class="vancell">' + vanCell(e.ek, s) + "</td>" +
@@ -1268,9 +1273,11 @@
 
         // The address under a punch time; tap it for the map. Punches from before locations were saved show nothing.
         // Punches count to the nearest 15 minutes; show the counted time when it differs from the punch
-        function countedLine(ts) {
-            if (typeof ts !== "number" || fmtTime(roundPunch(ts)) === fmtTime(ts)) return "";
-            return '<div class="counted" title="Hours are counted in 15-minute blocks">Counts as ' + esc(fmtTime(roundPunch(ts))) + "</div>";
+        // (from: the time the hours count from, when it isn't the punch itself: a punch out sent late counts from when it was pressed)
+        function countedLine(ts, from) {
+            const c = roundPunch(typeof from === "number" ? from : ts);
+            if (typeof ts !== "number" || fmtTime(c) === fmtTime(ts)) return "";
+            return '<div class="counted" title="Hours are counted in 15-minute blocks">Counts as ' + esc(fmtTime(c)) + "</div>";
         }
         function locLine(k, shiftId, which, loc, addr, addrErr) {
             if (!loc) return "";
@@ -1522,7 +1529,7 @@
                         wk.ms += split.regular + split.overtime; wk.reg += split.regular; wk.ot += split.overtime;
                         rows.push([name, e.email, dayKey(s.in), fmtTime(s.in),
                             typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
-                            fmtTime(roundPunch(s.in)), typeof s.out === "number" ? fmtTime(roundPunch(s.out)) : "",
+                            fmtTime(roundPunch(s.in)), typeof s.out === "number" ? fmtTime(roundPunch(countedOut(s))) : "",
                             fmtHours(shiftMs(s, t)), fmtHours(split.regular), fmtHours(split.overtime),
                             s.vehicleName || (s.shop ? "Shop" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
                             place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]);
@@ -1582,10 +1589,12 @@
             const sched = !shift && emp ? scheduleFor(emp, today) : null;
             $("smInDate").value = shift ? dayKey(shift.in) : today;
             $("smInTime").value = shift ? hhmmOf(shift.in) : (sched ? sched.start : "08:00");
-            const hasOut = shift ? typeof shift.out === "number" : true;
+            // A new punch for today before 4:30 PM starts as still on the clock (a 4:30 PM punch out would be in the future)
+            const hasOut = shift ? typeof shift.out === "number" : keyToEpoch(today, "16:30") <= t;
             $("smOpen").checked = !hasOut;
             $("smOutDate").value = shift && hasOut ? dayKey(shift.out) : $("smInDate").value;
             $("smOutTime").value = shift && hasOut ? hhmmOf(shift.out) : "16:30";
+            smInWas = $("smInDate").value;
             $("smGps").innerHTML = gpsOptions(shift && shift.vehicleId);
             $("smGps").value = shift && shift.vehicleId ? shift.vehicleId : shift && shift.shop ? SHOP_OPTION : "";
             $("smNote").value = "";
@@ -1597,7 +1606,7 @@
             if (late.in || late.out) {
                 $("smLate").innerHTML = "No signal when the driver punched, so the server got it late. The phone says " +
                     [late.in ? "in at <strong>" + esc(fmtTime(late.in)) + "</strong>" : "", late.out ? "out at <strong>" + esc(fmtTime(late.out)) + "</strong>" : ""].filter(Boolean).join(" and ") +
-                    '.<button type="button" class="copy-link" id="smUseTap">Use the phone\'s time' + (late.in && late.out ? "s" : "") + "</button>";
+                    "." + (late.out ? " The punch out already counts from then." : "") + '<button type="button" class="copy-link" id="smUseTap">Use the phone\'s time' + (late.in && late.out ? "s" : "") + "</button>";
                 $("smUseTap").addEventListener("click", () => {
                     if (late.in) { $("smInDate").value = dayKey(late.in); $("smInTime").value = hhmmOf(late.in); }
                     if (late.out) { $("smOutDate").value = dayKey(late.out); $("smOutTime").value = hhmmOf(late.out); }
@@ -1615,8 +1624,15 @@
         }
         $("smOpen").addEventListener("change", syncOutFields);
         $("smEmp").addEventListener("change", () => { if (smCtx && !smCtx.shift) smCtx.ek = $("smEmp").value; });
+        let smInWas = null; // the punch-in date before the last change, so the punch-out date moves with it
         ["smInDate", "smInTime", "smOutDate", "smOutTime"].forEach(id => $(id).addEventListener("input", () => {
-            if (id === "smInDate" && $("smOutDate").value < $("smInDate").value) $("smOutDate").value = $("smInDate").value;
+            if (id === "smInDate") {
+                const inDate = $("smInDate").value;
+                if ($("smOutDate").value < inDate || $("smOutDate").value === smInWas) $("smOutDate").value = inDate;
+                smInWas = inDate;
+                // A new punch moved to an earlier day: that shift is over, so it gets a punch out
+                if (smCtx && !smCtx.shift && inDate && inDate < dayKey(now()) && $("smOpen").checked) { $("smOpen").checked = false; syncOutFields(); return; }
+            }
             updateCalc();
         }));
 
@@ -1733,6 +1749,8 @@
                     u[base + "/vans/" + push(ref(db, base + "/vans")).key] = entry;
                 }
                 if (!r.out && beforeOut !== null) ["outLoc", "outAddr", "outAddrErr", "outTap"].forEach(f => put(f, null)); // reopened
+                // A new punch out time from the office replaces the phone's (a late punch out would otherwise still count from it)
+                else if (r.out && beforeOut !== null && beforeOut !== r.out && typeof before.outTap === "number") put("outTap", null);
                 if (before.swapHint && (r.out || vehicleId || shop)) put("swapHint", null); // no van swap needed any more
                 put("edited", edited);
                 data = Object.assign({}, before, { in: r.in, out: r.out || null }, vanChanged ? { vehicleId: vehicleId, vehicleName: vehicleName, shop: shop || null } : {});
@@ -1842,16 +1860,20 @@
         // A driver's own punch out also saves outTap; without it, the office closed the shift and the driver was never asked.
         function oilMissWhy(s) {
             if (s.oil && s.oil.done === false) return "Said at punch out they didn't check it";
-            if (typeof s.outTap !== "number" && (s.src === "admin" || s.edited)) return "Punched out by the office, so they weren't asked";
+            if (typeof s.outTap !== "number" && !s.outLoc && (s.src === "admin" || s.edited)) return "Punched out by the office, so they weren't asked";
             return "Didn't answer at punch out";
         }
         function inboxData() {
             const fixes = [];
             for (const [k, list] of Object.entries(requestsAll)) for (const [id, r] of Object.entries(list || {})) if (r && r.kind) fixes.push(Object.assign({ ek: k, id: id }, r));
-            return { fixes: fixes.sort((a, b) => (b.at || 0) - (a.at || 0)), openFixes: fixes.filter(r => r.status === "open").length };
+            // Punch ins that reached the server late (no signal), in the punches loaded (the last few weeks), until the office chooses
+            const lateIns = [];
+            for (const [k, list] of Object.entries(shiftsByEk)) if (employees[k]) for (const s of list) if (sentLate(s).in && !s.lateSeen) lateIns.push({ ek: k, s: s });
+            lateIns.sort((a, b) => b.s.in - a.s.in);
+            return { fixes: fixes.sort((a, b) => (b.at || 0) - (a.at || 0)), openFixes: fixes.filter(r => r.status === "open").length, lateIns: lateIns };
         }
         function renderInboxCount() {
-            const n = inboxData().openFixes;
+            const d = inboxData(), n = d.openFixes + d.lateIns.length;
             $("inboxCount").hidden = !n;
             $("inboxCount").textContent = n;
             requestAnimationFrame(moveInk);
@@ -1871,6 +1893,34 @@
                         '<button type="button" class="btn sm ghost" data-decline="fix|' + esc(r.ek + "|" + r.id) + '">Decline</button></div>') + "</div>";
             });
             $("ibFixes").innerHTML = fixes.join("") || '<div class="inbox-empty">No punch fixes waiting.</div>';
+            $("ibLateCount").textContent = d.lateIns.length;
+            $("ibLate").innerHTML = d.lateIns.map(({ ek: k, s }, i) => {
+                const tap = sentLate(s).in;
+                return '<div class="inbox-item" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(k)) + '</span><span class="ii-when">' + esc(fmtKey(dayKey(tap), true)) + "</span></div>" +
+                    '<div class="ii-what">Punch in sent late (no signal)</div>' +
+                    '<div class="ii-detail">Pressed ' + esc(fmtTime(tap)) + " · reached the server " + esc(fmtTime(s.in)) + (dayKey(s.in) !== dayKey(tap) ? " on " + esc(fmtKey(dayKey(s.in))) : "") +
+                    ". It counts from " + esc(fmtTime(s.in)) + " until you choose.</div>" +
+                    '<div class="ii-actions"><button type="button" class="btn sm primary" data-late-use="' + esc(k + "|" + s.id) + '">Use the phone\'s time</button>' +
+                    '<button type="button" class="btn sm ghost" data-late-keep="' + esc(k + "|" + s.id) + '">Keep the server\'s time</button></div></div>';
+            }).join("") || '<div class="inbox-empty">No late punches.</div>';
+        }
+
+        // A late punch in: count it from when it was pressed (logged like any edit), or keep the server's time
+        async function useLateTap(k, id) {
+            const s = findShift(k, id), tap = s && sentLate(s).in;
+            if (!tap) return;
+            const clash = overlapping(shiftsOf(k), tap, typeof s.out === "number" ? s.out : null, id, now())[0];
+            if (clash && !confirm("Starting at " + fmtTime(tap) + " overlaps another punch for " + empName(k) + ": " + fmtKey(dayKey(clash.in)) + ", " + fmtTime(clash.in) +
+                ".\n\nSaving both counts those hours twice. Use the phone's time anyway?")) return;
+            const note = "Used the time pressed on the phone (no signal)";
+            await update(ref(db, P.shifts + "/" + k + "/" + id), { in: tap, edited: { by: user.email, at: serverTimestamp(), note: note } });
+            flashRow = k + "/" + id;
+            await logAudit(k, id, "edit", s, Object.assign({}, s, { in: tap }), note);
+            toast(empName(k) + "'s punch in now counts from " + fmtTime(tap) + ".");
+        }
+        async function keepLateIn(k, id) {
+            await update(ref(db, P.shifts + "/" + k + "/" + id), { lateSeen: { by: user.email, at: serverTimestamp() } });
+            toast("Kept the server's time.");
         }
         $("inboxHandled").addEventListener("change", renderInbox);
 
@@ -1918,12 +1968,22 @@
             }
             $("smNote").value = ("Driver asked: " + (FIX_KINDS[r.kind] || "") + (r.note ? ". " + r.note : "")).slice(0, 300);
             if (r.kind === "accident") $("smSub").textContent += ". The driver says they punched in by accident: tap Delete punch to remove it.";
+            smInWas = $("smInDate").value;
             syncOutFields();
         }
 
         $("panel-inbox").addEventListener("click", async e => {
             const fix = e.target.closest("[data-fix]");
             if (fix) { const [k, id] = fix.dataset.fix.split("|"); fixFromRequest(k, id); return; }
+            const late = e.target.closest("[data-late-use], [data-late-keep]");
+            if (late) {
+                const [k, id] = (late.dataset.lateUse || late.dataset.lateKeep).split("|");
+                late.disabled = true;
+                try { await (late.dataset.lateUse ? useLateTap(k, id) : keepLateIn(k, id)); }
+                catch (err) { toast("Couldn't save: " + errText(err), true); }
+                late.disabled = false;
+                return;
+            }
             const dec = e.target.closest("[data-decline]");
             if (dec) {
                 const [type, k, id] = dec.dataset.decline.split("|");

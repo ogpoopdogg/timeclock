@@ -822,7 +822,20 @@
         <span id="netText"></span>
     </div>
 
+    <script>
+        // A phone too old for the time clock (Safari before 15, for one) can't run the code below and would show
+        // "Loading time clock…" forever. Say what to do instead. The code below puts the spinner back if it starts after all.
+        setTimeout(function () {
+            if (window.tcStarted) return;
+            var boot = document.getElementById("bootScreen");
+            window.tcBootHtml = boot.innerHTML;
+            boot.innerHTML = '<div class="boot"><div style="max-width:420px;text-align:center">The time clock is taking too long to start. Check your signal and open it again.' +
+                '<br><br>If it never starts, this phone\'s software may be too old for it. On an iPhone, update it in Settings → General → Software Update, or ask the office.</div></div>';
+        }, 10000);
+    </script>
     <script type="module">
+        window.tcStarted = true;
+        if (window.tcBootHtml) document.getElementById("bootScreen").innerHTML = window.tcBootHtml;
         let core;
         try {
             core = await import("./tc-core.js");
@@ -834,7 +847,7 @@
         const {
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
-            fmtClockDur, fmtHours, shiftList, openShift, weekTotals, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
+            fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
             vanKey, oilPlanFor, oilDue, punchForFix,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn
         } = core;
@@ -903,6 +916,9 @@
         });
 
         async function doSignOut() {
+            // A punch saved with no signal is only sent from this phone, by this person
+            if (loadPending().some(p => p.kind === "in" || p.kind === "out" || p.kind === "oil") &&
+                !confirm("A punch saved on this phone hasn't been sent yet (no signal). If you sign out now, it's only sent when you sign in on this phone again.\n\nBest to stay signed in until you have signal. Sign out anyway?")) return;
             if (current() && !confirm("You're still punched in. Sign out anyway? (You stay on the clock.)")) return;
             clearOfflineCopy();
             await signOut(auth);
@@ -1154,9 +1170,13 @@
             const when = (ts, k) => esc(fmtTime(ts)) + (dayKey(ts) !== k ? " <small>(" + esc(fmtKey(dayKey(ts))) + ")</small>" : "");
             const rows = d.shifts.map(s => {
                 const k = dayKey(s.in), closed = typeof s.out === "number";
-                return '<div class="dd-shift"><div class="dd-times">In <b>' + when(s.in, k) + "</b> · Out <b>" + (closed ? when(s.out, k) : "on the clock") + "</b></div>" +
+                // A punch out sent late (no signal) counts from when it was pressed
+                const notes = [s.pending ? "Saved on this phone, sent when there's signal." : "",
+                    !s.pending && closed && sentLate(s).out ? "No signal at punch out: counted from when you pressed it." : "",
+                    s.src === "admin" ? "Added by the office." : s.edited ? "Changed by the office." : ""].filter(Boolean);
+                return '<div class="dd-shift"><div class="dd-times">In <b>' + when(s.in, k) + "</b> · Out <b>" + (closed ? when(countedOut(s), k) : "on the clock") + "</b></div>" +
                     '<div class="dd-hrs">' + esc(fmtDur(byShift[s.id].regular + byShift[s.id].overtime)) + "</div>" +
-                    (s.pending ? '<div class="dd-note">Saved on this phone, sent when there\'s signal.</div>' : "") + "</div>";
+                    notes.map(n => '<div class="dd-note">' + esc(n) + "</div>").join("") + "</div>";
             }).join("");
             return rows + '<div class="dd-total"><span>Hours that day</span><strong>' + esc(fmtDur(d.ms)) + "</strong></div>" +
                 (d.overtime > 0 ? '<div class="dd-split">' + esc(fmtDur(d.regular)) + " regular · " + esc(fmtDur(d.overtime)) + " overtime</div>" : "");
