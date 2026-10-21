@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, punchForFix, overlapping } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -198,4 +198,20 @@ test('fix a punch: a punch that shares time with another is caught', () => {
   // One still on the clock runs until now
   assert.deepStrictEqual(overlapping([{ id: 'o', in: t0 }], t0 + 2 * H, t0 + 3 * H, null, t0 + 5 * H).map(s => s.id), ['o']);
   assert.deepStrictEqual(overlapping([{ id: 'o', in: t0 + 4 * H }], t0, null, null, t0 + 5 * H).map(s => s.id), ['o']);
+});
+
+test('no signal: a late punch out counts from when it was pressed; a late punch in waits for the office', () => {
+  // Punch out pressed at 5:00 PM with no signal, reached the server at 7:00 AM the next day
+  const out = { id: 'a', in: t0, out: t0 + 23 * H, outTap: t0 + 9 * H };
+  assert.strictEqual(countedOut(out), t0 + 9 * H);
+  assert.strictEqual(shiftMs(out, 0), 9 * H);
+  const wk = weekTotals([out], weekDays('2026-10-09'), 0);
+  assert.deepStrictEqual([wk.total, wk.regular, wk.overtime], [9 * H, 8 * H, 1 * H]);
+  assert.deepStrictEqual(vanTime(Object.assign({ vehicleId: 'g7', vehicleName: '7' }, out), 0), [{ vehicleId: 'g7', vehicleName: '7', ms: 9 * H }]);
+  // On time (under 2 minutes), no phone time, or a phone time before the punch in: never more than the server's time
+  assert.strictEqual(countedOut({ in: t0, out: t0 + 9 * H, outTap: t0 + 9 * H - M }), t0 + 9 * H);
+  assert.strictEqual(countedOut({ in: t0, out: t0 + 9 * H }), t0 + 9 * H);
+  assert.strictEqual(countedOut({ in: t0, out: t0 + 9 * H, outTap: t0 - H }), t0);
+  // A late punch in still counts from when it reached the server
+  assert.strictEqual(shiftMs({ in: t0 + 2 * H, tap: t0, out: t0 + 9 * H }, 0), 7 * H);
 });

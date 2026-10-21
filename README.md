@@ -159,6 +159,10 @@ steps have an **It's installed** button that stops them opening by themselves (t
 Install button stays). The installed app never shows any of this. On iPhone the
 installed app may ask the person to sign in once more.
 
+**Phones too old for the app** (Safari before version 15, for one) can't run it. If the clock
+hasn't started after 10 seconds, it says to check the signal and, if it never starts, to update
+the phone's software or ask the office.
+
 **Updates are automatic.** Edit and commit the files on GitHub as usual. There's no
 version number to change, and nobody needs to reinstall or clear anything.
 - **Opening the app:** the service worker (`sw.js`) opens the app straight from the copy
@@ -216,22 +220,37 @@ open (or the next check) picks it up.
 - **Late.** If an employee is scheduled today and hasn't punched in by *start time +
   late minutes* (10 by default, **Settings → Late after**), the admin live board shows
   them as **Late**. There is no punch-in reminder on the phone (removed October 2026).
-- **Admin edits** are marked "Edited by admin" on the employee's own screen, and each
-  one is saved to the change log (`timeclock/audit`) with the reason.
+- **Admin edits** show as *Changed by the office* (or *Added by the office*) when the
+  driver taps that day in My week, and each one is saved to the change log
+  (`timeclock/audit`) with the reason.
 
 ## No signal
 
 A punch works with no signal. The app saves it on the phone right away (with the time
 it was pressed) and a bar at the top says it's waiting. It's sent when the phone is
-back online, or the next time the app is opened if it was closed first. The punch time
-is the time the server receives it; the time pressed is saved with it. When the two
-are more than 2 minutes apart, the admin timesheet shows **sent late · pressed 7:02 AM**,
-and editing that punch has a **Use the phone's time** link to set it to the time pressed.
+back online, or the next time the app is opened if it was closed first (an iPhone pauses
+the app once it's closed, so that can be hours later). The punch is saved with the time the
+server receives it, and the time pressed is saved with it. When the two are more than 2
+minutes apart:
+
+- **Punch out sent late:** the hours count to the time it was pressed (`countedOut` in
+  `tc-core.js`). That can only lower the hours, so it can't be used to gain time. The
+  timesheet shows **Punch out sent late · counted from 5:00 PM**, and the driver's My week
+  says *counted from when you pressed it*.
+- **Punch in sent late:** it counts from when it reached the server until the office
+  chooses, because a phone's time can be changed. It shows in **Admin → Inbox → Late
+  punches** (from the punches loaded, about the last three weeks): **Use the phone's time**
+  moves the punch in to the time pressed (logged like any edit), **Keep the server's time**
+  keeps it (saved as `lateSeen` on the shift). The timesheet tags it **Punch in sent late ·
+  pressed 7:02 AM**, and editing the punch also has a **Use the phone's time** link.
+
+An admin who changes a punch out's time replaces the phone's time (`outTap` is removed).
 
 Picking a vehicle needs signal, because the server decides who has which vehicle. With
 none, the vehicle picker says so, and the list loads by itself when the signal is back
 (or the driver taps **Try again**, or closes it and picks later). Signing out works with
-no signal too.
+no signal too, but while a punch is still waiting to be sent it asks first: the punch is
+only sent from that phone, once the same person signs in on it again.
 
 The clock **opens instantly**, with or without signal. The phone keeps a copy of what the
 clock screen shows: who is signed in, their punches of the last three weeks, and the
@@ -262,7 +281,7 @@ phone's very first sign-in.
   When the vehicle isn't due, nothing is asked.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
-**Admin → Inbox** lists punch fixes, with a count on the tab. **Fix it** opens the punch
+**Admin → Inbox** lists punch fixes and late punch ins (see *No signal*), with a count on the tab. **Fix it** opens the punch
 editor already filled in from the request, and saving marks the request done. It opens
 the driver's own punch for that day (or the one from the day before that ran past midnight),
 so the fix changes that punch instead of adding a second one; only *Missed a whole shift*
