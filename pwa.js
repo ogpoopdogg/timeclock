@@ -60,6 +60,7 @@ export function safariVersion(ua) {
  * Returns { registration: Promise<ServiceWorkerRegistration|null> }
  */
 export function setupPwa({ installButton, toast, isBusy }) {
+    window.tcPwaStarted = true; // the page's first lines check this (see index.html)
     const registration = "serviceWorker" in navigator
         ? navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(err => { console.warn("Service worker:", err); return null; })
         : Promise.resolve(null);

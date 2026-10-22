@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'tc-core.js'), 'utf8')
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
-fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={};\n' + src);
+fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
   cleanOilPlan, oilPlanFor, oilNextDue, oilDue, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;

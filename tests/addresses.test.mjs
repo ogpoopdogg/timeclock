@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'tc-core.js'), 'utf8')
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
-fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),getDatabase=()=>({});const firebaseConfig={},ALLOWED_EMAIL="justin@ec.com";\n' + src);
+fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={},ALLOWED_EMAIL="justin@ec.com";\n' + src);
 const { addressJobs, vanHistory, mapsLink } = await import(pathToFileURL(tmp).href);
 
 test('punch in, punch out and van swaps that have a location but no address yet', () => {
