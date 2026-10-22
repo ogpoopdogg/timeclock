@@ -170,7 +170,9 @@ version number to change, and nobody needs to reinstall or clear anything.
   server for the newest copy of every file. Only when all of them have arrived does it
   replace the saved copy, and if anything changed the app shows "Updating to the latest
   version…" and reloads by itself. The Firebase code and fonts the pages load from Google
-  are saved too.
+  are saved too. If a new version ever fails to start (a broken commit), the page reloads
+  to the next fixed version by itself as soon as the service worker has it, so phones
+  don't stay stuck on it.
 - **App left open:** `pwa.js` has the service worker check again whenever someone
   returns to the app, and every 20 minutes, and reloads the same way. It never does this in the middle of a punch or a vehicle pick,
   or while an admin edit window is open or a field is being typed in. It waits until
@@ -258,6 +260,11 @@ settings (`tc_offline` in the browser's storage, cleared on sign-out).
 The clock shows from that copy straight away, and the server's data replaces it as soon as
 it arrives. With no signal a driver can still punch. The loading spinner only shows on a
 phone's very first sign-in.
+
+Sign-in is set up without Firebase's pop-up/redirect helper (`initializeAuth` in
+`tc-core.js`): on phones that helper was downloaded from Google on every open before
+Firebase would say who is signed in, which held up the driver's data and the sending of
+punches. Only email and password sign-in is used, which doesn't need it.
 
 ## Requests, the Inbox and Reports
 

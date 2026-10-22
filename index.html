@@ -13,7 +13,13 @@
     <script>
         // sw.js says "tc-updated" once it has saved a newer version of the app; pwa.js reloads to it when it's safe.
         // Listening this early means the message isn't missed while the rest of the page is still loading.
-        if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.type === "tc-updated") window.tcUpdateReady = true; });
+        // If pwa.js still hasn't started a few seconds later, this version didn't load (a broken update, say), and
+        // nothing else would ever move the phone off it: reload to the new version straight away.
+        if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
+            if (!e.data || e.data.type !== "tc-updated") return;
+            window.tcUpdateReady = true;
+            setTimeout(() => { if (!window.tcPwaStarted) location.reload(); }, 3000);
+        });
     </script>
     <link rel="manifest" href="clock.webmanifest">
     <link rel="icon" href="favicon.ico" sizes="any">
@@ -21,6 +27,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Start loading the clock's code now, while the rest of the page is read, instead of when the script at the end asks for it -->
+    <link rel="modulepreload" href="tc-core.js">
+    <link rel="modulepreload" href="firebase-config.js">
+    <link rel="modulepreload" href="pwa.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js">
+    <!-- Firebase sign-in checks the saved sign-in with these servers on every open: connect to them early -->
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
     <style>
         :root {
             --bg: #0c0e10;

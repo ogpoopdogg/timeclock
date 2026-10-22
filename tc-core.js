@@ -40,7 +40,7 @@
 //   developer/dispatch_dashboard/drivers/{gpsId}            { name, deviceId, color, ... }
 //   developer/dispatch_dashboard/driver_nicknames/{gpsId}   "Matt"
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { getDatabase } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -49,7 +49,11 @@ import { firebaseConfig } from "./firebase-config.js";
 export const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
 
 export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+// Sign-in kept on the phone the same way getAuth() keeps it (so nobody is signed out by this), but without Google's
+// pop-up/redirect sign-in helper: on phones getAuth() downloads it (apis.google.com and an iframe from firebaseapp.com)
+// before it even says who is signed in, which held up the driver's data and the sending of punches on every open.
+// The time clock, the admin panel and Garage only sign in with an email and password, which doesn't need it.
+export const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence] });
 export const db = getDatabase(app);
 
 // Accounts that can open the admin panel. database.rules.json lists the same emails, so change both together.

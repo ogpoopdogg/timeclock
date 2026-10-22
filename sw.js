@@ -16,6 +16,9 @@ const SHELL = [
 // The Firebase code the pages import (keep the version the same as in tc-core.js, index.html and admin.html)
 const SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
 const SDK_FILES = ["firebase-app.js", "firebase-auth.js", "firebase-database.js"].map(f => SDK + f);
+// The fonts' stylesheet the pages load (keep it the same as in index.html and admin.html). Saved at install, so the
+// first open after installing doesn't wait for Google before it can show anything.
+const FONT_CSS = "https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700;800&display=swap";
 const LIBS = /^https:\/\/(www\.gstatic\.com\/firebasejs\/|fonts\.googleapis\.com\/|fonts\.gstatic\.com\/)/;
 const CODE = /(\/|\.html|\.js|\.webmanifest)$/; // files whose change is a new version of the app (not the pictures)
 const REFRESH_GAP_MS = 30 * 1000;               // look for a new version at most this often
@@ -24,7 +27,10 @@ self.addEventListener("install", event => {
     // Save an offline copy of the app (a missing file doesn't stop the install), then take over right away
     event.waitUntil(caches.open(CACHE)
         .then(cache => Promise.all(SHELL.map(url => cache.add(new Request(url, { cache: "no-cache" })).catch(() => {}))
-            .concat(SDK_FILES.map(url => cache.match(url).then(hit => hit || cache.add(url)).catch(() => {})))))
+            .concat(SDK_FILES.map(url => cache.match(url).then(hit => hit || cache.add(url)).catch(() => {})))
+            // It comes back unreadable ("opaque"), so it's saved with put (add refuses that)
+            .concat(cache.match(FONT_CSS, { ignoreVary: true }).then(hit => hit || fetch(new Request(FONT_CSS, { mode: "no-cors" }))
+                .then(res => res.ok || res.type === "opaque" ? cache.put(FONT_CSS, res) : null)).catch(() => {}))))
         .then(() => self.skipWaiting()));
 });
 
