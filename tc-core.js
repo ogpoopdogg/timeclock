@@ -549,6 +549,21 @@ export function reportFailedSignIn(email, err, app) {
     sendReport(Object.assign({ kind: "failed", email: normEmail(email).slice(0, 200), code }, app ? { app } : {}));
 }
 
+/** Reports a sign-in that worked, so the security log can show which app it was (Firebase can't tell
+    the server). Once per sign-in: reopening a page that is already signed in doesn't count. */
+export async function reportSignedIn(user, app) {
+    const t = Date.parse(user && user.metadata && user.metadata.lastSignInTime);
+    if (!t || Math.abs(Date.now() - t) > 10 * 60 * 1000) return;
+    try {
+        const key = "ecSignInReported:" + user.uid;
+        if (localStorage.getItem(key) === String(t)) return;
+        localStorage.setItem(key, String(t));
+    } catch (e) { /* no storage: report anyway, the server only names the app once */ }
+    let idToken;
+    try { idToken = await user.getIdToken(); } catch (e) { return; } // the server ignores it without a token
+    sendReport(Object.assign({ kind: "signedin", email: normEmail(user.email).slice(0, 200), idToken }, app ? { app } : {}));
+}
+
 const reportedRefusals = new Set();
 /** Reports a signed-in account this page turned away (once per account and reason per page load). */
 export async function reportRefusedSignIn(user, reason, app) {
