@@ -876,7 +876,7 @@
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
-            AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
+            AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             oilState, sentLate, countedOut, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
@@ -956,6 +956,7 @@
         }
 
         onAuthStateChanged(auth, u => {
+            if (u) reportSignedIn(u);
             stopAll();
             user = u;
             employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = [];

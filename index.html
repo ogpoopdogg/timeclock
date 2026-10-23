@@ -865,7 +865,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
             vanKey, oilPlanFor, oilDue, punchForFix,
-            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn
+            AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
             await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js");
@@ -947,6 +947,7 @@
         function listen(r, cb, onErr) { unsubs.push(onValue(r, cb, onErr)); }
 
         onAuthStateChanged(auth, u => {
+            if (u) reportSignedIn(u);
             stopListening();
             // Already showing the clock from this phone's copy for this person: keep it up while their data loads
             const keep = offlineStart && !!u && emailKey(u.email) === ek;
