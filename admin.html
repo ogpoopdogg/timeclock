@@ -141,6 +141,7 @@
 
         .panel { animation: panelIn 0.5s var(--ease-out) both; padding-bottom: 60px; }
         @keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .redraw > * { animation: none !important; } /* a list updated in place (see draw()): no fade-in again */
 
         .panel-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
         .panel-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 0.95; }
@@ -1051,6 +1052,8 @@
             tabs.forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
             ["live", "inbox", "sheets", "people", "vehicles", "reports", "settings"].forEach(p => { $("panel-" + p).hidden = p !== name; });
             moveInk();
+            // Opening a tab fades its lists in once
+            $("panel-" + name).querySelectorAll("[data-drawn]").forEach(el => { delete el.dataset.drawn; el.classList.remove("redraw"); });
             renderAll();
             try { history.replaceState(null, "", "#" + name); } catch (e) {}
         }
@@ -1073,7 +1076,32 @@
         }
         const workingList = () => empList().filter(e => e.active !== false && !e.removed); // can punch in
         const empName = k => { const e = employees[k]; return e ? displayName(e, e.email) : String(k || "").replace(/,/g, ".").split("@")[0]; };
+        const hasSchedule = e => !!e.schedule && DOW_KEYS.some(d => e.schedule[d] && e.schedule[d].start);
         function shiftsOf(k) { return shiftsByEk[k] || []; }
+
+        // The lists are drawn again on every punch and once a minute. Only replace one when something in it changed,
+        // and only fade its cards in when the tab is opened: redrawing them all with the fade-in made the page flash
+        // as if it had reloaded. key: what to compare, if not the whole html (the live board leaves out its timers).
+        function draw(el, html, key) {
+            if (key === undefined) key = html;
+            if (el.dataset.drawn === key) return;
+            el.classList.toggle("redraw", el.dataset.drawn !== undefined);
+            el.innerHTML = html;
+            el.dataset.drawn = key;
+        }
+        // The same for a list of cards, replacing only the cards that changed (the others keep their animations going)
+        function drawCards(el, cards, keys) {
+            const kids = el.children;
+            if (el.dataset.drawn !== undefined && el.dataset.cards === "1" && kids.length === cards.length) {
+                cards.forEach((html, i) => { if (kids[i].dataset.key !== keys[i]) { kids[i].outerHTML = html; kids[i].dataset.key = keys[i]; } });
+                el.classList.add("redraw");
+                el.dataset.drawn = keys.join("\n");
+                return;
+            }
+            draw(el, cards.join(""), keys.join("\n"));
+            Array.from(kids).forEach((kid, i) => { kid.dataset.key = keys[i]; });
+            el.dataset.cards = "1";
+        }
         function findShift(k, id) { return shiftsOf(k).find(s => s.id === id) || null; }
 
         function renderAll() {
@@ -1097,6 +1125,7 @@
             const todays = list.filter(s => dayKey(s.in) === today);
             const sched = scheduleFor(e, today);
             if (open) return { kind: "in", open: open, todays: todays, sched: sched };
+            if (e.active === false) return { kind: "turnedoff", todays: todays, sched: sched };
             if (todays.length) return { kind: "done", todays: todays, sched: sched };
             if (!sched) return { kind: "off", sched: null, todays: todays };
             const startTs = keyToEpoch(today, sched.start);
@@ -1108,9 +1137,11 @@
         function renderLive() {
             const t = now(), today = dayKey(t);
             const days = weekDays(weekStartKey(today, settings.weekStart));
-            // Everyone who can punch in, plus anyone turned off or removed while still on the clock (so their open shift is seen)
+            // Everyone who can punch in, anyone turned off who still has a schedule (so they aren't missed), and anyone
+            // turned off or removed while still on the clock (so their open shift is seen)
             const active = workingList();
-            const people = empList().filter(e => (e.active !== false && !e.removed) || openShift(shiftsOf(e.ek)));
+            const people = empList().filter(e => (!e.removed && (e.active !== false || hasSchedule(e))) || openShift(shiftsOf(e.ek)));
+            const turnedOff = people.filter(e => e.active === false && !e.removed && !openShift(shiftsOf(e.ek))).length;
             let on = 0, late = 0, todayMs = 0, weekMs = 0, weekOt = 0;
             const cards = people.map((e, i) => {
                 const st = liveStatus(e, t, today);
@@ -1132,6 +1163,10 @@
                             : st.open.swapHint ? '<span class="tag warn" title="' + esc((st.open.swapHint.by || "Another driver") + " took vehicle " + (st.open.swapHint.vehicleName || "")) + '">Needs vehicle swap</span>'
                             : '<span class="tag">No vehicle</span>') + oilTag(st.open) +
                         '<button type="button" class="btn sm" data-punchout="' + esc(e.ek) + '" data-id="' + esc(st.open.id) + '">Punch out</button>';
+                } else if (st.kind === "turnedoff") {
+                    state = '<div class="person-state late">Turned off</div>';
+                    detail = "Has a schedule but can't punch in. Turn on Active to let them.";
+                    foot = '<span class="tag off">Inactive</span><button type="button" class="btn sm" data-emp="' + esc(e.ek) + '">Edit</button>';
                 } else if (st.kind === "late") {
                     late++; cls = "late";
                     state = '<div class="person-state late">Not punched in</div>';
@@ -1167,15 +1202,10 @@
             $("kWeek").innerHTML = esc(fmtHours(weekMs)) + "<small>h</small>";
             $("kWeekOt").textContent = weekOt > 0 ? "incl. " + fmtHours(weekOt) + " h overtime" : "No overtime";
             $("kWeekOt").classList.toggle("has", weekOt > 0);
-            $("liveSub").textContent = people.length ? active.length + " active employees · " + fmtKey(today, true)
+            $("liveSub").textContent = people.length ? active.length + " active employees" + (turnedOff ? " · " + turnedOff + " turned off" : "") + " · " + fmtKey(today, true)
                 : "Add employees in the Employees tab to get started.";
-            const html = cards.length ? cards.join("") :
-                '<div class="empty-state"><strong>No employees yet</strong>Add your team in the Employees tab, then they can sign in to the time clock.</div>';
-            const board = $("board");
-            if (board.dataset.html !== html.replace(/data-since[^>]*>[^<]*</g, "")) {
-                board.innerHTML = html;
-                board.dataset.html = html.replace(/data-since[^>]*>[^<]*</g, "");
-            }
+            if (cards.length) drawCards($("board"), cards, cards.map(html => html.replace(/data-since[^>]*>[^<]*</g, "")));
+            else { $("board").dataset.cards = ""; draw($("board"), '<div class="empty-state"><strong>No employees yet</strong>Add your team in the Employees tab, then they can sign in to the time clock.</div>'); }
         }
 
         $("board").addEventListener("click", async e => {
@@ -1193,6 +1223,8 @@
             }
             const add = e.target.closest("[data-add-for]");
             if (add) openShiftModal(add.dataset.addFor, null);
+            const edit = e.target.closest("[data-emp]");
+            if (edit) openEmpModal(edit.dataset.emp);
         });
 
         // ---------- Timesheets ----------
@@ -1219,10 +1251,10 @@
             const filter = $("empFilter").value;
             const people = empList().filter(e => filter === "all" ? ((e.active !== false && !e.removed) || weekTotals(shiftsOf(e.ek), days, t).total > 0) : e.ek === filter);
             if (!people.length) {
-                $("sheets").innerHTML = '<div class="empty-state"><strong>No employees</strong>Add employees in the Employees tab.</div>';
+                draw($("sheets"), '<div class="empty-state"><strong>No employees</strong>Add employees in the Employees tab.</div>');
                 return;
             }
-            $("sheets").innerHTML = people.map((e, i) => {
+            draw($("sheets"), people.map((e, i) => {
                 const { byDay, byShift, total, regular, overtime } = weekTotals(shiftsOf(e.ek), days, t);
                 const name = displayName(e, e.email);
                 const strip = days.map(k => {
@@ -1264,7 +1296,7 @@
                     '<div class="day-strip">' + strip + "</div>" +
                     (rows ? '<table class="punches"><thead><tr><th>Day</th><th>In</th><th>Out</th><th class="num">Hours</th><th>GPS</th><th>Notes</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
                         : '<p class="no-punches">No punches this week.</p>') + "</article>";
-            }).join("");
+            }).join(""));
             if (flashRow) {
                 const tr = document.querySelector('[data-row="' + CSS.escape(flashRow) + '"]');
                 if (tr) tr.classList.add("flash");
@@ -1899,9 +1931,9 @@
                     (done ? "" : '<div class="ii-actions"><button type="button" class="btn sm primary" data-fix="' + esc(r.ek + "|" + r.id) + '">Fix it</button>' +
                         '<button type="button" class="btn sm ghost" data-decline="fix|' + esc(r.ek + "|" + r.id) + '">Decline</button></div>') + "</div>";
             });
-            $("ibFixes").innerHTML = fixes.join("") || '<div class="inbox-empty">No punch fixes waiting.</div>';
+            draw($("ibFixes"), fixes.join("") || '<div class="inbox-empty">No punch fixes waiting.</div>');
             $("ibLateCount").textContent = d.lateIns.length;
-            $("ibLate").innerHTML = d.lateIns.map(({ ek: k, s }, i) => {
+            draw($("ibLate"), d.lateIns.map(({ ek: k, s }, i) => {
                 const tap = sentLate(s).in;
                 return '<div class="inbox-item" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(k)) + '</span><span class="ii-when">' + esc(fmtKey(dayKey(tap), true)) + "</span></div>" +
                     '<div class="ii-what">Punch in sent late (no signal)</div>' +
@@ -1909,7 +1941,7 @@
                     ". It counts from " + esc(fmtTime(s.in)) + " until you choose.</div>" +
                     '<div class="ii-actions"><button type="button" class="btn sm primary" data-late-use="' + esc(k + "|" + s.id) + '">Use the phone\'s time</button>' +
                     '<button type="button" class="btn sm ghost" data-late-keep="' + esc(k + "|" + s.id) + '">Keep the server\'s time</button></div></div>';
-            }).join("") || '<div class="inbox-empty">No late punches.</div>';
+            }).join("") || '<div class="inbox-empty">No late punches.</div>');
         }
 
         // A late punch in: count it from when it was pressed (logged like any edit), or keep the server's time
@@ -2153,7 +2185,7 @@
             $("showRemovedBtn").hidden = !removedCount;
             $("showRemovedBtn").textContent = showRemoved ? "Hide removed" : "Show removed (" + removedCount + ")";
             const list = all.filter(e => showRemoved || !e.removed);
-            $("empList").innerHTML = list.length ? list.map((e, i) => {
+            draw($("empList"), list.length ? list.map((e, i) => {
                 const name = displayName(e, e.email);
                 const open = openShift(shiftsOf(e.ek));
                 return '<div class="emp-row' + (e.active === false || e.removed ? " inactive" : "") + '" style="--i:' + i + '">' +
@@ -2164,7 +2196,7 @@
                         : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
                     "</div>" +
                     '<button type="button" class="btn sm" data-emp="' + esc(e.ek) + '">' + (e.removed ? "Add back" : "Edit") + "</button></div>";
-            }).join("") : '<div class="empty-state"><strong>No employees yet</strong>Click “Add employee” to put your first driver on the time clock.</div>';
+            }).join("") : '<div class="empty-state"><strong>No employees yet</strong>Click “Add employee” to put your first driver on the time clock.</div>');
         }
         $("showRemovedBtn").addEventListener("click", () => { showRemoved = !showRemoved; renderPeople(); });
 
@@ -2340,12 +2372,12 @@
         // ---------- Vehicles ----------
         function renderVehicles() {
             const grid = $("gpsGrid");
-            if (!gpsLoaded) { grid.innerHTML = '<div class="empty-state">Loading GPS units…</div>'; return; }
+            if (!gpsLoaded) { draw(grid, '<div class="empty-state">Loading GPS units…</div>'); return; }
             const orphan = Object.keys(claims).filter(id => !gpsUnits.some(g => g.id === id)).map(id => ({ id: id, name: claims[id].vehicleName || id, color: "#6b727a" }));
             const all = gpsUnits.concat(orphan);
             renderVansList();
-            if (!all.length) { grid.innerHTML = '<div class="empty-state"><strong>No vehicles yet</strong>Add GPS units in RouteWatcher → Settings (with a Device ID), or add vehicles without GPS below.</div>'; return; }
-            grid.innerHTML = all.map((g, i) => {
+            if (!all.length) { draw(grid, '<div class="empty-state"><strong>No vehicles yet</strong>Add GPS units in RouteWatcher → Settings (with a Device ID), or add vehicles without GPS below.</div>'); return; }
+            draw(grid, all.map((g, i) => {
                 const c = claims[g.id];
                 const nick = typeof nicknames[g.id] === "string" ? nicknames[g.id] : "";
                 return '<article class="gps-card' + (c ? " taken" : "") + '" style="--i:' + i + ";--c:" + esc(g.color) + '">' +
@@ -2355,7 +2387,7 @@
                     (g.manual ? "<br>No GPS unit" : "<br>RouteWatcher nickname: " + (nick ? "<strong>" + esc(nick) + "</strong>" : "none")) + "</div>" +
                     '<div class="gps-foot">' + (c ? '<span class="tag gps">Taken</span><button type="button" class="btn sm" data-release="' + esc(g.id) + '">Release</button>'
                         : '<span class="tag live">Free</span>') + "</div></article>";
-            }).join("");
+            }).join(""));
         }
         $("gpsGrid").addEventListener("click", async e => {
             const b = e.target.closest("[data-release]");

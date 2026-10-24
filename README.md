@@ -90,6 +90,11 @@ them, or saving them with *Active* off, first asks **Punch them out now?** OK pu
 out and frees their vehicle. Cancel leaves them on the clock, and they stay on the live
 board (marked *removed* or *turned off*) until someone punches them out there.
 
+**Turned off with a schedule:** someone saved with *Active* off still shows on the live
+board (**Who's working**) as *Turned off* while they have a start time on any day, so
+nobody with a schedule goes missing from it. Their **Edit** button opens them to turn
+*Active* back on.
+
 **Forgotten password:** the sign-in emails aren't real inboxes, so a password can't be
 reset by email. Add the person again with a new sign-in email and pick their old record
 under **Takes the place of**. Their punches, requests, schedule and vehicle move to
