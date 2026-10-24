@@ -1,0 +1,32 @@
+{
+  "packageId": "ca.eandccourier.timeclock",
+  "host": "app.eandccourier.ca",
+  "name": "E&C Courier Time Clock",
+  "launcherName": "E&C Clock",
+  "display": "standalone",
+  "themeColor": "#0c0e10",
+  "navigationColor": "#0c0e10",
+  "navigationColorDark": "#0c0e10",
+  "navigationDividerColor": "#0c0e10",
+  "navigationDividerColorDark": "#0c0e10",
+  "backgroundColor": "#0c0e10",
+  "enableNotifications": false,
+  "startUrl": "/timeclock/?app=play",
+  "iconUrl": "https://app.eandccourier.ca/timeclock/icon-512.png",
+  "maskableIconUrl": "https://app.eandccourier.ca/timeclock/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "webManifestUrl": "https://app.eandccourier.ca/timeclock/clock.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fingerprints": [],
+  "orientation": "portrait",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": []
+}

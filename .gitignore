@@ -2,3 +2,9 @@ node_modules/
 firebase-debug*.log
 .firebase/
 *-debug.log
+# Google Play build: signing keys and passwords never go in the repo
+*.keystore
+*.jks
+android/build/
+android/app/build/
+android/**/passwords*

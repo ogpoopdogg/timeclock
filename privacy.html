@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0c0e10">
+    <meta name="robots" content="noindex">
+    <title>Privacy &middot; E&amp;C Time Clock</title>
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <style>
+        :root { --bg: #0c0e10; --panel: #161a1e; --text: #f2f2f2; --muted: #a9b0b8; --yellow: #ffcc00; }
+        @media (prefers-color-scheme: light) {
+            :root:not([data-theme="dark"]) { --bg: #f5f6f7; --panel: #ffffff; --text: #15181c; --muted: #50565e; }
+        }
+        :root[data-theme="light"] { --bg: #f5f6f7; --panel: #ffffff; --text: #15181c; --muted: #50565e; }
+        html, body { background: var(--bg); color: var(--text); margin: 0; }
+        body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5; font-size: 16px; }
+        main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+        h1 { font-size: 1.6rem; margin: 0 0 4px; }
+        h2 { font-size: 1.1rem; margin: 28px 0 8px; color: var(--yellow); }
+        p, li { margin: 8px 0; }
+        ul { padding-left: 22px; }
+        .muted { color: var(--muted); font-size: 0.95rem; }
+        .panel { background: var(--panel); border-radius: 12px; padding: 4px 16px; }
+        a { color: var(--yellow); }
+        table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.95rem; }
+        th, td { text-align: left; vertical-align: top; padding: 8px 6px; border-bottom: 1px solid rgba(128,128,128,.25); }
+        .back { display: inline-block; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+<main>
+    <a class="back" href="./">&larr; Back to the time clock</a>
+    <h1>Privacy policy</h1>
+    <p class="muted">E&amp;C Courier time clock and its admin panel. Last updated 2026-10-24.</p>
+
+    <p>This policy explains what the E&amp;C Courier time clock stores about its drivers and staff, why, who can see it, and how to ask for changes or deletion. The time clock is used by E&amp;C Courier employees only. The app is operated by E&amp;C Courier. Questions and requests: text the office at <a href="sms:+12047306628">204-730-6628</a>.</p>
+
+    <h2>What we store</h2>
+    <div class="panel">
+        <table>
+            <tr><th>Information</th><th>Why</th></tr>
+            <tr><td>Name, sign-in username and the employee's time clock record</td><td>To show who is signed in, and to pay and schedule them</td></tr>
+            <tr><td>Punch in and punch out times, and any punch changes made by the office</td><td>Hours worked and timesheets</td></tr>
+            <tr><td>GPS location (latitude and longitude, accuracy and time) when punching in or out, and when changing vehicles</td><td>Where the punch was made. Only collected when the phone allows it</td></tr>
+            <tr><td>Street address for each saved location, looked up with Google's geocoder</td><td>To show readable locations on timesheets and the live board</td></tr>
+            <tr><td>Vehicle chosen for the day, and vehicle swaps</td><td>Dispatch and vehicle records</td></tr>
+            <tr><td>Vehicle Check reports (problems the driver reports) and oil check answers</td><td>Vehicle safety and maintenance</td></tr>
+            <tr><td>Sign-in records for the office's security log: time, sign-in method, IP address and browser or app details, for successful and failed sign-ins</td><td>Security and account protection</td></tr>
+        </table>
+    </div>
+    <p>The phone keeps a copy of your recent punches and the clock screen on the phone itself, so the clock works without signal. Punches made with no signal are kept on that phone until they are sent. Signing out clears the copy of the clock screen; any punch still waiting to be sent stays on the phone until that person signs in again.</p>
+
+    <h2>Who can see it</h2>
+    <ul>
+        <li>Each employee can see their own punches, their week and their own reports.</li>
+        <li>The office administrators (named in the time clock's settings) can see all employees' records, timesheets, vehicle records and the security log.</li>
+        <li>Google and Firebase (the service that stores the data) host the data and process it on E&amp;C's behalf. Google's geocoder receives the latitude and longitude to look up street addresses.</li>
+    </ul>
+    <p>We do not sell this information and do not use it for advertising. The app does not use cameras or microphones.</p>
+
+    <h2>How long we keep it</h2>
+    <p>Records are kept while the employee works for E&amp;C Courier and for the period the company needs for payroll and record-keeping. [Office to fill in the exact period before this page goes live.]</p>
+
+    <h2>Your choices and requests</h2>
+    <ul>
+        <li>You can ask to see or correct your records by texting the office at <a href="sms:+12047306628">204-730-6628</a>.</li>
+        <li>You can ask for your account and records to be deleted. The office deletes your time clock record and sign-in. Some records, such as payroll and the security log, may need to be kept for legal or record-keeping reasons, and we will tell you which ones.</li>
+        <li>Location access can be turned off in your phone's settings. Punches still work, but without a location.</li>
+    </ul>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, the new version is posted on this page with its date.</p>
+</main>
+</body>
+</html>
