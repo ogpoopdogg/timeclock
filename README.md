@@ -515,3 +515,26 @@ someone.
 
 The function must answer within 7 seconds, or Firebase fails the sign-up. It reads one
 database record, so it normally takes well under a second.
+
+## Google Play app (Android)
+
+The Android app on Google Play is a thin shell around the live clock. It opens `app.eandccourier.ca/timeclock/?app=play` full screen, using a Trusted Web Activity built with Google's Bubblewrap tool. The clock's code is not copied into the app, so a normal update to this repo reaches Play users straight away. Only a change to the app's own settings (name, icon, package, Android version) needs a new Play release.
+
+Files in this repo:
+
+- `android/twa-manifest.json`: the Bubblewrap settings (package `ca.eandccourier.timeclock`, start URL, icons, location delegation on). It contains no keys.
+- `android/assetlinks.json`: the website-to-app link file. It must be published at `https://app.eandccourier.ca/.well-known/assetlinks.json` on the site that owns the root of `app.eandccourier.ca` (not this repo). Replace `REPLACE_WITH_PLAY_APP_SIGNING_KEY_SHA256` first.
+- `android/store/feature-graphic-1024x500.png`: the Play listing's feature graphic.
+- `privacy.html`: the privacy policy, linked from the sign-in screen and the admin panel. Fill in the retention period marked in the page before publishing.
+
+### Building a new Play release
+
+1. Work in a folder outside this repo, for example `~/play-build`. Copy `android/twa-manifest.json` into it.
+2. `npm i -g @bubblewrap/cli`, then `bubblewrap init --manifest=https://app.eandccourier.ca/timeclock/clock.webmanifest`, using the settings in `twa-manifest.json`. Bubblewrap asks for the signing key the first time; keep that key and its passwords in a password manager, never in the repo.
+3. `bubblewrap build` makes `app-release-bundle.aab`. Upload it in Play Console under Closed testing.
+4. In Play Console, go to **Setup → App integrity** and copy the **App signing key certificate** SHA-256 (Google re-signs the app with its own key, so this is not the upload key). Put it in `android/assetlinks.json`, publish that file on the site root, and check that the app opens without a browser bar at the top.
+5. Keep the new `twa-manifest.json` (with the `fingerprints` entry added by `bubblewrap fingerprint add`) in this repo.
+
+Once a year, or when Google raises the required Android version, rebuild with the newest Bubblewrap and upload a new release.
+
+Sources for these settings and steps are in the project's Google Play plan doc.

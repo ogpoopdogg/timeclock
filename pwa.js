@@ -22,6 +22,12 @@ export function isStandalone() {
     return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 }
 
+// The Android app from Google Play opens the clock at ?app=play (android/twa-manifest.json). It is already
+// installed there, so the install button and steps stay hidden inside it.
+export function isPlayApp() {
+    return new URLSearchParams(location.search).get("app") === "play";
+}
+
 export function isIOS() {
     return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
@@ -74,7 +80,7 @@ export function setupPwa({ installButton, toast, isBusy }) {
 
 function setupInstall(button, isBusy) {
     if (!button) return;
-    if (isStandalone()) { button.hidden = true; return; } // already running as the installed app
+    if (isStandalone() || isPlayApp()) { button.hidden = true; return; } // already running as the installed app (or the Play app)
     const manifest = document.querySelector('link[rel="manifest"]');
     const key = "tc_installed_" + (manifest ? manifest.getAttribute("href") : location.pathname);
     const shownKey = "tc_install_shown_" + (manifest ? manifest.getAttribute("href") : location.pathname);
