@@ -295,6 +295,15 @@ test('a driver on the clock can take a van without GPS', async () => {
   await assertSucceeds(db.ref(`timeclock/shifts/${matt}/s1`).update({ vehicleId: 'van_a', vehicleName: 'Van 12' }));
 });
 
+// ---------- Settings ----------
+test('settings: employees and admins can read them, other signed-in accounts cannot', async () => {
+  await assertSucceeds(adminDb().ref('timeclock/settings').set({ reminderMinutes: 10, longShiftHours: 14 }));
+  await assertSucceeds(mattDb().ref('timeclock/settings').once('value'));
+  await assertSucceeds(adminDb().ref('timeclock/settings').once('value'));
+  await assertFails(as('customer@example.com').ref('timeclock/settings').once('value'));
+  await assertFails(mattDb().ref('timeclock/settings/longShiftHours').set(24));
+});
+
 // ---------- Left as they were ----------
 test('B9 (kept on purpose): an employee can still name any GPS in RouteWatcher', async () => {
   await assertSucceeds(mattDb().ref('developer/dispatch_dashboard/driver_nicknames/g7').set('Matt'));

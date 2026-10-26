@@ -38,6 +38,8 @@ rules** actually stop an employee from changing their own punches.
   `timeclock/open/{ek}` (the open shift's id), and a punch in is refused while that
   shift is still open.
 - Removed employees (`removed: true`) can't punch in or report a van problem.
+- The settings (`timeclock/settings`) can be read by employees and admins only, not by
+  other accounts signed in to the same Firebase project (Request Pickup customers).
 - Only the admin panel can mark a punch as added by an admin (`src: "admin"`).
 - A punch can carry the time it was pressed on the phone (`tap`, `outTap`), so a punch
   saved with no signal shows when it was really made. It can't be more than a week old.
@@ -227,9 +229,26 @@ open (or the next check) picks it up.
 - **Late.** If an employee is scheduled today and hasn't punched in by *start time +
   late minutes* (10 by default, **Settings → Late after**), the admin live board shows
   them as **Late**. There is no punch-in reminder on the phone (removed October 2026).
+- **Long shifts (a forgotten punch out).** A driver who punches out after at least the
+  long-shift hours (14 by default, **Settings → Long shift**, 4 to 24, the same for every
+  driver) is asked *Did you forget to punch out?*. **Fix a punch** opens on a missed
+  punch out for the day the shift started, so they can send the time they really
+  finished. Every shift that long (or still on the clock that long) also shows in
+  **Admin → Inbox → Long shifts** and is tagged **Long shift** on the timesheet, until an
+  admin edits it or taps **It's right** (saved as `longSeen` on the shift).
 - **Admin edits** show as *Changed by the office* (or *Added by the office*) when the
   driver taps that day in My week, and each one is saved to the change log
   (`timeclock/audit`) with the reason.
+
+## Time
+
+All times are Brandon, MB time, whatever the phone or computer is set to. Manitoba stopped
+changing its clocks: it stays on UTC-5 all year, starting 2026-11-01 (it no longer falls
+back). A device only knows that once its own software has been updated, so from that
+date `tc-core.js` works out Brandon time itself (UTC-5) instead of asking the device;
+earlier punches use the device's time zone rules, which are right for the past
+(`FIXED_OFFSET_FROM`). If Manitoba ever changes its clocks again, that is the place to
+change. Punch times themselves are always the server's clock, not the phone's.
 
 ## No signal
 
@@ -252,6 +271,9 @@ minutes apart:
   pressed 7:02 AM**, and editing the punch also has a **Use the phone's time** link.
 
 An admin who changes a punch out's time replaces the phone's time (`outTap` is removed).
+
+Where the phone was at a no-signal punch is saved on the phone with the punch, and sent
+right after it, so it isn't lost if the app is closed before the signal comes back.
 
 Picking a vehicle needs signal, because the server decides who has which vehicle. With
 none, the vehicle picker says so, and the list loads by itself when the signal is back

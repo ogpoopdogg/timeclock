@@ -864,7 +864,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, punchForFix,
+            vanKey, oilPlanFor, oilDue, punchForFix, longShift,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -892,6 +892,7 @@
         let busy = false;
         let afterPunchInPick = false;       // open the vehicle picker once the success overlay closes
         let afterPunchOutOil = null;        // the shift to ask "Did you check the oil?" about once it closes
+        let afterPunchOutLong = null;       // a long shift to ask "Did you forget to punch out?" about once it closes
 
         const now = () => Date.now() + serverOffset;
         const current = () => openShift(shifts);
@@ -1340,12 +1341,13 @@
             const where = standIn ? null : readLocation();
             try {
                 let res;
-                if (open) { res = await punchOut(open); if (where) saveLocation(P.shifts + "/" + ek + "/" + open.id + "/outLoc", where); }
-                else { res = await punchIn(); if (where) saveLocation(P.shifts + "/" + ek + "/" + res.id + "/inLoc", where); }
+                if (open) { res = await punchOut(open); if (where) keepLocation({ kind: "out", id: open.id }, where); }
+                else { res = await punchIn(); if (where) keepLocation({ kind: "in", id: res.id }, where); }
                 if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
                 burst();
                 showSuccess(!open, res.tap, !res.sent);
                 afterPunchOutOil = open && oilWanted(open) && !oilDone(open) ? open : null;
+                afterPunchOutLong = open && longShift(Object.assign({}, open, { out: res.tap }), settings, res.tap) ? Object.assign({}, open, { out: res.tap }) : null;
             } catch (err) {
                 $("punchMsg").textContent = (open ? "Punch out" : "Punch in") + " failed: " + errText(err);
                 punchEl.classList.remove("shake"); void punchEl.offsetWidth; punchEl.classList.add("shake");
@@ -1432,7 +1434,9 @@
                 : p.kind === "out" ? sendPunchOut(p.id, p.tap) : p.kind === "oilDue" ? sendOilDue(p) : sendOil(p));
             sendChain = run;
             const done = run.then(() => {
+                const kept = loadPending().find(x => samePending(x, p)); // with the location, if it was saved on the phone
                 dropPending(p);
+                if (kept && kept.loc && (p.kind === "in" || p.kind === "out")) saveLocation(shiftPath(p.id) + "/" + p.kind + "Loc", kept.loc);
                 if (p.kind === "out" && p.vehicleId) releaseVehicle(p.vehicleId, p.nickname).catch(err => console.warn("Vehicle release:", err));
             }, err => { dropPending(p); throw err; }).finally(() => inflight.delete(key));
             inflight.set(key, done);
@@ -1520,6 +1524,18 @@
             document.body.classList.toggle("net-shown", !!text);
         }
 
+        // Where the phone was for a punch. While the punch is still saved on this phone (no signal), the location is saved
+        // with it, so it's sent with the punch even if the app is closed first; once the punch is in, it's sent straight away.
+        async function keepLocation(punch, where) {
+            locSaving++;
+            try {
+                const loc = await where;
+                const list = loadPending(), waiting = list.find(x => samePending(x, punch));
+                if (waiting) { waiting.loc = loc; savePending(list); }
+                else saveLocation(shiftPath(punch.id) + "/" + punch.kind + "Loc", loc);
+            } finally { locSaving--; }
+        }
+
         // Saves where the phone was for a punch or van swap. The server adds the street address (functions/).
         async function saveLocation(path, where) {
             locSaving++;
@@ -1550,7 +1566,11 @@
         function hideSuccess() {
             $("success").classList.remove("show");
             if (afterPunchInPick) { afterPunchInPick = false; setTimeout(() => openSheet(), 250); }
-            if (afterPunchOutOil) { const shift = afterPunchOutOil; afterPunchOutOil = null; setTimeout(() => askOilAtPunchOut(shift), 250); }
+            const oilShift = afterPunchOutOil, longOne = afterPunchOutLong;
+            afterPunchOutOil = afterPunchOutLong = null;
+            const askOil = oilShift ? () => askOilAtPunchOut(oilShift) : null;
+            if (longOne) setTimeout(() => askLongShift(longOne, askOil), 250);
+            else if (askOil) setTimeout(askOil, 250);
         }
         $("success").addEventListener("click", () => { clearTimeout(showSuccess.t); hideSuccess(); });
 
@@ -1856,9 +1876,12 @@
         // The punches on a day the driver can say were by accident (newest first; one still on the clock is the likely one)
         const punchesOn = day => shifts.filter(x => !x.pending && dayKey(x.in) === day).reverse();
         const punchLabel = x => "In " + fmtTime(x.in) + (typeof x.out === "number" ? " · out " + fmtTime(x.out) : " · still on the clock");
-        function openFixPunch() {
+        // preset: { kind, day } to start with (after a long shift: the missed punch out on the day it started), and
+        // after: what to open once it's closed, sent or not
+        function openFixPunch(preset) {
             const today = dayKey(now()), open = current();
-            const kind = open && dayKey(open.in) !== today ? "out" : "in"; // still on the clock from an earlier day: likely a missed punch out
+            const kind = preset && preset.kind ? preset.kind : open && dayKey(open.in) !== today ? "out" : "in"; // still on the clock from an earlier day: likely a missed punch out
+            const day = preset && preset.day ? preset.day : kind === "out" && open ? dayKey(open.in) : today;
             openForm({
                 title: "Fix a punch",
                 sub: "Tell the office what to change. You'll see their answer here under Requests.",
@@ -1866,12 +1889,13 @@
                     '<div class="full"><label class="field-label" for="fxKind">What happened</label><select class="input" id="fxKind">' +
                     Object.entries(FIX_KINDS).map(([k, v]) => '<option value="' + k + '"' + (k === kind ? " selected" : "") + ">" + esc(v) + "</option>").join("") + "</select></div>" +
                     '<div class="full"><label class="field-label" for="fxDay">Day</label><input class="input" id="fxDay" type="date" max="' + today + '" value="' +
-                    (kind === "out" ? dayKey(open.in) : today) + '"></div>' +
+                    day + '"></div>' +
                     '<div id="fxInWrap"><label class="field-label" for="fxIn">Punch in time</label><input class="input" id="fxIn" type="time"></div>' +
                     '<div id="fxOutWrap"><label class="field-label" for="fxOut">Punch out time</label><input class="input" id="fxOut" type="time"></div>' +
                     '<div class="full" id="fxShiftWrap"><label class="field-label" for="fxShift">Which punch</label><select class="input" id="fxShift"></select></div>' +
                     '<div class="full"><label class="field-label" for="fxNote">Details</label><textarea class="input textarea" id="fxNote" maxlength="500" placeholder="e.g. My phone died, I started at 7:30"></textarea></div></div>',
                 onSubmit: sendFixPunch,
+                onClose: preset && preset.after ? preset.after : null,
                 afterOpen: syncFixFields
             });
         }
@@ -2071,7 +2095,24 @@
             try { await remove(ref(db, P.requests + "/" + ek + "/" + b.dataset.cancel)); toast("Request cancelled."); }
             catch (err) { toast("Couldn't cancel: " + errText(err), true); }
         });
-        $("fixPunchBtn").addEventListener("click", openFixPunch);
+        $("fixPunchBtn").addEventListener("click", () => openFixPunch());
+
+        // After punching out of a shift at least as long as the office's limit (Settings → Long shift): a forgotten punch
+        // out? "Fix a punch" opens on the missed punch out for the day it started. then: what comes next (the oil question).
+        function askLongShift(shift, then) {
+            let fixing = false;
+            openForm({
+                title: "Did you forget to punch out?",
+                sub: "You were on the clock " + fmtDur(shift.out - shift.in) + ", since " + fmtTime(shift.in) +
+                    (dayKey(shift.in) !== dayKey(shift.out) ? " on " + fmtKey(dayKey(shift.in)) : "") + ". If you finished earlier, tell the office the time you really finished.",
+                body: "",
+                submit: "Fix a punch",
+                cancel: "No, it's right",
+                offline: true,
+                onSubmit: () => { fixing = true; },
+                onClose: () => { if (fixing) openFixPunch({ kind: "out", day: dayKey(shift.in), after: then }); else if (then) then(); }
+            });
+        }
 
         // ---------- Van taken by another driver ----------
         let swapBannerFor = null, swapBannerDismissed = null;
@@ -2089,7 +2130,8 @@
         setupPwa({
             installButton: $("installBtn"),
             toast: toast,
-            isBusy: () => holding || busy || sheetOpen || formOpen || !!picking || locSaving > 0 || flushing || $("success").classList.contains("show")
+            isBusy: () => holding || busy || sheetOpen || formOpen || !!picking || locSaving > 0 || flushing || $("success").classList.contains("show") ||
+                (!$("signinScreen").hidden && !!($("email").value || $("password").value)) // typing their sign-in
         });
 
         let bannerMode = null; // "swap" (van taken) while the banner shows
