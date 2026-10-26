@@ -1,8 +1,10 @@
 // Shared code for the E&C time clock (employee page and admin panel).
 //
 // Database layout (Firebase Realtime Database, project eandccourier-36fcc):
-//   timeclock/settings                 { reminderMinutes, weekStart }  reminderMinutes: someone not punched in by then
-//                                        (minutes after their scheduled start) shows as Late on the admin live board
+//   timeclock/settings                 { reminderMinutes, weekStart, longShiftHours, ... }  reminderMinutes: someone not
+//                                        punched in by then (minutes after their scheduled start) shows as Late on the
+//                                        admin live board. longShiftHours: a shift this long asks "Did you forget to punch
+//                                        out?" at punch out, and shows under Long shifts in the admin Inbox
 //   timeclock/employees/{ek}           { email, name, active, removed, schedule: { sun..sat: { start, end } } }
 //       removed                          true once the admin removes them: they can't punch in and are hidden from the
 //                                        live board, but their punches still show on timesheets and exports
@@ -21,6 +23,7 @@
 //                                        (no signal) shows both; see sentLate(). A late punch out counts from outTap
 //                                        (countedOut()); a late punch in waits for the office (lateSeen, or "Use the phone's time")
 //       lateSeen                         the office kept the server's time for a late punch in: { by, at }
+//       longSeen                         the office said a long shift is right (Inbox → Long shifts): { by, at }
 //       swapHint                         set by the server when another driver takes this driver's van:
 //                                        { at, by, vehicleId, vehicleName, suggestId, suggestName }
 //       oil                              the oil check: { done, at, how, seenBy, seenAt } or { due: false, at } when
@@ -78,7 +81,8 @@ export const P = {
 };
 
 export const PAY_WEEK_START = 5; // pay weeks always run Friday to Thursday (payday is Friday)
-export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: PAY_WEEK_START, shopRadius: 500 };
+export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: PAY_WEEK_START, shopRadius: 500, longShiftHours: 14 };
+export const LONG_SHIFT_MIN_HOURS = 4, LONG_SHIFT_MAX_HOURS = 24;
 export const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DOW_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -89,6 +93,7 @@ export function settingsWithDefaults(v) {
     s.reminderMinutes = clampInt(s.reminderMinutes, 0, 240, DEFAULT_SETTINGS.reminderMinutes);
     s.weekStart = PAY_WEEK_START; // fixed, whatever an older saved setting says
     s.shopRadius = clampInt(s.shopRadius, 50, 50000, DEFAULT_SETTINGS.shopRadius);
+    s.longShiftHours = clampInt(s.longShiftHours, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, DEFAULT_SETTINGS.longShiftHours);
     // Where the shop is, for flagging punches made far from it (Settings → Shop location). Both or neither.
     const lat = Number(s.shopLat), lng = Number(s.shopLng);
     if (s.shopLat === undefined || s.shopLat === null || s.shopLat === "" || !isFinite(lat) || Math.abs(lat) > 90 ||
@@ -127,14 +132,26 @@ export function initials(name) {
 }
 
 // ---------- Time (always in Brandon, MB time, whatever the device is set to) ----------
-const partsFmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, hourCycle: "h23", weekday: "short",
-    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit"
-});
+// Manitoba stopped changing its clocks: it stays on UTC-5 all year, starting when it would have fallen back
+// (2026-11-01, 2:00 AM; the change took effect 2026-10-31). A phone or computer only knows that once its own software
+// has the update, so from then on the time clock works out Brandon time itself instead of asking the device.
+// Times before then use the device's time zone rules, which are right for the past.
+export const FIXED_OFFSET_FROM = Date.UTC(2026, 10, 1, 7); // 2026-11-01 2:00 AM CDT, already UTC-5 on both sides
+const FIXED_OFFSET_MS = -5 * 3600000;
+// The instant to format and the time zone to format it in, so the formatted wall time is Brandon's
+function wall(ts) {
+    return ts >= FIXED_OFFSET_FROM ? { date: new Date(ts + FIXED_OFFSET_MS), zone: "UTC" } : { date: new Date(ts), zone: TZ };
+}
+const fmtCache = {};
+function formatter(name, zone, opts) {
+    const key = name + "|" + zone;
+    return fmtCache[key] || (fmtCache[key] = new Intl.DateTimeFormat(name === "parts" ? "en-US" : "en-CA", Object.assign({ timeZone: zone }, opts)));
+}
+const PARTS = { hourCycle: "h23", weekday: "short", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" };
 
 export function zoned(ts) {
-    const out = {};
-    for (const p of partsFmt.formatToParts(new Date(ts))) out[p.type] = p.value;
+    const out = {}, w = wall(ts);
+    for (const p of formatter("parts", w.zone, PARTS).formatToParts(w.date)) out[p.type] = p.value;
     const hh = parseInt(out.hour, 10) % 24;
     return {
         y: +out.year, m: +out.month, d: +out.day, hh: hh, mm: +out.minute, ss: +out.second,
@@ -172,14 +189,15 @@ export function weekStartKey(key, weekStart) { return addDaysKey(key, -((dowOfKe
 export function weekDays(startKey) { return Array.from({ length: 7 }, (_, i) => addDaysKey(startKey, i)); }
 export function hhmmOf(ts) { const z = zoned(ts); return pad2(z.hh) + ":" + pad2(z.mm); }
 
-const timeFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, hour: "numeric", minute: "2-digit", hour12: true });
-const dateFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" });
-const longDateFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, weekday: "long", month: "long", day: "numeric" });
+const TIME = { hour: "numeric", minute: "2-digit", hour12: true };
+const DATE = { weekday: "short", month: "short", day: "numeric" };
+const LONG_DATE = { weekday: "long", month: "long", day: "numeric" };
+const fmtWall = (name, opts, ts) => { const w = wall(ts); return formatter(name, w.zone, opts).format(w.date); };
 
 const tidy = s => s.replace(/\./g, "").replace(/\s+/g, " ").replace(/am|pm/i, m => m.toUpperCase());
-export function fmtTime(ts) { return ts ? tidy(timeFmt.format(new Date(ts))) : "—"; }
-export function fmtDate(ts) { return tidy(dateFmt.format(new Date(ts))); }
-export function fmtLongDate(ts) { return longDateFmt.format(new Date(ts)); }
+export function fmtTime(ts) { return ts ? tidy(fmtWall("time", TIME, ts)) : "—"; }
+export function fmtDate(ts) { return tidy(fmtWall("date", DATE, ts)); }
+export function fmtLongDate(ts) { return fmtWall("long", LONG_DATE, ts); }
 export function fmtKey(key, long) {
     const ts = keyToEpoch(key, "12:00");
     return long ? fmtLongDate(ts) : fmtDate(ts);
@@ -348,6 +366,15 @@ export function oilNextDue(plan, last, t) {
 export function oilDue(plan, last, t) {
     const next = oilNextDue(plan, last, t);
     return next === "shift" || (next !== null && next <= dayKey(t));
+}
+
+// ---------- Long shifts (a forgotten punch out) ----------
+// How long the shift has been, when it's at least the office's limit (Settings → Long shifts); null otherwise.
+// Measured from punch in to punch out (or now, still on the clock), before rounding.
+export function longShift(s, settings, now) {
+    if (!s || typeof s.in !== "number") return null;
+    const ms = (typeof s.out === "number" ? countedOut(s) : now) - s.in;
+    return ms >= settingsWithDefaults(settings).longShiftHours * 3600000 ? ms : null;
 }
 
 // ---------- Punches sent late ----------

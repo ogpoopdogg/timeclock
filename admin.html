@@ -619,14 +619,17 @@
         <!-- Inbox -->
         <section class="panel" id="panel-inbox" role="tabpanel" hidden>
             <div class="panel-head">
-                <div><h1 class="panel-title">Inbox</h1><p class="panel-sub">Punch fixes drivers asked for, and punches sent late with no signal.</p></div>
+                <div><h1 class="panel-title">Inbox</h1><p class="panel-sub">Punch fixes drivers asked for, punches sent late with no signal, and long shifts.</p></div>
                 <div class="panel-actions"><label class="switch"><input type="checkbox" id="inboxHandled"><span class="track"></span>Show handled</label></div>
             </div>
             <div class="inbox-grid">
                 <div class="inbox-col"><h3>Punch fixes <span class="tab-count" id="ibFixCount">0</span></h3><div class="inbox-list" id="ibFixes"></div>
                     <h3 class="ib-late-head">Late punches <span class="tab-count" id="ibLateCount">0</span></h3>
                     <p class="hint ib-late-hint">Punch ins made with no signal reach the server late, and count from when they arrived until you choose here.</p>
-                    <div class="inbox-list" id="ibLate"></div></div>
+                    <div class="inbox-list" id="ibLate"></div>
+                    <h3 class="ib-late-head">Long shifts <span class="tab-count" id="ibLongCount">0</span></h3>
+                    <p class="hint ib-late-hint" id="ibLongHint"></p>
+                    <div class="inbox-list" id="ibLong"></div></div>
                 <div class="inbox-col"><h3>Vehicle checks</h3><div class="card"><p class="hint">Problems drivers report at Vehicle Check and the oil checks are in Garage now, with everything else about each vehicle.</p><a class="btn primary" href="../garage/garage.html#look">Open Garage</a></div></div>
             </div>
         </section>
@@ -708,10 +711,15 @@
             <div class="settings-grid">
                 <form class="card" id="settingsForm">
                     <h3>Time clock</h3>
-                    <p class="hint">All times use Brandon, MB time (<span id="tzName"></span>).</p>
+                    <p class="hint">All times use Brandon, MB time. Manitoba stays on UTC-5 all year (no clock changes from November 2026), and the time clock keeps to that even on a phone or computer that hasn't updated.</p>
                     <div class="field">
                         <label for="sReminder">Late after (minutes after scheduled start)</label>
                         <input class="input" id="sReminder" type="number" min="0" max="240" step="1" inputmode="numeric">
+                    </div>
+                    <div class="field">
+                        <label for="sLongShift">Long shift (hours)</label>
+                        <input class="input" id="sLongShift" type="number" min="4" max="24" step="1" inputmode="numeric">
+                        <p class="hint" style="margin:6px 0 0">A driver who punches out after this many hours is asked "Did you forget to punch out?", and the shift shows under Long shifts in the Inbox. 4 to 24 hours, for every driver.</p>
                     </div>
                     <div class="field">
                         <label>Pay week</label>
@@ -878,7 +886,8 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, sentLate, countedOut, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping
+            oilState, sentLate, countedOut, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping,
+            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -1272,6 +1281,8 @@
                     const late = sentLate(s);
                     if (late.in) tags.push('<span class="tag late" title="No signal: the punch in reached the server at ' + esc(fmtTime(s.in)) + '. It counts from then until you choose in the Inbox (Late punches).">Punch in sent late · pressed ' + esc(fmtTime(late.in)) + "</span>");
                     if (late.out) tags.push('<span class="tag late" title="No signal: the punch out reached the server at ' + esc(fmtTime(s.out)) + '. The hours count to when it was pressed.">Punch out sent late · counted from ' + esc(fmtTime(late.out)) + "</span>");
+                    const long = longShift(s, settings, t);
+                    if (long) tags.push('<span class="tag warn" title="' + esc("At least " + settings.longShiftHours + " hours (Settings → Long shift). A forgotten punch out?") + '">Long shift · ' + esc(fmtDur(long)) + "</span>");
                     const oil = oilTag(s);
                     if (oil) tags.push(oil);
                     if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
@@ -1909,10 +1920,18 @@
             const lateIns = [];
             for (const [k, list] of Object.entries(shiftsByEk)) if (employees[k]) for (const s of list) if (sentLate(s).in && !s.lateSeen) lateIns.push({ ek: k, s: s });
             lateIns.sort((a, b) => b.s.in - a.s.in);
-            return { fixes: fixes.sort((a, b) => (b.at || 0) - (a.at || 0)), openFixes: fixes.filter(r => r.status === "open").length, lateIns: lateIns };
+            // Shifts at least as long as Settings → Long shift (a forgotten punch out?), in the punches loaded, until the
+            // office says they're right or changes them (an edited shift has been looked at)
+            const t = now(), longs = [];
+            for (const [k, list] of Object.entries(shiftsByEk)) if (employees[k]) for (const s of list) {
+                const ms = !s.longSeen && !s.edited ? longShift(s, settings, t) : null;
+                if (ms) longs.push({ ek: k, s: s, ms: ms });
+            }
+            longs.sort((a, b) => b.s.in - a.s.in);
+            return { fixes: fixes.sort((a, b) => (b.at || 0) - (a.at || 0)), openFixes: fixes.filter(r => r.status === "open").length, lateIns: lateIns, longs: longs };
         }
         function renderInboxCount() {
-            const d = inboxData(), n = d.openFixes + d.lateIns.length;
+            const d = inboxData(), n = d.openFixes + d.lateIns.length + d.longs.length;
             $("inboxCount").hidden = !n;
             $("inboxCount").textContent = n;
             requestAnimationFrame(moveInk);
@@ -1942,6 +1961,16 @@
                     '<div class="ii-actions"><button type="button" class="btn sm primary" data-late-use="' + esc(k + "|" + s.id) + '">Use the phone\'s time</button>' +
                     '<button type="button" class="btn sm ghost" data-late-keep="' + esc(k + "|" + s.id) + '">Keep the server\'s time</button></div></div>';
             }).join("") || '<div class="inbox-empty">No late punches.</div>');
+            $("ibLongCount").textContent = d.longs.length;
+            $("ibLongHint").textContent = "Shifts of " + settings.longShiftHours + " hours or more (change it in Settings). Often a forgotten punch out: fix the times, or say it's right.";
+            draw($("ibLong"), d.longs.map(({ ek: k, s, ms }, i) => {
+                const open = typeof s.out !== "number";
+                return '<div class="inbox-item" style="--i:' + i + '"><div class="ii-top"><span class="ii-who">' + esc(empName(k)) + '</span><span class="ii-when">' + esc(fmtKey(dayKey(s.in), true)) + "</span></div>" +
+                    '<div class="ii-what">' + (open ? "On the clock for " : "Long shift: ") + esc(fmtDur(ms)) + "</div>" +
+                    '<div class="ii-detail">In ' + esc(fmtTime(s.in)) + " · " + (open ? "still on the clock" : "out " + esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? " on " + esc(fmtKey(dayKey(s.out))) : "")) + "</div>" +
+                    '<div class="ii-actions"><button type="button" class="btn sm primary" data-long-edit="' + esc(k + "|" + s.id) + '">Fix the times</button>' +
+                    '<button type="button" class="btn sm ghost" data-long-ok="' + esc(k + "|" + s.id) + '">It\'s right</button></div></div>';
+            }).join("") || '<div class="inbox-empty">No long shifts.</div>');
         }
 
         // A late punch in: count it from when it was pressed (logged like any edit), or keep the server's time
@@ -2014,6 +2043,16 @@
         $("panel-inbox").addEventListener("click", async e => {
             const fix = e.target.closest("[data-fix]");
             if (fix) { const [k, id] = fix.dataset.fix.split("|"); fixFromRequest(k, id); return; }
+            const longEdit = e.target.closest("[data-long-edit]");
+            if (longEdit) { const [k, id] = longEdit.dataset.longEdit.split("|"); openShiftModal(k, id); return; }
+            const longOk = e.target.closest("[data-long-ok]");
+            if (longOk) {
+                const [k, id] = longOk.dataset.longOk.split("|");
+                longOk.disabled = true;
+                try { await update(ref(db, P.shifts + "/" + k + "/" + id), { longSeen: { by: user.email, at: serverTimestamp() } }); toast("Marked as right."); }
+                catch (err) { toast("Couldn't save: " + errText(err), true); longOk.disabled = false; }
+                return;
+            }
             const late = e.target.closest("[data-late-use], [data-late-keep]");
             if (late) {
                 const [k, id] = (late.dataset.lateUse || late.dataset.lateKeep).split("|");
@@ -2288,7 +2327,9 @@
                 const before = existing || {};
                 const record = { email: email, name: $("emName").value.trim(), active: $("emActive").checked, schedule: schedule,
                     createdAt: before.createdAt || serverTimestamp() };
-                await set(ref(db, P.employees + "/" + k), record); // also clears "removed" when adding someone back
+                // Only these fields change, so anything else saved on the employee (by Garage, say) is kept.
+                // Adding someone back also clears "removed".
+                await update(ref(db, P.employees + "/" + k), Object.assign({}, record, before.removed ? { removed: null, removedAt: null } : {}));
                 if (replaceEk) await moveEmployee(replaceEk, k, record);
                 let note = "";
                 if (closeOpen) { await punchOutNow(k, closeOpen, "Punched out when turned off"); note = " Punched out."; }
@@ -2454,10 +2495,10 @@
         }
 
         // ---------- Settings ----------
-        $("tzName").textContent = TZ;
         function fillSettingsForm() {
             if (document.activeElement && $("settingsForm").contains(document.activeElement)) return;
             $("sReminder").value = settings.reminderMinutes;
+            $("sLongShift").value = settings.longShiftHours;
             if (!(document.activeElement && $("shopForm").contains(document.activeElement))) {
                 $("shLat").value = typeof settings.shopLat === "number" ? settings.shopLat : "";
                 $("shLng").value = typeof settings.shopLng === "number" ? settings.shopLng : "";
@@ -2466,7 +2507,11 @@
         }
         $("settingsForm").addEventListener("submit", async e => {
             e.preventDefault();
-            const next = settingsWithDefaults(Object.assign({}, settingsRaw, { reminderMinutes: $("sReminder").value }));
+            const hours = parseInt($("sLongShift").value, 10);
+            if (!isFinite(hours) || hours < LONG_SHIFT_MIN_HOURS || hours > LONG_SHIFT_MAX_HOURS) {
+                toast("Enter a long shift from " + LONG_SHIFT_MIN_HOURS + " to " + LONG_SHIFT_MAX_HOURS + " hours.", true); return;
+            }
+            const next = settingsWithDefaults(Object.assign({}, settingsRaw, { reminderMinutes: $("sReminder").value, longShiftHours: hours }));
             try {
                 await set(ref(db, P.settings), next);
                 viewWeek = weekStartKey(dayKey(now()), next.weekStart);

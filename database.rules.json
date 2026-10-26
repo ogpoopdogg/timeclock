@@ -5,7 +5,7 @@
       ".write": "auth != null && (auth.token.email.toLowerCase() === 'justin@ec.com' || auth.token.email.toLowerCase() === 'desirae@ec.com' || auth.token.email.toLowerCase() === 'celeste@ec.com')",
 
       "settings": {
-        ".read": "auth != null"
+        ".read": "auth != null && root.child('timeclock/employees').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
       },
 
       "employees": {

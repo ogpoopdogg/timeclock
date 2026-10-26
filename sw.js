@@ -95,7 +95,9 @@ async function download(url) {
 }
 
 // Downloads the newest copy of every app file. Nothing is replaced until all of them have arrived, so the
-// app never opens half old and half new; with no signal (or a file that won't download) the saved copy stays.
+// app never opens half old and half new: with no signal, or a file the server fails to send (a brief GitHub Pages
+// error, say), the whole saved copy stays and the next check tries again. A file the server says is gone (404) is
+// left out of the update instead, so one removed file can't hold every later update back.
 let refreshing = null, refreshedAt = 0;
 function refresh() {
     if (refreshing) return refreshing;
@@ -105,6 +107,7 @@ function refresh() {
         const urls = new Set(SHELL.map(u => new URL(u, self.registration.scope).href));
         for (const req of await cache.keys()) if (req.url.startsWith(self.registration.scope) && !req.url.includes("?")) urls.add(req.url);
         const files = await Promise.all([...urls].map(async url => ({ url: url, res: await download(url) })));
+        if (files.some(({ res }) => !res.ok && res.status !== 404 && res.status !== 410)) return;
         let changed = false;
         const keep = [];
         for (const { url, res } of files) {
