@@ -314,3 +314,86 @@ test('employees cannot read other employees\' punches or the whole time clock', 
   await assertFails(mattDb().ref('timeclock').once('value'));
   await assertSucceeds(adminDb().ref('timeclock').once('value'));
 });
+
+// ---------- Gil: "Who's driving this?" in RouteWatcher ----------
+// Gil (gil@ec.com, a dispatcher) may see who is on the clock and give them a vehicle, the way RouteWatcher's driver
+// window does it, and nothing else in the time clock.
+const gilDb = () => as('gil@ec.com');
+// Dave's shift from yesterday, already punched out
+const daveDone = () => env.withSecurityRulesDisabled(ctx => ctx.database().ref(`timeclock/shifts/${dave}/d1`).set({ in: Date.now() - DAY, out: Date.now() - DAY + 3600000 }));
+const gilAssign = (db, ek, id, gps) => db.ref().update({
+  [`timeclock/shifts/${ek}/${id}/vehicleId`]: gps,
+  [`timeclock/shifts/${ek}/${id}/vehicleName`]: 'Van ' + gps,
+  [`timeclock/shifts/${ek}/${id}/nickname`]: 'Matt',
+  [`timeclock/shifts/${ek}/${id}/shop`]: null,
+  [`timeclock/shifts/${ek}/${id}/swapHint`]: null,
+  [`timeclock/shifts/${ek}/${id}/vans/${gps}`]: { at: NOW, how: 'admin', by: 'gil@ec.com', vehicleId: gps, vehicleName: 'Van ' + gps },
+  [`timeclock/shifts/${ek}/${id}/edited`]: { by: 'gil@ec.com', at: NOW, note: 'Vehicle set in RouteWatcher' }
+});
+
+test('Gil can see who is on the clock: names, and the vehicle of shifts still open', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1'));
+  await assertSucceeds(gilDb().ref('timeclock/open').once('value'));
+  await assertSucceeds(gilDb().ref(`timeclock/employees/${matt}/name`).once('value'));
+  await assertSucceeds(gilDb().ref(`timeclock/employees/${matt}/email`).once('value'));
+  for (const f of ['in', 'out', 'vehicleId', 'vehicleName', 'shop', 'nickname']) {
+    await assertSucceeds(gilDb().ref(`timeclock/shifts/${matt}/s1/${f}`).once('value'));
+  }
+  await assertSucceeds(gilDb().ref('timeclock/vehicle_claims').once('value'));
+});
+
+test('Gil cannot read timesheets, finished shifts, locations, schedules or anything else', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1'));
+  await assertSucceeds(mattDb().ref(`timeclock/shifts/${matt}/s1/inLoc`).set({ lat: 49.8, lng: -99.9, acc: 5, at: Date.now() }));
+  await daveDone();
+  await assertFails(gilDb().ref('timeclock').once('value'));
+  await assertFails(gilDb().ref('timeclock/employees').once('value'));
+  await assertFails(gilDb().ref(`timeclock/employees/${matt}`).once('value'));
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}`).once('value'));
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/s1`).once('value'));
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/s1/inLoc`).once('value'));
+  await assertFails(gilDb().ref(`timeclock/shifts/${dave}/d1/in`).once('value'));
+  await assertFails(gilDb().ref(`timeclock/shifts/${dave}/d1/out`).once('value'));
+  await assertFails(gilDb().ref('timeclock/audit').once('value'));
+  await assertFails(gilDb().ref('timeclock/requests').once('value'));
+  await assertFails(gilDb().ref('timeclock/settings').once('value'));
+});
+
+test('Gil can give an on-the-clock driver a vehicle, claim it for them and log it', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1'));
+  await assertSucceeds(gilAssign(gilDb(), matt, 's1', 'g1'));
+  await assertSucceeds(gilDb().ref('timeclock/vehicle_claims/g1').set({ ek: matt, email: 'matt@ec.com', name: 'Matt', nickname: 'Matt', shiftId: 's1', vehicleName: 'Van g1', at: NOW }));
+  await assertSucceeds(gilDb().ref('timeclock/audit/a1').set({ at: NOW, by: 'gil@ec.com', ek: matt, shiftId: 's1', action: 'edit', note: 'Vehicle set in RouteWatcher' }));
+  // moving Matt on to another vehicle frees the first one
+  await assertSucceeds(gilAssign(gilDb(), matt, 's1', 'g2'));
+  await assertSucceeds(gilDb().ref('timeclock/vehicle_claims/g1').remove());
+});
+
+test('Gil cannot change punches or anyone\'s details, or assign outside the rules', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1'));
+  await daveDone();
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/s1/in`).set(Date.now() - 3600000));
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/s1/out`).set(NOW));
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/s1/shop`).set(true));
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/new`).set({ in: NOW }));
+  await assertFails(gilAssign(gilDb(), dave, 'd1', 'g1')); // a finished shift
+  await assertFails(gilDb().ref(`timeclock/employees/${matt}/name`).set('X'));
+  await assertFails(gilDb().ref(`timeclock/open/${matt}`).set('x'));
+  // a claim must match the vehicle on the driver's shift, and a vehicle someone is driving can't just be freed
+  await assertFails(gilDb().ref('timeclock/vehicle_claims/g1').set({ ek: matt, shiftId: 's1', name: 'Matt' }));
+  await assertSucceeds(gilAssign(gilDb(), matt, 's1', 'g1'));
+  await assertSucceeds(gilDb().ref('timeclock/vehicle_claims/g1').set({ ek: matt, shiftId: 's1', name: 'Matt' }));
+  await assertFails(gilDb().ref('timeclock/vehicle_claims/g1').remove());
+  // history and log entries are Gil's own, marked as an office change
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/s1/vans/x`).set({ at: NOW, how: 'pick', by: 'gil@ec.com', vehicleId: 'g1', vehicleName: 'Van 1' }));
+  await assertFails(gilDb().ref(`timeclock/shifts/${matt}/s1/vans/x`).set({ at: NOW, how: 'admin', by: 'justin@ec.com', vehicleId: 'g1', vehicleName: 'Van 1' }));
+  await assertFails(gilDb().ref('timeclock/audit/a2').set({ at: NOW, by: 'justin@ec.com' }));
+});
+
+test('other signed-in accounts get none of Gil\'s access', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1'));
+  await assertFails(as('desk@ec.com').ref('timeclock/open').once('value'));
+  await assertFails(daveDb().ref('timeclock/open').once('value'));
+  await assertFails(daveDb().ref(`timeclock/employees/${matt}/name`).once('value'));
+  await assertFails(daveDb().ref(`timeclock/shifts/${matt}/s1/vehicleId`).set('g1'));
+});
