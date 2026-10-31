@@ -26,6 +26,14 @@ rules** actually stop an employee from changing their own punches.
   (lets them into the admin panel) and `database.rules.json` (lets them read and change
   the data), then publish the rules in the Firebase console. Each admin needs their own
   sign-in account under Firebase **Authentication**.
+- Gil (`gil@ec.com`, dispatch) is not an admin, but RouteWatcher's **Who's driving this?**
+  list lets them give a vehicle to someone on the clock. For that the rules let Gil read
+  employee names, `timeclock/open`, the vehicle claims, and the punch-in and vehicle fields
+  of shifts still on the clock, and write only a vehicle change on an open shift (its
+  vehicle history line marked `admin` and their own, the claim matching it, their own change
+  log entry). Gil can't read timesheets, finished shifts, locations, schedules, requests,
+  settings or the change log, and can't change punches or employees. To give someone else
+  this access, change `gil@ec.com` in `database.rules.json` (tests in `tests/rules/`).
 - Employees can read the GPS list and nicknames, and set a GPS nickname, so a vehicle
   pick shows up in RouteWatcher.
 - An employee on the clock can take a van another driver has (**Van swap**), but only
