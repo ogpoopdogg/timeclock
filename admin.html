@@ -1901,7 +1901,7 @@
         // The oil check on a shift, as a tag for the live board and timesheets ("" for a shift with no vehicle)
         function oilTag(s) {
             const st = oilState(s);
-            return st === "checked" ? '<span class="tag live" title="' + esc(s.oil.how === "out" ? "Said so at punch out" : "Ticked the oil check box") + '">Oil checked · ' + esc(fmtTime(s.oil.at)) + "</span>"
+            return st === "checked" ? '<span class="tag live" title="' + esc(s.oil.how === "out" ? "Said so at punch out" : s.oil.how === "swap" ? "Said so when handing off vehicle " + (s.oil.vehicle || "") : "Ticked the oil check box") + '">Oil checked · ' + esc(fmtTime(s.oil.at)) + "</span>"
                 : st === "notdue" ? '<span class="tag" title="This vehicle\'s oil check wasn\'t due on this shift (Garage → Oil schedule)">Oil not due</span>'
                 : st === "waiting" ? '<span class="tag warn">Oil not checked yet</span>'
                 : st === "missed" ? '<span class="tag warn" title="' + esc(oilMissWhy(s)) + '">Oil not checked</span>' : "";
@@ -1909,6 +1909,7 @@
         // Why a shift that's over has no oil check. "Got it" adds seenBy/seenAt to oil, so only done === false is a "no".
         // A driver's own punch out also saves outTap; without it, the office closed the shift and the driver was never asked.
         function oilMissWhy(s) {
+            if (s.oil && s.oil.done === false && s.oil.how === "swap") return "Said when handing off vehicle " + (s.oil.vehicle || "") + " they didn't check it";
             if (s.oil && s.oil.done === false) return "Said at punch out they didn't check it";
             if (typeof s.outTap !== "number" && !s.outLoc && (s.src === "admin" || s.edited)) return "Punched out by the office, so they weren't asked";
             return "Didn't answer at punch out";

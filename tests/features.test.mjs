@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -80,6 +80,20 @@ test('oil check: only shifts with a vehicle; checked, not yet, or missed', () =>
   assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked }), 'missed');                      // never answered
   assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked, oil: { done: false, at: t0 + H, how: 'out' } }), 'missed');
   assert.strictEqual(oilState({ in: t0, out: t0 + H, vans: picked, oil: { done: true, at: t0 + H, how: 'out' } }), 'checked');
+});
+
+test('oil check: an answer at a vehicle swap settles the shift, yes or no', () => {
+  const picked = { a: { at: t0, how: 'pick', vehicleId: 'g7', vehicleName: '7' } };
+  assert.strictEqual(oilSettled({ in: t0, vehicleId: 'g7' }), false);
+  assert.strictEqual(oilSettled({ in: t0, vehicleId: 'g7', oil: { due: true, at: t0 } }), false);
+  assert.strictEqual(oilSettled({ in: t0, vehicleId: 'g7', oil: { done: false, at: t0, how: 'out' } }), false);
+  assert.strictEqual(oilSettled({ in: t0, vehicleId: 'g7', oil: { done: true, at: t0, how: 'box' } }), true);
+  const no = { in: t0, vehicleId: 'g9', vans: picked, oil: { done: false, at: t0 + H, how: 'swap', vehicle: '7' } };
+  assert.strictEqual(oilSettled(no), true);
+  assert.strictEqual(oilHandoffVehicle(no), '7');                                   // about the vehicle handed off
+  assert.strictEqual(oilState(Object.assign({}, no, { out: t0 + 2 * H })), 'missed');  // still a "no" for the office
+  assert.strictEqual(oilState(Object.assign({}, no, { oil: { done: true, at: t0 + H, how: 'swap', vehicle: '7' } })), 'checked');
+  assert.strictEqual(oilHandoffVehicle({ in: t0, oil: { done: true, at: t0, how: 'box' } }), '');
 });
 
 test('oil check: a vehicle whose check wasn\'t due is left out', () => {

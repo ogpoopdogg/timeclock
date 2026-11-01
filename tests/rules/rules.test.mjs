@@ -186,6 +186,20 @@ test('oil check: only for a real shift, with a sensible time, and never "seen" b
   await assertFails(mattDb().ref(p).set(oil({ seenBy: 'matt@ec.com' })));
 });
 
+test('oil check: a driver handing off a vehicle answers for it (how "swap", with the vehicle)', async () => {
+  await assertSucceeds(punchIn(mattDb(), matt, 's1', {}));
+  const p = `timeclock/shifts/${matt}/s1/oil`;
+  await assertSucceeds(mattDb().ref(p).set(oil({ done: false, how: 'swap', vehicle: '12' })));
+  await assertSucceeds(mattDb().ref(p).set(oil({ how: 'swap', vehicle: '12' })));
+  await assertFails(mattDb().ref(p).set(oil({ done: false, how: 'swap', vehicle: '12' })));          // yes -> no isn't
+  await assertSucceeds(punchIn(daveDb(), dave, 'd1', {}));
+  const d = `timeclock/shifts/${dave}/d1/oil`;
+  await assertFails(daveDb().ref(d).set(oil({ how: 'box', vehicle: '12' })));                        // vehicle only on a swap answer
+  await assertFails(daveDb().ref(d).set(oil({ how: 'swap', vehicle: 'x'.repeat(61) })));
+  await assertFails(daveDb().ref(d).set(oil({ how: 'swap', vehicle: 12 })));
+  await assertFails(mattDb().ref(d).set(oil({ how: 'swap', vehicle: '12' })));                       // not their shift
+});
+
 test('oil check: can be answered just after punching out, not days later', async () => {
   await seed({ timeclock: {
     employees: { [matt]: { email: 'matt@ec.com', active: true } },
