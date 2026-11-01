@@ -864,7 +864,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, punchForFix, longShift,
+            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, longShift,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -891,6 +891,7 @@
         let empLoaded = false, shiftsLoaded = false;
         let busy = false;
         let afterPunchInPick = false;       // open the vehicle picker once the success overlay closes
+        let handoffAsked = null;            // the shift and taken vehicle the handoff oil question last opened for by itself
         let afterPunchOutOil = null;        // the shift to ask "Did you check the oil?" about once it closes
         let afterPunchOutLong = null;       // a long shift to ask "Did you forget to punch out?" about once it closes
 
@@ -1104,6 +1105,10 @@
                 $("vpName").textContent = lost ? "Pick your vehicle" : has ? (open.vehicleName || "—") : shop ? "Shop" : "Tap to pick one";
                 $("swapBtnText").textContent = has || lost ? "Vehicle swap" : "Pick vehicle";
                 showSwapBanner(open, lost);
+                if (lost && lost.vehicleName && needsHandoffOil(open) && !formOpen && !sheetOpen && handoffAsked !== open.id + "|" + lost.vehicleName) {
+                    handoffAsked = open.id + "|" + lost.vehicleName;
+                    askOilAtHandoff(open.id, lost.vehicleName, null);
+                }
             }
             $("vanReportBtn").hidden = !(open && open.vehicleId && !lostVan(open));
             renderOilBox(open);
@@ -1346,7 +1351,7 @@
                 if (navigator.vibrate) navigator.vibrate([18, 60, 30]);
                 burst();
                 showSuccess(!open, res.tap, !res.sent);
-                afterPunchOutOil = open && oilWanted(open) && !oilDone(open) ? open : null;
+                afterPunchOutOil = open && oilWanted(open) && !oilSettled(open) ? open : null;
                 afterPunchOutLong = open && longShift(Object.assign({}, open, { out: res.tap }), settings, res.tap) ? Object.assign({}, open, { out: res.tap }) : null;
             } catch (err) {
                 $("punchMsg").textContent = (open ? "Punch out" : "Punch in") + " failed: " + errText(err);
@@ -1401,8 +1406,16 @@
 
         // The oil check answer (see "Oil check" below); a "checked" already on the server is never changed
         async function sendOil(p) {
-            try { await set(ref(db, shiftPath(p.id) + "/oil"), { done: p.done === true, at: p.tap, how: p.how === "out" ? "out" : "box" }); }
-            catch (err) { if (!(await shiftHas(p.id, "oil/done"))) throw err; return; }
+            const how = p.how === "out" || p.how === "swap" ? p.how : "box";
+            const oil = Object.assign({ done: p.done === true, at: p.tap, how: how }, how === "swap" && p.vehicle ? { vehicle: String(p.vehicle).slice(0, 60) } : {});
+            try { await set(ref(db, shiftPath(p.id) + "/oil"), oil); }
+            catch (err) {
+                if (await shiftHas(p.id, "oil/done")) return;
+                if (how !== "swap" || !isDenied(err)) throw err;
+                // Database rules from before handoff answers: saved as a plain answer
+                try { await set(ref(db, shiftPath(p.id) + "/oil"), { done: p.done === true, at: p.tap, how: "box" }); }
+                catch (err2) { if (!(await shiftHas(p.id, "oil/done"))) throw err2; return; }
+            }
             if (p.done === true && vanKey(p.vehicle)) sendOilLast(p).catch(err => console.warn("Last oil check not saved:", err));
         }
         // Whether the vehicle's oil check is due on this shift, saved before any answer (never over an answer).
@@ -1478,7 +1491,7 @@
                 const s = list.find(x => x.id === p.id);
                 if (p.kind === "in" && !s) list.push({ id: p.id, in: p.tap, tap: p.tap, src: "clock", pending: true });
                 else if (p.kind === "out" && s && typeof s.out !== "number") { s.out = p.tap; s.pending = true; }
-                else if (p.kind === "oil" && s && !oilDone(s)) s.oil = { done: p.done, at: p.tap, how: p.how, pending: true };
+                else if (p.kind === "oil" && s && !oilDone(s)) s.oil = Object.assign({ done: p.done, at: p.tap, how: p.how, pending: true }, p.how === "swap" && p.vehicle ? { vehicle: p.vehicle } : {});
                 else if (p.kind === "oilDue" && s && !(s.oil && typeof s.oil.done === "boolean")) s.oil = { due: p.due, at: p.tap, pending: true };
             }
             shifts = list.sort((a, b) => a.in - b.in);
@@ -1597,7 +1610,10 @@
         }
 
         async function openSheet() {
-            if (!current()) return;
+            const open = current();
+            if (!open) return;
+            const lost = lostVan(open);
+            if (lost && lost.vehicleName && needsHandoffOil(open) && !formOpen) { askOilAtHandoff(open.id, lost.vehicleName, openSheet); return; }
             sheetOpen = true;
             $("sheetBackdrop").classList.add("show");
             const sheet = $("sheet");
@@ -1721,6 +1737,12 @@
             const prevId = open.vehicleId && !lost ? open.vehicleId : null;
             const prevName = prevId ? open.vehicleName || null : null;
             const prevNick = open.nickname;
+            // Vehicle swap: the vehicle this driver hands off (or that was taken) and whether to ask about its oil first;
+            // and whether the new one comes from another driver today (taken from them, or the one they left behind),
+            // so it was already checked: no Vehicle Check and no oil question for it
+            const handedOff = prevId ? prevName || prevId : lost ? lost.vehicleName || "" : "";
+            const askHandoff = !!handedOff && needsHandoffOil(open);
+            const takenOver = !!holder || (!!lost && !!lost.suggestId && lost.suggestId === g.id);
             try {
                 const res = await runTransaction(ref(db, P.claims + "/" + g.id), cur => {
                     // Free, already mine, or still held by the driver this driver agreed to take it from
@@ -1752,7 +1774,9 @@
                 const msg = (prevId || lost ? "Vehicle swap done. " : "") + "You are driving vehicle " + g.name + (holder ? ". " + holderName + " has been unassigned." : "");
                 if (nickOk) toast(msg);
                 else toast(msg + " Its RouteWatcher name couldn't be updated, so tell your administrator.", true);
-                setTimeout(() => openVanCheck(g.id, g.name, true), 450); // van check: anything wrong with it?
+                // van check: anything wrong with it? (not for a vehicle another driver had today: they had the check)
+                const next = takenOver ? () => remindOil(true) : () => openVanCheck(g.id, g.name, true);
+                setTimeout(askHandoff ? () => askOilAtHandoff(open.id, handedOff, next) : next, 450);
             } catch (err) {
                 picking = null;
                 renderSheet();
@@ -1988,19 +2012,21 @@
             const box = $("oilBox");
             box.hidden = !oilWanted(open);
             if (box.hidden) return;
-            const done = oilDone(open);
-            box.classList.toggle("done", done);
-            box.setAttribute("aria-disabled", String(done));
-            $("oilTitle").textContent = done ? "Oil checked" : "Oil check";
-            $("oilSub").textContent = done ? fmtTime(open.oil.at) + (open.oil.pending ? " · saved on this phone" : "")
+            const done = oilDone(open), settled = oilSettled(open), handed = oilHandoffVehicle(open);
+            box.classList.toggle("done", settled);
+            box.setAttribute("aria-disabled", String(settled));
+            $("oilTitle").textContent = done ? "Oil checked" : settled ? "Oil not checked" : "Oil check";
+            $("oilSub").textContent = settled ? (handed ? "Vehicle " + handed + " · " : "") + fmtTime(open.oil.at) + (open.oil.pending ? " · saved on this phone" : "")
                 : "Tap here once you've checked the oil";
         }
 
-        // After a vehicle is picked: saves whether its oil check is due on this shift, and reminds the driver if it is
-        function remindOil() {
+        // After a vehicle is picked: saves whether its oil check is due on this shift, and reminds the driver if it is.
+        // takenOver: the vehicle came from another driver in a vehicle swap today. Its oil is that driver's (they're
+        // asked when they hand it off), so this driver isn't asked about it: the shift is saved as not due.
+        function remindOil(takenOver) {
             const open = current();
-            if (!open || !open.vehicleName || oilDone(open)) return;
-            const name = open.vehicleName, due = oilDueNow(name);
+            if (!open || !open.vehicleName || oilSettled(open)) return;
+            const name = open.vehicleName, due = takenOver === true ? false : oilDueNow(name);
             if (!open.oil || open.oil.due !== due) saveOilDue(open.id, due);
             if (!due || formOpen || sheetOpen) return;
             const asked = open.id + "|" + vanKey(name);
@@ -2018,7 +2044,7 @@
 
         function openOilCheck() {
             const open = current();
-            if (!open || oilDone(open)) return;
+            if (!open || oilSettled(open)) return;
             const name = vehicleOf(open);
             openForm({
                 title: "Oil check",
@@ -2055,8 +2081,30 @@
             });
         }
 
-        function saveOil(id, done, how) {
-            const s = shifts.find(x => x.id === id), vehicle = s ? vehicleOf(s) : "";
+        // Vehicle swap: the driver handing off a vehicle (or whose vehicle another driver took) is asked about its oil
+        // right then, if they haven't ticked it yet. Some drivers only tick it at punch out, and the driver taking the
+        // vehicle isn't responsible for its oil. The answer settles the shift's oil (see oilSettled() in tc-core.js).
+        function needsHandoffOil(open) { return !!open && oilWanted(open) && !oilSettled(open); }
+        function askOilAtHandoff(shiftId, vehicleName, then) {
+            openForm({
+                title: "Did you check the oil?",
+                sub: "Before you hand off vehicle " + vehicleName + ", let the office know if you checked its oil today. The next driver won't be asked about it.",
+                body: '<label class="check-row"><input type="checkbox" id="oilYes"><span>I checked the oil in vehicle ' + esc(vehicleName) + "</span></label>",
+                submit: "Save",
+                noCancel: true,
+                mustAnswer: true,
+                offline: true,
+                onSubmit: () => {
+                    const yes = $("oilYes").checked;
+                    saveOil(shiftId, yes, "swap", vehicleName);
+                    toast(yes ? "Oil check saved. Thanks!" : "Saved: oil not checked.");
+                },
+                onClose: then || null
+            });
+        }
+
+        function saveOil(id, done, how, handedOff) {
+            const s = shifts.find(x => x.id === id), vehicle = handedOff || (s ? vehicleOf(s) : "");
             const p = { kind: "oil", id: id, tap: now(), done: done, how: how, vehicle: vehicle };
             if (done && vanKey(vehicle)) { oilLast = Object.assign({}, oilLast); oilLast[vanKey(vehicle)] = { at: p.tap, pending: true }; }
             addPending(p);

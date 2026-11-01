@@ -312,6 +312,16 @@ export function oilState(shift) {
     if (shift.oil && shift.oil.due === false && shift.oil.done === undefined) return "notdue";
     return typeof shift.out === "number" ? "missed" : "waiting";
 }
+// Vehicle swaps: the driver handing a vehicle to another driver is the one asked about its oil, right then
+// (oil.how "swap", with oil.vehicle the vehicle they handed off). After that answer, yes or no, the shift's oil is
+// settled: no more oil questions that shift, not for the vehicle they get either.
+export function oilSettled(shift) {
+    return !!(shift && shift.oil && (shift.oil.done === true || (shift.oil.how === "swap" && typeof shift.oil.done === "boolean")));
+}
+// The vehicle the oil answer was about: the handed-off one for a swap answer, else "" (the shift's vehicle)
+export function oilHandoffVehicle(shift) {
+    return shift && shift.oil && shift.oil.how === "swap" && typeof shift.oil.vehicle === "string" ? shift.oil.vehicle : "";
+}
 
 // ---------- Oil check schedule ----------
 // oil_plan = { def: plan, vehicles: { [vanKey]: plan }, ask: { [vanKey]: time } }: how often each vehicle's oil is

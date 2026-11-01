@@ -55,7 +55,8 @@
               "done": { ".validate": "newData.isBoolean()" },
               "due": { ".validate": "newData.isBoolean() && !newData.parent().child('done').exists()" },
               "at": { ".validate": "newData.isNumber()" },
-              "how": { ".validate": "newData.val() === 'box' || newData.val() === 'out'" },
+              "how": { ".validate": "newData.val() === 'box' || newData.val() === 'out' || newData.val() === 'swap'" },
+              "vehicle": { ".validate": "newData.isString() && newData.val().length <= 60 && newData.parent().child('how').val() === 'swap'" },
               "seenBy": { ".validate": "newData.isString() && newData.val().length <= 100" },
               "seenAt": { ".validate": "newData.isNumber()" },
               "$other": { ".validate": false }

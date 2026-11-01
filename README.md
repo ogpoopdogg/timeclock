@@ -56,7 +56,9 @@ rules** actually stop an employee from changing their own punches.
 - A driver can save the oil check on their own shift (`oil` on the shift) while it's open
   or within a day of punching out. Once it says *checked* it can't be changed back. Only
   admins can mark a missed one as seen. Before an answer, the clock can also save that the
-  vehicle's oil check wasn't due on that shift (`oil: { due: false }`).
+  vehicle's oil check wasn't due on that shift (`oil: { due: false }`). An answer given when
+  handing a vehicle off in a vehicle swap is `how: "swap"` with the vehicle's name
+  (`vehicle`, only on a swap answer).
 - Employees can read the oil check schedule (`timeclock/oil_plan`); only admins can change
   it. Each vehicle's last oil check (`timeclock/oil_last/{vehicle}`) can be saved by a driver
   only from their own shift that says *checked*, at that check's time, and never over a
@@ -321,6 +323,15 @@ punches. Only email and password sign-in is used, which doesn't need it.
   (checked or not) is saved on the shift. Only **Save** closes that question, so a stray
   tap outside it doesn't count as "not checked". It works with no signal, like a punch.
   When the vehicle isn't due, nothing is asked.
+- **Vehicle swaps:** the driver handing a vehicle off is the one responsible for its oil.
+  If they haven't ticked the oil check yet that shift, they're asked *Did you check the
+  oil?* about that vehicle right away: when they tap **Vehicle swap** and pick another
+  vehicle, or, when another driver takes theirs, as soon as their app sees it (and before
+  they pick the vehicle they're in now). The answer, yes or no, settles the shift's oil: no
+  more oil questions that shift, not at punch out either. The driver getting a vehicle
+  another driver had today (taken from them, or the one they left behind) gets no Vehicle
+  Check and no oil question for it; their shift is saved as *Oil not due*. A vehicle
+  nobody was driving (picked up from the lot, or after Shop) is a normal pick.
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
 **Admin → Inbox** lists punch fixes and late punch ins (see *No signal*), with a count on the tab. **Fix it** opens the punch
