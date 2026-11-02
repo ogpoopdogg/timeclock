@@ -31,8 +31,12 @@ rules** actually stop an employee from changing their own punches.
   employee names, `timeclock/open`, the vehicle claims, and the punch-in and vehicle fields
   of shifts still on the clock, and write only a vehicle change on an open shift (its
   vehicle history line marked `admin` and their own, the claim matching it, their own change
-  log entry). Gil can't read timesheets, finished shifts, locations, schedules, requests,
-  settings or the change log, and can't change punches or employees. To give someone else
+  log entry). RouteWatcher also sets its From/To times from when a driver punched in, so
+  Gil can look up a person's shifts by punch-in time: a query on `timeclock/shifts/{ek}`
+  ordered by `in`, with a start, an end and at most 10 results. That query returns whole
+  shift records (punch times, vehicles, punch locations), and repeated queries could reach
+  any shift. Gil can't read a shift directly, or schedules, requests, settings or the change
+  log, and can't change punches or employees. To give someone else
   this access, change `gil@ec.com` in `database.rules.json` (tests in `tests/rules/`).
 - Employees can read the GPS list and nicknames, and set a GPS nickname, so a vehicle
   pick shows up in RouteWatcher.
