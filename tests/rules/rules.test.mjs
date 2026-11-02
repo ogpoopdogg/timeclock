@@ -1,6 +1,7 @@
 // Database rules (../../database.rules.json) against the Realtime Database emulator.
 // Run from this folder: npm install, then npm test (it starts the emulator; needs Java 11+).
 import test, { before, after, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -354,6 +355,29 @@ test('Gil can see who is on the clock: names, and the vehicle of shifts still op
     await assertSucceeds(gilDb().ref(`timeclock/shifts/${matt}/s1/${f}`).once('value'));
   }
   await assertSucceeds(gilDb().ref('timeclock/vehicle_claims').once('value'));
+});
+
+// RouteWatcher sets its From/To times from when the driver punched in that day (finished shifts too)
+const dayQuery = (db, ek, from, to, n) => db.ref(`timeclock/shifts/${ek}`).orderByChild('in').startAt(from).endAt(to).limitToFirst(n || 10).once('value');
+
+test('Gil can look up one person\'s shifts for one day (by punch-in time), finished ones too', async () => {
+  await daveDone();
+  const dayStart = Date.now() - 2 * DAY;
+  const snap = await assertSucceeds(dayQuery(gilDb(), dave, dayStart, dayStart + DAY + 3600000));
+  assert.equal(typeof snap.val().d1.in, 'number');
+});
+
+test('Gil cannot read shifts directly, open-ended, or more than 10 at a time', async () => {
+  await daveDone();
+  const from = Date.now() - 3 * DAY;
+  await assertFails(gilDb().ref(`timeclock/shifts/${dave}`).orderByChild('in').startAt(from).once('value'));
+  await assertFails(gilDb().ref(`timeclock/shifts/${dave}`).orderByChild('in').endAt(Date.now()).once('value'));
+  await assertFails(dayQuery(gilDb(), dave, from, from + DAY, 11));
+  await assertFails(gilDb().ref(`timeclock/shifts/${dave}`).orderByChild('in').startAt(from).endAt(from + DAY).once('value')); // no limit
+  await assertFails(gilDb().ref(`timeclock/shifts/${dave}`).orderByKey().startAt('a').endAt('z').once('value'));
+  await assertFails(gilDb().ref(`timeclock/shifts/${dave}`).orderByChild('out').startAt(from).endAt(from + DAY).once('value'));
+  // other people still can't
+  await assertFails(dayQuery(mattDb(), dave, from, from + DAY));
 });
 
 test('Gil cannot read timesheets, finished shifts, locations, schedules or anything else', async () => {
