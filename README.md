@@ -305,7 +305,17 @@ ones. Hover over any cell or bar for the numbers.
   A cell that starts with = + - or @ gets a ' in front, so Excel keeps it as text instead
   of running it as a formula.
 - **Settings → Shop location:** punches made farther than the set distance from the shop
-  show **Far from shop** on the timesheet.
+  show **Far from shop** on the timesheet. **Pick on the map** opens a map where you
+  search an address or tap to drop the pin (drag it to move it).
+- **Settings → Punch spots:** places other than the shop where some drivers start and end
+  their day (Winnipeg, say), each with a name, a pin on the map and its own distance.
+  Saved in `timeclock/spots`. Give a driver their spot on **Staff → Edit → Punch spot**
+  (saved as `spot` on the employee). Their punches in and out then show
+  **Far from (spot name)** when farther than that spot's distance, including a punch at
+  the shop. Shifts in the shop (Shop picked, or set by an admin) are still checked against
+  the shop. The flag is worked out when the timesheet is shown, so changing or removing a
+  driver's spot changes the flag on their old punches too. Removing a spot puts its
+  drivers back on the shop. **Takes the place of** brings the old sign-in's spot along.
 - **Settings → Change log** includes employee changes (added, edited, removed, added back,
   moved to a new sign-in), can be filtered to one person, and loads older changes on
   request.

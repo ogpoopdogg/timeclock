@@ -299,6 +299,21 @@
         .map-meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
         .map-frame { display: block; width: 100%; height: min(420px, 55vh); border: 0; border-radius: 14px; background: var(--asphalt-3); margin-bottom: 10px; overflow: hidden; }
         .map-nokey { color: var(--muted); font-size: 0.9rem; padding: 14px; border-radius: 12px; background: var(--asphalt-3); margin-bottom: 10px; }
+        /* ---------- Map picker (shop location and punch spots) ---------- */
+        .place-search { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .place-search .input { flex: 1 1 200px; min-width: 0; }
+        .place-results { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+        .place-results button {
+            text-align: left; padding: 8px 10px; border: 0; border-radius: 10px; cursor: pointer; font: inherit; font-size: 0.9rem;
+            color: var(--text); background: var(--asphalt-3); box-shadow: inset 0 0 0 1px var(--line);
+        }
+        .place-results button:hover, .place-results button:focus-visible { box-shadow: inset 0 0 0 1px var(--yellow); }
+        .place-results .none { color: var(--muted); font-size: 0.9rem; }
+        .map-frame.pick { height: min(360px, 45vh); cursor: crosshair; }
+        .spot-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); margin-bottom: 8px; }
+        .spot-row .spot-name { font-weight: 600; }
+        .spot-row .spot-meta { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+        .person-spot { color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
         a.btn { text-decoration: none; }
 
         /* ---------- Employees ---------- */
@@ -736,19 +751,26 @@
                 </div>
                 <form class="card" id="shopForm">
                     <h3>Shop location</h3>
-                    <p class="hint">Punches made farther than this from the shop are flagged on the timesheet. Leave it empty to turn the flag off.</p>
+                    <p class="hint">Punches made farther than this from the shop are flagged on the timesheet. Leave it empty to turn the flag off. Drivers with their own punch spot are checked against that spot instead.</p>
                     <div class="modal-grid">
                         <div class="field"><label for="shLat">Latitude</label><input class="input" id="shLat" inputmode="decimal" placeholder="49.8485"></div>
                         <div class="field"><label for="shLng">Longitude</label><input class="input" id="shLng" inputmode="decimal" placeholder="-99.9501"></div>
                         <div class="field full"><label for="shRadius">Flag punches farther than (metres)</label><input class="input" id="shRadius" type="number" min="50" max="50000" step="10" inputmode="numeric"></div>
                     </div>
-                    <p class="hint" style="margin-top:-4px">Tip: in Google Maps, right-click the shop and click the numbers at the top to copy them, then paste here as latitude, longitude.</p>
+                    <p class="hint" style="margin-top:-4px">Use “Pick on the map” to search an address or drop a pin. Or, in Google Maps, right-click the shop and click the numbers at the top to copy them, then paste here as latitude, longitude.</p>
                     <div class="modal-foot" style="justify-content:flex-start">
                         <button type="submit" class="btn primary">Save shop location</button>
+                        <button type="button" class="btn" id="shPick">Pick on the map</button>
                         <button type="button" class="btn" id="shHere">Use where I am now</button>
                         <button type="button" class="btn ghost" id="shClear">Clear</button>
                     </div>
                 </form>
+                <div class="card">
+                    <h3>Punch spots</h3>
+                    <p class="hint">For drivers who start and end their day somewhere other than the shop. Give a driver their spot on Staff → Edit. Their punches in and out are then flagged when far from that spot instead of the shop. Shifts in the shop are still checked against the shop.</p>
+                    <div id="spotList"></div>
+                    <button type="button" class="btn" id="addSpotBtn">Add punch spot</button>
+                </div>
             </div>
         </section>
     </main>
@@ -800,6 +822,11 @@
                 <div class="field"><label for="emName">Name</label><input class="input" id="emName" maxlength="60" placeholder="Matt Smith" autocomplete="off"></div>
                 <div class="field"><label for="emEmail">Sign-in email</label><input class="input" id="emEmail" type="email" placeholder="matt@ec.com" autocapitalize="off" spellcheck="false" autocomplete="off"></div>
                 <div class="field full"><label class="switch"><input type="checkbox" id="emActive" checked><span class="track"></span>Active (can punch in)</label></div>
+                <div class="field full">
+                    <label for="emSpot">Punch spot</label>
+                    <select class="select" id="emSpot"></select>
+                    <p class="hint" style="margin:0;color:var(--muted);font-size:0.85rem">Where they punch in and out. Punches far from it are flagged on the timesheet. Spots are set up in Settings → Punch spots.</p>
+                </div>
                 <div class="field full" id="emReplaceField">
                     <label for="emReplace">Takes the place of (optional)</label>
                     <select class="select" id="emReplace"></select>
@@ -870,6 +897,36 @@
         </div>
     </div>
 
+    <!-- Map picker: the shop location or a punch spot -->
+    <div class="modal-backdrop" id="placeModal">
+        <form class="modal map-modal" role="dialog" aria-modal="true" aria-labelledby="plTitle" id="placeForm" novalidate>
+            <h2 id="plTitle">Punch spot</h2>
+            <p class="modal-sub">Search an address, or tap the map to drop the pin. Drag the pin to move it.</p>
+            <div class="field" id="plNameField"><label for="plName">Name</label><input class="input" id="plName" maxlength="40" placeholder="Winnipeg lot" autocomplete="off"></div>
+            <div class="place-search">
+                <input class="input" id="plSearch" type="search" placeholder="Search an address" autocomplete="off" aria-label="Search an address or place">
+                <button type="button" class="btn" id="plFind">Search</button>
+                <button type="button" class="btn ghost" id="plHere">Where I am now</button>
+            </div>
+            <div class="place-results" id="plResults"></div>
+            <div class="map-frame pick" id="plMap" aria-label="Map: tap to drop the pin"></div>
+            <p class="map-nokey" id="plNoKey" hidden>The map couldn't load here. Type the latitude and longitude below instead.</p>
+            <p class="map-meta" id="plAddr"></p>
+            <div class="modal-grid">
+                <div class="field"><label for="plLat">Latitude</label><input class="input" id="plLat" inputmode="decimal" placeholder="49.8485"></div>
+                <div class="field"><label for="plLng">Longitude</label><input class="input" id="plLng" inputmode="decimal" placeholder="-99.9501"></div>
+                <div class="field full"><label for="plRadius">Flag punches farther than (metres)</label><input class="input" id="plRadius" type="number" min="50" max="50000" step="10" inputmode="numeric"></div>
+            </div>
+            <p class="modal-msg" id="plMsg" role="alert"></p>
+            <div class="modal-foot">
+                <button type="button" class="btn danger" id="plDelete">Remove spot</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost" data-close>Cancel</button>
+                <button type="submit" class="btn primary" id="plSave">Save</button>
+            </div>
+        </form>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="viz-tip" id="vizTip" role="tooltip"></div>
 
@@ -886,7 +943,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, sentLate, countedOut, farFromShop, fmtDistance, rangeDays, vanTime, punchForFix, overlapping,
+            oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, overlapping,
             longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
@@ -905,6 +962,7 @@
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
         let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [];
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
+        let spots = {}, spotsLoaded = false;               // punch spots other than the shop (cleanSpots of timeclock/spots)
         let requestsAll = {}; // the Inbox: punch fixes (vehicle problems and oil checks are in Garage)
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
         let viewWeek = null, rangeStart = null;
@@ -970,7 +1028,7 @@
             stopAll();
             user = u;
             employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = [];
-            requestsAll = {}; settingsRaw = {}; reportCache = null;
+            requestsAll = {}; settingsRaw = {}; reportCache = null; spots = {}; spotsLoaded = false;
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
                 $("gateSub").textContent = "Only the time clock administrator can open this panel.";
@@ -998,7 +1056,12 @@
                 fillSettingsForm();
                 renderAll();
             });
-            sub(ref(db, P.employees), s => { employees = s.val() || {}; syncShiftListeners(); renderAll(); });
+            sub(ref(db, P.employees), s => { employees = s.val() || {}; syncShiftListeners(); renderAll(); renderSpots(); });
+            sub(ref(db, P.spots), s => {
+                spots = cleanSpots(s.val()); spotsLoaded = true;
+                renderSpots(); renderAll();
+                if ($("empModal").classList.contains("show")) fillSpotSelect($("emSpot").value);
+            });
             sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
@@ -1333,12 +1396,19 @@
             if (!loc) return "";
             if (!hasCoords(loc)) return '<div class="loc none" title="' + esc(LOCATION_ERRORS[loc.err] || loc.err || "") + '">No location · ' +
                 esc(LOCATION_ERRORS[loc.err] || "not recorded") + "</div>";
-            // Punch in / out made far from the shop (Settings → Shop location)
-            const far = which === "in" || which === "out" ? farFromShop(loc, settings) : null;
+            // Punch in / out made far from the driver's punch spot, or the shop (Settings → Punch spots / Shop location)
+            const place = which === "in" || which === "out" ? placeForShift(k, shiftId) : null;
+            const far = place ? farFromPlace(loc, place) : null;
             return '<button type="button" class="loc" data-map="' + esc(k + "|" + shiftId + "|" + which) + '" title="Show on the map">' + PIN +
                 "<span>" + esc(placeText(loc, addr, addrErr)) + "</span></button>" +
-                (far ? '<span class="far" title="More than ' + esc(fmtDistance(settings.shopRadius)) + ' from the shop">Far from shop · ' + esc(fmtDistance(far)) + "</span>" : "");
+                (far ? '<span class="far" title="More than ' + esc(fmtDistance(place.radius)) + " from " + esc(placeName(place, true)) + '">Far from ' +
+                    esc(placeName(place)) + " · " + esc(fmtDistance(far)) + "</span>" : "");
         }
+
+        // Where a shift's punches in and out should be: the driver's punch spot, or the shop (and for shop shifts)
+        function placeForShift(k, shiftId) { return punchPlace(employees[k], findShift(k, shiftId), spots, settings); }
+        // "shop" / "the shop" for the shop, else the spot's name
+        function placeName(place, the) { return place.id ? place.name : the ? "the shop" : "shop"; }
 
         // Every van in the shift, in order, with where each change happened
         function vanCell(k, s) {
@@ -1385,6 +1455,8 @@
         function mapUnavailable() {
             $("mapFrame").hidden = true;
             $("mapNoKey").hidden = false;
+            $("plMap").hidden = true;
+            $("plNoKey").hidden = false;
         }
 
         async function showOnMap(loc) {
@@ -1462,8 +1534,9 @@
             $("mapTitle").textContent = p.label;
             $("mapSub").textContent = displayName(emp, emp && emp.email) + " · " + fmtKey(dayKey(p.at)) + ", " + fmtTime(p.at);
             $("mapAddr").textContent = p.addr || (p.addrErr ? "No street address found" : !MAPS_KEY || mapsFailed ? "Street address not available" : "Finding the address…");
-            const far = which === "in" || which === "out" ? farFromShop(p.loc, settings) : null;
-            $("mapMeta").textContent = coordsText(p.loc) + (p.loc.acc ? " · accurate to about " + p.loc.acc + " m" : "") + (far ? " · " + fmtDistance(far) + " from the shop" : "");
+            const place = which === "in" || which === "out" ? placeForShift(k, shiftId) : null;
+            const far = place ? farFromPlace(p.loc, place) : null;
+            $("mapMeta").textContent = coordsText(p.loc) + (p.loc.acc ? " · accurate to about " + p.loc.acc + " m" : "") + (far ? " · " + fmtDistance(far) + " from " + placeName(place, true) : "");
             $("mapLink").href = mapsLink(p.loc);
             $("mapNoKey").hidden = true;
             $("mapFrame").hidden = false;
@@ -1620,7 +1693,9 @@
             m.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => closeModal(m.id)));
         });
         document.addEventListener("keydown", e => {
-            if (e.key === "Escape") document.querySelectorAll(".modal-backdrop.show").forEach(m => closeModal(m.id));
+            if (e.key !== "Escape") return;
+            const shown = document.querySelectorAll(".modal-backdrop.show"); // the one on top is last (the map picker can open over Edit employee)
+            if (shown.length) closeModal(shown[shown.length - 1].id);
         });
 
         function openShiftModal(ek, shiftId, request) {
@@ -1851,6 +1926,7 @@
             if ((before.name || "") !== (after.name || "")) out.push("Name: " + (before.name || "none") + " → " + (after.name || "none"));
             if ((before.active !== false) !== (after.active !== false)) out.push(after.active !== false ? "Turned on (can punch in)" : "Turned off (can't punch in)");
             if (schedText(before.schedule) !== schedText(after.schedule)) out.push("Schedule: " + schedText(before.schedule) + " → " + schedText(after.schedule));
+            if ("spot" in after && (before.spot || "") !== (after.spot || "")) out.push("Punch spot: " + spotLabel(before.spot) + " → " + spotLabel(after.spot));
             return out;
         }
 
@@ -2230,7 +2306,8 @@
                 const open = openShift(shiftsOf(e.ek));
                 return '<div class="emp-row' + (e.active === false || e.removed ? " inactive" : "") + '" style="--i:' + i + '">' +
                     '<div class="avatar">' + esc(initials(name)) + "</div>" +
-                    '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
+                    '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div>" +
+                    (e.spot && spots[e.spot] ? '<div class="person-spot">Punch spot: ' + esc(spots[e.spot].name) + "</div>" : "") + "</div>" +
                     schedSummary(e) +
                     '<div class="emp-status">' + (e.removed ? '<span class="tag off">Removed</span>' : e.active === false ? '<span class="tag off">Inactive</span>'
                         : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
@@ -2289,6 +2366,7 @@
             $("emReplace").innerHTML = '<option value="">Nobody (a new employee)</option>' + others.map(p => '<option value="' + esc(p.ek) + '">' +
                 esc(displayName(p, p.email)) + " · " + esc(p.email) + (p.removed ? " (removed)" : " (inactive)") + "</option>").join("");
             buildSchedEditor(e ? e.schedule : { mon: { start: "08:00" }, tue: { start: "08:00" }, wed: { start: "08:00" }, thu: { start: "08:00" }, fri: { start: "08:00" } });
+            fillSpotSelect(e && e.spot);
             openModal("empModal");
         }
         $("emReplace").addEventListener("change", () => {
@@ -2296,7 +2374,25 @@
             if (!old) return;
             if (!$("emName").value.trim()) $("emName").value = old.name || "";
             buildSchedEditor(old.schedule);
+            if (old.spot && spots[old.spot]) fillSpotSelect(old.spot); // their punch spot comes along too
         });
+
+        // Punch spot choice: the shop, a spot from Settings → Punch spots, or a new one made on the map
+        const NEW_SPOT = "_new";
+        function fillSpotSelect(cur) {
+            const list = Object.values(spots).sort((a, b) => a.name.localeCompare(b.name));
+            $("emSpot").innerHTML = '<option value="">The shop</option>' + list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + "</option>").join("") +
+                '<option value="' + NEW_SPOT + '">New punch spot…</option>';
+            $("emSpot").value = cur && spots[cur] ? cur : "";
+            $("emSpot").dataset.prev = $("emSpot").value;
+        }
+        $("emSpot").addEventListener("change", () => {
+            const sel = $("emSpot");
+            if (sel.value !== NEW_SPOT) { sel.dataset.prev = sel.value; return; }
+            sel.value = sel.dataset.prev || "";
+            openPlaceModal("spot", null, "emp");
+        });
+        const spotLabel = id => id && spots[id] ? spots[id].name : "the shop";
 
         $("empForm").addEventListener("submit", async ev => {
             ev.preventDefault();
@@ -2328,6 +2424,9 @@
                 const before = existing || {};
                 const record = { email: email, name: $("emName").value.trim(), active: $("emActive").checked, schedule: schedule,
                     createdAt: before.createdAt || serverTimestamp() };
+                // Punch spot: null takes it away (the shop). Left alone if the spots haven't loaded yet.
+                const spotPick = $("emSpot").value;
+                if (spotsLoaded && spotPick !== NEW_SPOT) record.spot = spotPick && spots[spotPick] ? spotPick : null;
                 // Only these fields change, so anything else saved on the employee (by Garage, say) is kept.
                 // Adding someone back also clears "removed".
                 await update(ref(db, P.employees + "/" + k), Object.assign({}, record, before.removed ? { removed: null, removedAt: null } : {}));
@@ -2336,7 +2435,7 @@
                 if (closeOpen) { await punchOutNow(k, closeOpen, "Punched out when turned off"); note = " Punched out."; }
                 if (canCreate && pass) note = await createLogin(email, pass);
                 const action = replaceEk ? "emp-replace" : emCtx.restoring || (existing && existing.removed) ? "emp-restore" : emCtx.ek ? "emp-edit" : "emp-add";
-                const changes = action === "emp-edit" ? empChanges(before, record) : action === "emp-add" || action === "emp-replace" ? ["Schedule: " + schedText(schedule)] : [];
+                const changes = action === "emp-edit" ? empChanges(before, record) : action === "emp-add" || action === "emp-replace" ? ["Schedule: " + schedText(schedule)].concat(record.spot ? ["Punch spot: " + spotLabel(record.spot)] : []) : [];
                 if (action !== "emp-edit" || changes.length) {
                     await logEmpAudit(k, action, changes, Object.assign({ name: displayName(record, email) }, replaceEk ? { from: empName(replaceEk) + " (" + String(replaceEk).replace(/,/g, ".") + ")" } : {}));
                 }
@@ -2552,6 +2651,214 @@
             }, () => toast("Couldn't get this device's location.", true), { enableHighAccuracy: true, timeout: 15000 });
         });
         $("shClear").addEventListener("click", () => { $("shLat").value = ""; $("shLng").value = ""; });
+
+        // ---------- Punch spots and the map picker ----------
+        function spotUsers(id) { return empList().filter(e => !e.removed && e.spot === id); }
+        function renderSpots() {
+            if (!user) return;
+            const list = Object.values(spots).sort((a, b) => a.name.localeCompare(b.name));
+            $("spotList").innerHTML = list.length ? list.map(s => {
+                const n = spotUsers(s.id).length;
+                return '<div class="spot-row"><div style="min-width:0"><div class="spot-name">' + esc(s.name) + '</div><div class="spot-meta">' +
+                    esc(s.addr || coordsText(s)) + " · flags punches past " + esc(fmtDistance(s.radius)) + " · " + n + (n === 1 ? " driver" : " drivers") +
+                    '</div></div><button type="button" class="btn sm" data-spot="' + esc(s.id) + '">Edit</button></div>';
+            }).join("") : '<p class="hint">No punch spots yet, so everyone is checked against the shop.</p>';
+        }
+        $("spotList").addEventListener("click", e => { const b = e.target.closest("[data-spot]"); if (b) openPlaceModal("spot", b.dataset.spot); });
+        $("addSpotBtn").addEventListener("click", () => openPlaceModal("spot", null));
+        $("shPick").addEventListener("click", () => openPlaceModal("shop"));
+
+        // plCtx: { mode: "shop" | "spot", id (the spot being edited, or null for a new one), from: "emp" when opened from Edit employee }
+        let plCtx = null, plMap = null, plMarker = null, plCircle = null, plAddrFor = "", plLookup = 0;
+        const MB_CENTER = { lat: 49.8485, lng: -99.9501 }; // Brandon, when there's no shop location to start from
+        function plNum(v) { const n = Number(String(v).trim()); return String(v).trim() !== "" && isFinite(n) ? n : null; }
+        // The pin from the latitude / longitude boxes ("49.8485, -99.9501" pasted into the first box works too)
+        function plPoint() {
+            const both = $("plLat").value.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+            if (both) { $("plLat").value = both[1]; $("plLng").value = both[2]; }
+            const lat = plNum($("plLat").value), lng = plNum($("plLng").value);
+            return lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat: lat, lng: lng } : null;
+        }
+        function plRadius() {
+            const r = parseInt($("plRadius").value, 10);
+            return isFinite(r) ? Math.min(SPOT_RADIUS_MAX, Math.max(SPOT_RADIUS_MIN, r)) : settings.shopRadius;
+        }
+        function plDraw(pan) {
+            if (!plMap) return;
+            const pt = plPoint();
+            if (!pt) { plMarker.setMap(null); plCircle.setMap(null); return; }
+            plMarker.setPosition(pt); plMarker.setMap(plMap);
+            plCircle.setCenter(pt); plCircle.setRadius(plRadius()); plCircle.setMap(plMap);
+            if (pan) plMap.panTo(pt);
+        }
+        // Moves the pin; addr is the address when it's known already (a search result), else it's looked up
+        function plSetPoint(pt, addr, zoom) {
+            $("plLat").value = pt.lat.toFixed(6);
+            $("plLng").value = pt.lng.toFixed(6);
+            $("plMsg").textContent = "";
+            plDraw(true);
+            if (zoom && plMap) plMap.setZoom(zoom);
+            if (addr) { plAddrFor = addr; $("plAddr").textContent = addr; } else plFindAddress(pt);
+        }
+        async function plFindAddress(pt) {
+            const mine = ++plLookup;
+            plAddrFor = "";
+            $("plAddr").textContent = MAPS_KEY && !mapsFailed ? "Finding the address…" : "";
+            if (!MAPS_KEY || mapsFailed) return;
+            try {
+                const maps = await loadMaps();
+                const r = await new maps.Geocoder().geocode({ location: pt });
+                const first = r && r.results && r.results[0];
+                if (mine !== plLookup) return; // the pin moved again since
+                plAddrFor = first && first.formatted_address ? first.formatted_address.slice(0, 300) : "";
+                $("plAddr").textContent = plAddrFor || "No street address here";
+            } catch (err) {
+                if (mine === plLookup) $("plAddr").textContent = "No street address here";
+            }
+        }
+        async function plShowMap(pt) {
+            $("plMap").hidden = false; $("plNoKey").hidden = true;
+            try {
+                const maps = await loadMaps();
+                if (mapsFailed) { mapUnavailable(); return; }
+                if (!$("placeModal").classList.contains("show")) return;
+                const shop = typeof settings.shopLat === "number" ? { lat: settings.shopLat, lng: settings.shopLng } : null;
+                $("plMap").innerHTML = "";
+                plMap = new maps.Map($("plMap"), { center: pt || shop || MB_CENTER, zoom: pt ? 16 : shop ? 12 : 8, mapTypeControl: false,
+                    streetViewControl: false, fullscreenControl: true, clickableIcons: false });
+                plMarker = new maps.Marker({ draggable: true, title: "Drag to move",
+                    icon: { path: maps.SymbolPath.CIRCLE, scale: 9, fillColor: "#ffcc00", fillOpacity: 1, strokeColor: "#111111", strokeWeight: 2 } });
+                plCircle = new maps.Circle({ strokeColor: "#ffcc00", strokeOpacity: 0.8, strokeWeight: 1, fillColor: "#ffcc00", fillOpacity: 0.1, clickable: false });
+                plMap.addListener("click", e => plSetPoint({ lat: e.latLng.lat(), lng: e.latLng.lng() }));
+                plMarker.addListener("dragend", e => plSetPoint({ lat: e.latLng.lat(), lng: e.latLng.lng() }));
+                plDraw(false);
+            } catch (err) {
+                console.warn("Map picker not shown:", err);
+                mapUnavailable();
+            }
+        }
+        function openPlaceModal(mode, id, from) {
+            const s = mode === "spot" && id ? spots[id] : null;
+            if (mode === "spot" && id && !s) { toast("That punch spot isn't there any more.", true); return; }
+            plCtx = { mode: mode, id: s ? id : null, from: from || null };
+            plMap = null; plLookup++;
+            $("plTitle").textContent = mode === "shop" ? "Shop location" : s ? "Edit punch spot" : "New punch spot";
+            $("plNameField").hidden = mode === "shop";
+            $("plName").value = s ? s.name : "";
+            $("plSearch").value = "";
+            $("plResults").innerHTML = "";
+            $("plMsg").textContent = "";
+            $("plDelete").hidden = !s;
+            $("plSave").textContent = mode === "shop" ? "Use this location" : "Save spot";
+            let pt = null, radius = settings.shopRadius, addr = "";
+            if (mode === "shop") {
+                // Start from what's in the Shop location boxes (saved or not)
+                const lat = plNum($("shLat").value), lng = plNum($("shLng").value);
+                if (lat !== null && lng !== null) pt = { lat: lat, lng: lng };
+                radius = parseInt($("shRadius").value, 10) || settings.shopRadius;
+            } else if (s) { pt = { lat: s.lat, lng: s.lng }; radius = s.radius; addr = s.addr || ""; }
+            $("plLat").value = pt ? pt.lat : "";
+            $("plLng").value = pt ? pt.lng : "";
+            $("plRadius").value = radius;
+            plAddrFor = addr;
+            $("plAddr").textContent = addr;
+            openModal("placeModal");
+            if (mode === "spot" && !s) setTimeout(() => $("plName").focus(), 80);
+            plShowMap(pt);
+            if (pt && !addr) plFindAddress(pt);
+        }
+        $("plLat").addEventListener("change", () => { const pt = plPoint(); plDraw(true); if (pt) plFindAddress(pt); });
+        $("plLng").addEventListener("change", () => { const pt = plPoint(); plDraw(true); if (pt) plFindAddress(pt); });
+        $("plRadius").addEventListener("input", () => plDraw(false));
+
+        // Address search: Google's geocoder (the same one that finds punch addresses), leaning toward Manitoba
+        async function plSearch() {
+            const q = $("plSearch").value.trim();
+            const box = $("plResults");
+            if (!q) { $("plSearch").focus(); return; }
+            if (!MAPS_KEY || mapsFailed) { box.innerHTML = '<p class="none">Search needs the map, which couldn\'t load here. Type the latitude and longitude instead.</p>'; return; }
+            box.innerHTML = '<p class="none">Searching…</p>';
+            try {
+                const maps = await loadMaps();
+                const bounds = new maps.LatLngBounds({ lat: 49.0, lng: -102.1 }, { lat: 53.0, lng: -95.1 }); // southern Manitoba
+                let results = [];
+                try { results = ((await new maps.Geocoder().geocode({ address: q, region: "ca", bounds: bounds })) || {}).results || []; }
+                catch (e) { if (String((e && e.code) || "") !== "ZERO_RESULTS") throw e; }
+                results = results.slice(0, 5);
+                if (!results.length) { box.innerHTML = '<p class="none">Nothing found for “' + esc(q) + '”. Try adding the town, or tap the map instead.</p>'; return; }
+                box.innerHTML = results.map((r, i) => '<button type="button" data-i="' + i + '">' + esc(r.formatted_address) + "</button>").join("");
+                box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+                    const r = results[Number(b.dataset.i)], loc = r.geometry.location;
+                    plSetPoint({ lat: loc.lat(), lng: loc.lng() }, r.formatted_address.slice(0, 300), 17);
+                    box.innerHTML = "";
+                }));
+                if (results.length === 1) box.querySelector("button").click();
+            } catch (err) {
+                console.warn("Address search failed:", err);
+                box.innerHTML = '<p class="none">Search didn\'t work just now. Tap the map to drop the pin instead.</p>';
+            }
+        }
+        $("plFind").addEventListener("click", plSearch);
+        $("plSearch").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); plSearch(); } });
+        $("plHere").addEventListener("click", () => {
+            if (!navigator.geolocation) { toast("This browser can't share its location.", true); return; }
+            navigator.geolocation.getCurrentPosition(pos => {
+                plSetPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude }, null, 17);
+                toast("Pin put where this device is (about " + Math.round(pos.coords.accuracy) + " m accurate).");
+            }, () => toast("Couldn't get this device's location.", true), { enableHighAccuracy: true, timeout: 15000 });
+        });
+
+        $("placeForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const msg = $("plMsg");
+            const pt = plPoint();
+            if (!pt) { msg.textContent = "Drop the pin on the map, or type the latitude and longitude."; return; }
+            const radius = parseInt($("plRadius").value, 10);
+            if (!isFinite(radius) || radius < SPOT_RADIUS_MIN || radius > SPOT_RADIUS_MAX) { msg.textContent = "Enter a distance from " + SPOT_RADIUS_MIN + " to " + SPOT_RADIUS_MAX + " metres."; return; }
+            const lat = Math.round(pt.lat * 1e6) / 1e6, lng = Math.round(pt.lng * 1e6) / 1e6;
+            if (plCtx.mode === "shop") {
+                // Into the Shop location form, saved straight away
+                $("shLat").value = lat; $("shLng").value = lng; $("shRadius").value = radius;
+                try { await saveShop(lat, lng, radius); closeModal("placeModal"); toast("Shop location saved."); }
+                catch (err) { msg.textContent = "Couldn't save: " + errText(err); }
+                return;
+            }
+            const name = $("plName").value.trim().slice(0, SPOT_NAME_MAX);
+            if (!name) { msg.textContent = "Give the spot a name, like “Winnipeg lot”."; $("plName").focus(); return; }
+            if (/^(the )?shop$/i.test(name)) { msg.textContent = "“Shop” is the shop location. Give this spot another name."; return; }
+            if (Object.values(spots).some(s => s.id !== plCtx.id && s.name.toLowerCase() === name.toLowerCase())) { msg.textContent = "There's already a spot called " + name + "."; return; }
+            const data = { name: name, lat: lat, lng: lng, radius: radius, addr: plAddrFor || null, at: serverTimestamp(), by: String(user.email).slice(0, 60) };
+            const btn = $("plSave");
+            btn.disabled = true; msg.textContent = "";
+            try {
+                const id = plCtx.id || push(ref(db, P.spots)).key;
+                // Only these fields change, so anything else saved on the spot is kept
+                await update(ref(db, P.spots + "/" + id), data);
+                closeModal("placeModal");
+                if (plCtx.from === "emp") {
+                    spots[id] = Object.assign({ id: id }, spots[id], data, { at: Date.now() }); // shows in the list before the database echoes it back
+                    fillSpotSelect(id);
+                }
+                toast((plCtx.id ? "Saved " : "Added ") + name + ".");
+            } catch (err) { msg.textContent = "Couldn't save: " + errText(err); }
+            finally { btn.disabled = false; }
+        });
+        $("plDelete").addEventListener("click", async () => {
+            const s = plCtx && plCtx.id ? spots[plCtx.id] : null;
+            if (!s) return;
+            const users = spotUsers(s.id);
+            if (!confirm("Remove the punch spot " + s.name + "?" + (users.length ? "\n\n" + users.map(e => displayName(e, e.email)).join(", ") +
+                (users.length === 1 ? " uses it and" : " use it and") + " will be checked against the shop again, on old punches too." : ""))) return;
+            const u = { [P.spots + "/" + s.id]: null };
+            // Also anyone removed who still points at it
+            empList().filter(e => e.spot === s.id).forEach(e => { u[P.employees + "/" + e.ek + "/spot"] = null; });
+            try {
+                await update(ref(db), u);
+                for (const e of users) await logEmpAudit(e.ek, "emp-edit", ["Punch spot: " + s.name + " → the shop (spot removed)"], { name: displayName(e, e.email) });
+                closeModal("placeModal");
+                toast(s.name + " removed.");
+            } catch (err) { $("plMsg").textContent = "Couldn't remove: " + errText(err); }
+        });
 
         // ---------- Ticking ----------
         setInterval(() => {
