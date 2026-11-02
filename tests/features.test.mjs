@@ -10,7 +10,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
-const { vanTime, sentLate, farFromShop, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
+const { vanTime, sentLate, farFromShop, farFromPlace, punchPlace, cleanSpots, shopShift, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
   cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
@@ -63,6 +63,41 @@ test('far from the shop: only past the radius, only when a shop is set', () => {
   assert.strictEqual(farFromShop({ lat: 49.9, lng: -99.9 }, settingsWithDefaults({})), null);
   assert.strictEqual(farFromShop({ err: 'denied' }, shop), null);
   assert.ok(Math.abs(distanceM({ lat: 0, lng: 0 }, { lat: 1, lng: 0 }) - 111195) < 10);
+});
+
+test('punch spots: a driver with a spot is checked against it, shop shifts and everyone else against the shop', () => {
+  const settings = settingsWithDefaults({ shopLat: 49.8485, shopLng: -99.9501, shopRadius: 500 });
+  const spots = cleanSpots({
+    wpg: { name: ' Winnipeg lot ', lat: 49.8951, lng: -97.1384, radius: 300 },
+    bad: { name: 'No place', lat: '', lng: -97 },
+    noname: { name: '', lat: 49.9, lng: -97.1 },
+    big: { name: 'Far', lat: '49.9', lng: '-97.1', radius: 999999 }
+  });
+  assert.deepStrictEqual(Object.keys(spots).sort(), ['big', 'wpg']);
+  assert.strictEqual(spots.wpg.name, 'Winnipeg lot');
+  assert.strictEqual(spots.big.radius, 50000);   // kept in range
+  assert.strictEqual(spots.big.lat, 49.9);       // numbers, even when saved as text
+  assert.strictEqual(cleanSpots({ x: { name: 'No radius', lat: 49, lng: -97 } }).x.radius, 500);
+
+  const wpgDriver = { name: 'Sam', spot: 'wpg' }, shift = { in: t0, vehicleId: 'g7' };
+  const atShop = { lat: 49.8486, lng: -99.9502 }, atLot = { lat: 49.8952, lng: -97.1385 };
+  const place = punchPlace(wpgDriver, shift, spots, settings);
+  assert.strictEqual(place.name, 'Winnipeg lot');
+  assert.strictEqual(farFromPlace(atLot, place), null);
+  const d = farFromPlace(atShop, place);  // at the shop is far from their spot (Justin: say far from the spot)
+  assert.ok(d > 195000 && d < 205000, String(d)); // Brandon to Winnipeg, about 200 km
+
+  // No spot, a removed spot, or a shop shift: the shop
+  assert.strictEqual(punchPlace({ name: 'Pat' }, shift, spots, settings).name, 'shop');
+  assert.strictEqual(punchPlace({ name: 'Pat', spot: 'gone' }, shift, spots, settings).name, 'shop');
+  const shopDay = { in: t0, shop: true, vans: { a: { at: t0, how: 'shop' } } };
+  const movedToShop = { in: t0, out: t0 + H, vans: { a: { at: t0, how: 'pick', vehicleId: 'g7' }, b: { at: t0 + M, how: 'shop' } } };
+  assert.deepStrictEqual([shopShift(shopDay), shopShift(movedToShop), shopShift(shift), shopShift(null)], [true, true, false, false]);
+  assert.strictEqual(punchPlace(wpgDriver, shopDay, spots, settings).name, 'shop');
+  assert.strictEqual(farFromPlace(atShop, punchPlace(wpgDriver, movedToShop, spots, settings)), null);
+  // No shop set and no spot: nothing to check against
+  assert.strictEqual(punchPlace({ name: 'Pat' }, shift, spots, settingsWithDefaults({})), null);
+  assert.strictEqual(punchPlace(wpgDriver, shift, spots, settingsWithDefaults({})).name, 'Winnipeg lot');
 });
 
 test('settings keep the shop location; a half-filled one is dropped', () => {

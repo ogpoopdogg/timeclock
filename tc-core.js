@@ -5,7 +5,8 @@
 //                                        punched in by then (minutes after their scheduled start) shows as Late on the
 //                                        admin live board. longShiftHours: a shift this long asks "Did you forget to punch
 //                                        out?" at punch out, and shows under Long shifts in the admin Inbox
-//   timeclock/employees/{ek}           { email, name, active, removed, schedule: { sun..sat: { start, end } } }
+//   timeclock/employees/{ek}           { email, name, active, removed, spot, schedule: { sun..sat: { start, end } } }
+//       spot                             the id of their punch spot (timeclock/spots), when it isn't the shop
 //       removed                          true once the admin removes them: they can't punch in and are hidden from the
 //                                        live board, but their punches still show on timesheets and exports
 //   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, shop, src, edited,
@@ -37,6 +38,7 @@
 //   timeclock/van_reports/{id}         problems drivers report with a van: { at, ek, name, vehicleId, vehicleName, shiftId,
 //                                        text, status: "open" | "fixed", fixNote, by, doneAt }
 //   timeclock/vans/{van_id}            vans with no GPS unit, added by an admin: { name, at, by }
+//   timeclock/spots/{id}               punch spots other than the shop: { name, lat, lng, radius, addr, at, by }
 // {ek} is the employee's email in lower case with "." replaced by "," (keys can't contain ".").
 //
 // GPS units and their nicknames are the ones RouteWatcher uses:
@@ -74,6 +76,7 @@ export const P = {
     requests: "timeclock/requests",
     vanReports: "timeclock/van_reports",
     vans: "timeclock/vans",
+    spots: "timeclock/spots",
     oilPlan: "timeclock/oil_plan",
     oilLast: "timeclock/oil_last",
     gps: "developer/dispatch_dashboard/drivers",
@@ -414,9 +417,49 @@ export function distanceM(a, b) {
 export function fmtDistance(m) { return m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(m < 10000 ? 1 : 0) + " km"; }
 // How far a punch location is from the shop, when it's past the allowed radius; null otherwise (or no shop set)
 export function farFromShop(loc, settings) {
-    if (!hasCoords(loc) || !settings || typeof settings.shopLat !== "number") return null;
-    const d = distanceM(loc, { lat: settings.shopLat, lng: settings.shopLng });
-    return d > settings.shopRadius ? d : null;
+    return farFromPlace(loc, shopPlace(settings));
+}
+// How far a punch location is from a place { lat, lng, radius }, when it's past the place's radius; null otherwise
+export function farFromPlace(loc, place) {
+    if (!hasCoords(loc) || !place || typeof place.lat !== "number" || typeof place.lng !== "number") return null;
+    const d = distanceM(loc, place);
+    return d > place.radius ? d : null;
+}
+
+// ---------- Punch spots ----------
+// timeclock/spots/{id} = { name, lat, lng, radius, addr, at, by }: places other than the shop where drivers start and
+// end their day (Admin → Settings → Punch spots). An employee's punch spot is employees/{ek}/spot = the spot's id.
+// Their punches in and out are flagged when far from that spot instead of the shop; with no spot it's the shop.
+export const SPOT_NAME_MAX = 40;
+export const SPOT_RADIUS_MIN = 50, SPOT_RADIUS_MAX = 50000;
+// The shop as a place, or null when no shop location is set
+export function shopPlace(settings) {
+    if (!settings || typeof settings.shopLat !== "number" || typeof settings.shopLng !== "number") return null;
+    return { id: "", name: "shop", lat: settings.shopLat, lng: settings.shopLng, radius: settings.shopRadius };
+}
+// Only the spots that have a name and a usable location, with the radius kept in range
+export function cleanSpots(raw) {
+    const out = {};
+    for (const [id, s] of Object.entries(raw || {})) {
+        if (!s || typeof s !== "object") continue;
+        const name = String(s.name || "").trim().slice(0, SPOT_NAME_MAX);
+        const lat = Number(s.lat), lng = Number(s.lng);
+        if (!name || s.lat === null || s.lat === "" || s.lng === null || s.lng === "" || !isFinite(lat) || !isFinite(lng) ||
+            Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
+        out[id] = Object.assign({}, s, { id: id, name: name, lat: lat, lng: lng, radius: clampInt(s.radius, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, DEFAULT_SETTINGS.shopRadius) });
+    }
+    return out;
+}
+// A shift where the driver worked in the shop (picked Shop, or an admin set it): checked against the shop
+export function shopShift(shift) {
+    return !!shift && (!!shift.shop || Object.values(shift.vans || {}).some(v => v && v.how === "shop"));
+}
+// The place a shift's punches in and out are checked against: the employee's punch spot, or the shop (also for shop
+// shifts, and when their spot was removed). null when neither is set. spots: cleanSpots() output.
+export function punchPlace(emp, shift, spots, settings) {
+    const id = emp && typeof emp.spot === "string" ? emp.spot : "";
+    if (id && spots && spots[id] && !shopShift(shift)) return spots[id];
+    return shopPlace(settings);
 }
 
 // ---------- Date ranges ----------
