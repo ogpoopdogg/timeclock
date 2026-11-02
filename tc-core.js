@@ -59,7 +59,7 @@ export const app = initializeApp(firebaseConfig);
 export const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence] });
 export const db = getDatabase(app);
 
-// Accounts that can open the admin panel. database.rules.json lists the same emails, so change both together.
+// Accounts that can open the admin panel. The database rules (Firebase console) list the same emails, so change both together.
 export const ADMIN_EMAILS = ["justin@ec.com", "desirae@ec.com", "celeste@ec.com"];
 export const EMAIL_DOMAIN = "@ec.com";
 export const TZ = "America/Winnipeg"; // Brandon, MB runs on Central Time

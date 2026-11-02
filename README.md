@@ -10,86 +10,22 @@ Both pages use the same Firebase project as RouteWatcher (`eandccourier-36fcc`).
 
 ## Set up before first use
 
-### 1. Add the database rules (required)
+### 1. Database rules (required)
 
 The pages hide admin features from employees, but only the **Realtime Database
-rules** actually stop an employee from changing their own punches.
-`database.rules.json` holds the rules for this feature:
+rules** actually stop an employee from changing their own punches. The rules are kept
+only in the Firebase console (**Realtime Database** → **Rules**), not in this repo.
 
-- Employees can create a punch-in and add a punch-out on their own shifts only. The
-  time must be the server's current time (no backdating), and a time can't be changed
-  after it is saved.
-- Only the admins (`justin@ec.com`, `desirae@ec.com`, `celeste@ec.com`) can edit, add or
-  delete punches, employees, schedules and settings. Admins can also read the GPS list
-  and set GPS nicknames without being on the employee list.
 - To add or remove an admin, change the email in **both** `ADMIN_EMAILS` in `tc-core.js`
-  (lets them into the admin panel) and `database.rules.json` (lets them read and change
-  the data), then publish the rules in the Firebase console. Each admin needs their own
-  sign-in account under Firebase **Authentication**.
-- Gil (`gil@ec.com`, dispatch) is not an admin, but RouteWatcher's **Who's driving this?**
-  list lets them give a vehicle to someone on the clock. For that the rules let Gil read
-  employee names, `timeclock/open`, the vehicle claims, and the punch-in and vehicle fields
-  of shifts still on the clock, and write only a vehicle change on an open shift (its
-  vehicle history line marked `admin` and their own, the claim matching it, their own change
-  log entry). RouteWatcher also sets its From/To times from when a driver punched in, so
-  Gil can look up a person's shifts by punch-in time: a query on `timeclock/shifts/{ek}`
-  ordered by `in`, with a start, an end and at most 10 results. That query returns whole
-  shift records (punch times, vehicles, punch locations), and repeated queries could reach
-  any shift. Gil can't read a shift directly, or schedules, requests, settings or the change
-  log, and can't change punches or employees. To give someone else
-  this access, change `gil@ec.com` in `database.rules.json` (tests in `tests/rules/`).
-- Employees can read the GPS list and nicknames, and set a GPS nickname, so a vehicle
-  pick shows up in RouteWatcher.
-- An employee on the clock can take a van another driver has (**Van swap**), but only
-  for their own open shift. Only the driver holding a van can release it.
-- An employee on the clock can mark their own open shift as **Shop** (working in the
-  shop, not driving).
-- Each punch and van swap can save where the phone was, once, within 5 minutes of the
-  punch. Only the admin panel writes the street address.
-- An employee can only have one shift open at a time. Each punch in also writes
-  `timeclock/open/{ek}` (the open shift's id), and a punch in is refused while that
-  shift is still open.
-- Removed employees (`removed: true`) can't punch in or report a van problem.
-- The settings (`timeclock/settings`) can be read by employees and admins only, not by
-  other accounts signed in to the same Firebase project (Request Pickup customers).
-- Only the admin panel can mark a punch as added by an admin (`src: "admin"`).
-- A punch can carry the time it was pressed on the phone (`tap`, `outTap`), so a punch
-  saved with no signal shows when it was really made. It can't be more than a week old.
-- Employees can send, read and cancel their own punch-fix requests
-  (`timeclock/requests/{ek}`) while they're still open. Only admins can answer them.
-- A driver can save the oil check on their own shift (`oil` on the shift) while it's open
-  or within a day of punching out. Once it says *checked* it can't be changed back. Only
-  admins can mark a missed one as seen. Before an answer, the clock can also save that the
-  vehicle's oil check wasn't due on that shift (`oil: { due: false }`). An answer given when
-  handing a vehicle off in a vehicle swap is `how: "swap"` with the vehicle's name
-  (`vehicle`, only on a swap answer).
-- Employees can read the oil check schedule (`timeclock/oil_plan`); only admins can change
-  it. Each vehicle's last oil check (`timeclock/oil_last/{vehicle}`) can be saved by a driver
-  only from their own shift that says *checked*, at that check's time, and never over a
-  newer one.
-- Employees can read the list of vans without GPS (`timeclock/vans`); only admins can
-  change it.
-- Employees can add a van problem report (`timeclock/van_reports`) in their own name, but
-  can't read the reports or close one. Only admins can.
-
-`tests/rules/` checks these rules against the Firebase emulator (`npm ci && npm test`
-in that folder; needs Java 11 or later). GitHub runs them on every push.
-
-**Order when updating:** publish the new rules in the Firebase console soon after the
-pages update. Until then, punches still work, but Fix a punch, vehicle problem
-reports and oil checks show an error when sent. If `functions/` changed, deploy the functions
-too (see *Server functions → Deploying*).
-
-Firebase console → **Realtime Database** → **Rules**: merge the `timeclock` block and
-the `developer/dispatch_dashboard/drivers` and `driver_nicknames` entries into your
-existing rules. Don't replace the whole file, or you'll remove the rules your other
-apps rely on.
-
-**Important:** in Realtime Database rules, a `.read`/`.write` that allows access at a
-parent path can't be taken back at a child path. If your current rules have something
-like `".write": "auth != null"` at the root or on a parent of `timeclock`, any
-signed-in user could still edit punches. Those broad rules need to be narrowed for the
-lock to hold.
+  (lets them into the admin panel) and the database rules in the Firebase console (lets
+  them read and change the data). Each admin needs their own sign-in account under
+  Firebase **Authentication**.
+- **Order when updating:** publish any rules change in the Firebase console soon after the
+  pages update. If `functions/` changed, deploy the functions too (see *Server functions →
+  Deploying*).
+- In Realtime Database rules, a `.read`/`.write` that allows access at a parent path
+  can't be taken back at a child path, so a broad rule on the root or on a parent of
+  `timeclock` would undo the punch lock.
 
 ### 2. Add employees
 
@@ -443,7 +379,7 @@ reminder and no vehicle swap alerts. Their functions (`timeclockPlanReminders`,
 *Deleting the old notification functions* below. The data they used
 (`timeclock/prefs`, `timeclock/push_tokens`, `timeclock/push_tests`,
 `timeclock/reminders_sent`, `timeclock/swap_reminders_sent`) is no longer read, and can
-be deleted in the Firebase console. Their entries in `database.rules.json` are harmless
+be deleted in the Firebase console. Their entries in the database rules are harmless
 and were left as they are, so the rules didn't need publishing again.
 
 ### Deploying (once, and again whenever `functions/` changes)
