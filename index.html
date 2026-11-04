@@ -333,6 +333,8 @@
         }
 
         .punch-msg { text-align: center; min-height: 1.5em; color: var(--red); font-size: 0.95rem; margin-top: 8px; }
+        .loc-note { text-align: center; color: var(--dim); font-size: 0.82rem; margin: 2px 12px 0; }
+        .loc-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
         .vehicle-pill {
             display: flex; align-items: center; gap: 12px; width: min(400px, 100%); margin: 12px auto 0;
@@ -714,6 +716,7 @@
                     </button>
                 </div>
                 <p class="punch-msg" id="punchMsg" role="alert" aria-live="assertive"></p>
+                <p class="loc-note" id="locNote">Your phone's location is saved with each punch and vehicle change. <a href="https://app.eandccourier.ca/privacy/staff.html" target="_blank" rel="noopener">What we record</a></p>
 
                 <div class="vehicle-pill" id="vehiclePill" hidden>
                     <svg class="vp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>

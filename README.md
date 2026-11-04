@@ -331,6 +331,10 @@ If the phone blocks location, or there's no fix within 10 seconds, the punch sti
 goes through. The admin timesheet shows *No location* with the reason (blocked, timed
 out, unavailable).
 
+The clock screen says, under the punch button, that the phone's location is saved with each punch and
+vehicle change, and links to the staff notice at `app.eandccourier.ca/privacy/staff.html` (the `privacy`
+repo), which lists everything E&C records about staff. Each employee should sign a copy.
+
 The first punch makes the phone ask the driver to allow location. On iPhone, the
 setting is under **Settings → Privacy & Security → Location Services**, for Safari
 websites or the home-screen app.
