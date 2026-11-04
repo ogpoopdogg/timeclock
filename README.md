@@ -383,7 +383,7 @@ before you rely on them:
 
 - `timeclockVanTaken` unassigns a driver whose vehicle another driver took (see
   *How it works → Van swap*).
-- `timeclockBeforeUserCreated` refuses @ec.com sign-ins an admin didn't add (see
+- `timeclockBeforeUserCreated` refuses @ec.com sign-ins the admin panel didn't make (see
   *Only admins can make @ec.com sign-ins* below).
 
 **There are no phone notifications any more** (removed October 2026): no punch-in
@@ -462,14 +462,19 @@ sign-up page or by calling Firebase directly with the public web key.
 Authentication before any new account is saved. A new @ec.com account goes through
 only if:
 
-- an admin already added that exact email under **Employees** (and didn't remove it).
+- an admin already added that exact email under **Employees** (and didn't remove it), and
+- the admin panel is making that sign-in right now. Just before it creates a sign-in, the
+  admin panel saves a go-ahead at `timeclock/signup_ok/<email key>` (only admins can
+  write there). It works once and only for 15 minutes; when it's used, the server marks
+  it with the time and the new account's id. Go-aheads are kept, never deleted.
 
 The admin emails get no exception: the database rules make anyone signed in as one an
 admin, so if an admin's sign-in is ever deleted, another admin adds that email under
 **Employees** before it is made again.
 
 Every other @ec.com sign-up is refused with *"This email can only be added by an E&C
-admin."* and logged as *"Refused a new @ec.com sign-in"*. Customer addresses aren't
+admin."* and logged as *"Refused a new @ec.com sign-in"* with the reason (not on the time
+clock, not created from the admin panel, go-ahead already used, or go-ahead expired). Customer addresses aren't
 affected, and accounts that already exist keep working.
 
 Every new account, allowed or refused, is also saved to the E&C security log
@@ -481,9 +486,10 @@ sign-up goes ahead as normal and the entry is written to the functions log inste
 creates the sign-in, so the check lets it through. Staff who aren't on the time clock
 need to be added under **Employees** before their sign-in is made.
 
-An employee record with no sign-in yet (added without a starting password) can be
-claimed by whoever signs up with that email first. Set a starting password when you add
-someone.
+An employee record with no sign-in yet (added without a starting password) can't be
+claimed by someone else signing up with that email (before November 2026 it could). To
+make that person's sign-in later, remove them and add them back with a starting password
+(their punches stay).
 
 ### Turning it on
 

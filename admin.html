@@ -2463,10 +2463,13 @@
             }
         }
 
-        // Creates the Firebase sign-in account on a separate app instance so the admin stays signed in
+        // Creates the Firebase sign-in account on a separate app instance so the admin stays signed in.
+        // First it tells the server this sign-in is coming (timeclock/signup_ok/<ek>, admins only):
+        // the server refuses any new @ec.com sign-in without that go-ahead from the last 15 minutes.
         async function createLogin(email, pass) {
             const tmp = initializeApp(firebaseConfig, "tc-create-" + Date.now());
             try {
+                await set(ref(db, "timeclock/signup_ok/" + emailKey(email)), { at: serverTimestamp(), by: String(user.email || "").toLowerCase().slice(0, 100) });
                 const tmpAuth = getAuth(tmp);
                 await createUserWithEmailAndPassword(tmpAuth, email, pass);
                 await signOut(tmpAuth);
