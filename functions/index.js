@@ -28,6 +28,12 @@ const { onValueWritten } = require('firebase-functions/v2/database');
 const { beforeUserCreated, HttpsError } = require('firebase-functions/v2/identity');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
+const { setGlobalOptions } = require('firebase-functions/v2');
+
+// Runs as its own Google account (database and phone notifications only), shared with the
+// Dispatch functions, instead of the project's default account, which has Editor on everything.
+// usage/scripts/setup-robot-keys.sh makes it. Added 2026-11-05.
+setGlobalOptions({ serviceAccount: 'ec-apps@eandccourier-36fcc.iam.gserviceaccount.com' });
 const S = require('./swaps');
 const G = require('./signups');
 
