@@ -8,7 +8,8 @@
    New sign-ins (see signups.js):
    - timeclockBeforeUserCreated runs inside Firebase Authentication before any new
      account is saved. It refuses a new @ec.com account unless an admin already put
-     that email on the time clock, so nobody can make themselves a staff sign-in
+     that email on the time clock and the admin panel is creating the sign-in right
+     now (timeclock/signup_ok), so nobody can make themselves a staff sign-in
      through Request Pickup or by calling Firebase directly. Needs Firebase
      Authentication with Identity Platform (see README). Every new account, allowed or
      refused, is written to the security log (security_log/events) with its IP address
@@ -63,20 +64,33 @@ exports.timeclockBeforeUserCreated = beforeUserCreated(
   async (event) => {
     const email = event.data && event.data.email;
     let allowed = true;
+    let reason = null;
     if (G.isStaffEmail(email)) {
-      const employee = (await admin.database().ref(`timeclock/employees/${G.emailKey(email)}`).once('value')).val();
-      allowed = G.signupAllowed(email, employee);
+      const db = admin.database();
+      const ek = G.emailKey(email);
+      const [employee, invite] = await Promise.all([
+        db.ref(`timeclock/employees/${ek}`).once('value').then((s) => s.val()),
+        db.ref(`timeclock/signup_ok/${ek}`).once('value').then((s) => s.val())
+      ]);
+      const now = Date.now();
+      allowed = G.signupAllowed(email, employee, invite, now);
+      if (allowed) {
+        // Works once: the next sign-up for this email needs a new go-ahead (kept, never deleted)
+        await db.ref(`timeclock/signup_ok/${ek}`).update({ usedAt: now, uid: (event.data && event.data.uid) || null });
+      } else {
+        reason = G.refusalReason(employee, invite);
+      }
     }
-    await logSignup(event, allowed);
+    await logSignup(event, allowed, reason);
     if (allowed) return;
-    logger.warn('Refused a new @ec.com sign-in that is not on the time clock', { email: G.normEmail(email) });
+    logger.warn('Refused a new @ec.com sign-in', { email: G.normEmail(email), reason });
     throw new HttpsError('permission-denied', 'This email can only be added by an E&C admin.');
   }
 );
 
 // A log that can't be saved never changes the answer: it goes to the functions log instead
-async function logSignup(event, allowed) {
-  const entry = G.signupLogEntry(event, allowed, Date.now());
+async function logSignup(event, allowed, reason) {
+  const entry = G.signupLogEntry(event, allowed, Date.now(), reason);
   try {
     await admin.database().ref(G.SECURITY_EVENTS).push(entry);
   } catch (err) {
