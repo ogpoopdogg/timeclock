@@ -320,6 +320,38 @@ ones. Hover over any cell or bar for the numbers.
   moved to a new sign-in), can be filtered to one person, and loads older changes on
   request.
 
+## Punch time reminder
+
+A one-time message for drivers who punch in before they get to work or punch out after
+they get home. Turn it on in **Staff → Edit → Show the punch time reminder**. The next time
+that driver opens the clock, a pop-up asks them to punch in when they arrive at work and
+punch out before they leave for home. Tapping outside it doesn't close it. Only the
+**I have read and understand** button does.
+
+- The tap is saved with the server's time at `timeclock/notice_acks/<ek>/punch`. Staff shows
+  *Punch time reminder: agreed …* under their name, and Edit shows the same.
+- It shows once per driver, on any phone. To show it again, turn the switch off, save,
+  turn it on and save. That clears their earlier answer.
+- **Takes the place of** carries the switch and the answer over to the new sign-in.
+- **Database rules:** drivers can only save their own answer, only once, only while the
+  switch is on for them, and only with the server's time. Paste this block inside
+  `"timeclock": { … }` in the Firebase console, right above `"vehicle_claims": {`:
+
+```json
+      "notice_acks": {
+        "$ek": {
+          ".read": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek",
+          "$notice": {
+            ".write": "auth != null && auth.token.email.toLowerCase().replace('.', ',') === $ek && root.child('timeclock/employees').child($ek).child('notices').child($notice).val() === true && !data.exists() && newData.exists()",
+            ".validate": "newData.isNumber() && newData.val() === now"
+          }
+        }
+      },
+```
+
+  Until those rules are published, the pop-up doesn't show at all (the clock can't read
+  the answers yet), so nothing breaks if the pages update first.
+
 ## Punch locations
 
 Each punch in, punch out and van swap saves where the phone was: latitude, longitude

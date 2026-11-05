@@ -827,6 +827,10 @@
                     <select class="select" id="emSpot"></select>
                     <p class="hint" style="margin:0;color:var(--muted);font-size:0.85rem">Where they punch in and out. Punches far from it are flagged on the timesheet. Spots are set up in Settings → Punch spots.</p>
                 </div>
+                <div class="field full">
+                    <label class="switch"><input type="checkbox" id="emNotice"><span class="track"></span>Show the punch time reminder</label>
+                    <p class="hint" style="margin:0;color:var(--muted);font-size:0.85rem">A message shown one time on their time clock: punch in when you arrive at work, punch out before you leave for home. It stays until they tap “I have read and understand”. <span id="emNoticeStatus"></span></p>
+                </div>
                 <div class="field full" id="emReplaceField">
                     <label for="emReplace">Takes the place of (optional)</label>
                     <select class="select" id="emReplace"></select>
@@ -944,7 +948,7 @@
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, overlapping,
-            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS
+            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -963,6 +967,7 @@
         let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [];
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
         let spots = {}, spotsLoaded = false;               // punch spots other than the shop (cleanSpots of timeclock/spots)
+        let noticeAcks = {};                               // when each driver agreed to the punch time reminder (timeclock/notice_acks)
         let requestsAll = {}; // the Inbox: punch fixes (vehicle problems and oil checks are in Garage)
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
         let viewWeek = null, rangeStart = null;
@@ -1028,7 +1033,7 @@
             stopAll();
             user = u;
             employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = [];
-            requestsAll = {}; settingsRaw = {}; reportCache = null; spots = {}; spotsLoaded = false;
+            requestsAll = {}; settingsRaw = {}; reportCache = null; spots = {}; spotsLoaded = false; noticeAcks = {};
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
                 $("gateSub").textContent = "Only the time clock administrator can open this panel.";
@@ -1063,6 +1068,7 @@
                 if ($("empModal").classList.contains("show")) fillSpotSelect($("emSpot").value);
             });
             sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
+            sub(ref(db, P.noticeAcks), s => { noticeAcks = s.val() || {}; renderPeople(); if ($("empModal").classList.contains("show")) noticeStatus(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
@@ -2307,7 +2313,8 @@
                 return '<div class="emp-row' + (e.active === false || e.removed ? " inactive" : "") + '" style="--i:' + i + '">' +
                     '<div class="avatar">' + esc(initials(name)) + "</div>" +
                     '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div>" +
-                    (e.spot && spots[e.spot] ? '<div class="person-spot">Punch spot: ' + esc(spots[e.spot].name) + "</div>" : "") + "</div>" +
+                    (e.spot && spots[e.spot] ? '<div class="person-spot">Punch spot: ' + esc(spots[e.spot].name) + "</div>" : "") +
+                    (punchNoticeOn(e) ? '<div class="person-spot">Punch time reminder: ' + esc(noticeText(e.ek)) + "</div>" : "") + "</div>" +
                     schedSummary(e) +
                     '<div class="emp-status">' + (e.removed ? '<span class="tag off">Removed</span>' : e.active === false ? '<span class="tag off">Inactive</span>'
                         : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
@@ -2367,6 +2374,8 @@
                 esc(displayName(p, p.email)) + " · " + esc(p.email) + (p.removed ? " (removed)" : " (inactive)") + "</option>").join("");
             buildSchedEditor(e ? e.schedule : { mon: { start: "08:00" }, tue: { start: "08:00" }, wed: { start: "08:00" }, thu: { start: "08:00" }, fri: { start: "08:00" } });
             fillSpotSelect(e && e.spot);
+            $("emNotice").checked = punchNoticeOn(e);
+            noticeStatus();
             openModal("empModal");
         }
         $("emReplace").addEventListener("change", () => {
@@ -2375,7 +2384,22 @@
             if (!$("emName").value.trim()) $("emName").value = old.name || "";
             buildSchedEditor(old.schedule);
             if (old.spot && spots[old.spot]) fillSpotSelect(old.spot); // their punch spot comes along too
+            $("emNotice").checked = punchNoticeOn(old); // and the punch time reminder (and their answer to it)
+            noticeStatus();
         });
+
+        // Punch time reminder (see PUNCH_NOTICE in tc-core.js): on for this employee, and when they agreed to it
+        const punchNoticeOn = e => !!(e && e.notices && e.notices[PUNCH_NOTICE] === true);
+        const noticeAt = k => { const a = k && noticeAcks[k]; return a && typeof a[PUNCH_NOTICE] === "number" ? a[PUNCH_NOTICE] : 0; };
+        const noticeText = k => noticeAt(k) ? "agreed " + fmtDate(noticeAt(k)) + " at " + fmtTime(noticeAt(k)) : "not agreed yet";
+        function noticeStatus() {
+            const el = $("emNoticeStatus");
+            const k = emCtx && emCtx.ek ? emCtx.ek : $("emReplace").value;
+            const on = $("emNotice").checked, was = !!(emCtx && emCtx.ek && punchNoticeOn(employees[emCtx.ek])) || (!!$("emReplace").value && punchNoticeOn(employees[$("emReplace").value]));
+            el.textContent = !on ? "" : noticeAt(k) && was ? "They agreed " + fmtDate(noticeAt(k)) + " at " + fmtTime(noticeAt(k)) + "."
+                : noticeAt(k) ? "Saving shows it to them once more." : "They haven't agreed yet.";
+        }
+        $("emNotice").addEventListener("change", noticeStatus);
 
         // Punch spot choice: the shop, a spot from Settings → Punch spots, or a new one made on the map
         const NEW_SPOT = "_new";
@@ -2429,13 +2453,19 @@
                 if (spotsLoaded && spotPick !== NEW_SPOT) record.spot = spotPick && spots[spotPick] ? spotPick : null;
                 // Only these fields change, so anything else saved on the employee (by Garage, say) is kept.
                 // Adding someone back also clears "removed".
-                await update(ref(db, P.employees + "/" + k), Object.assign({}, record, before.removed ? { removed: null, removedAt: null } : {}));
+                // Punch time reminder: turning it on for someone who agreed before (it was off) clears that, so they see it once more
+                const noticeOn = $("emNotice").checked, noticeWas = punchNoticeOn(before) || (!!replaceEk && punchNoticeOn(employees[replaceEk]));
+                const ackedBefore = !!(noticeAt(k) || (replaceEk && noticeAt(replaceEk)));
+                await update(ref(db, P.employees + "/" + k), Object.assign({}, record, before.removed ? { removed: null, removedAt: null } : {},
+                    { ["notices/" + PUNCH_NOTICE]: noticeOn ? true : null }));
                 if (replaceEk) await moveEmployee(replaceEk, k, record);
+                if (noticeOn && !noticeWas && ackedBefore) await remove(ref(db, P.noticeAcks + "/" + k + "/" + PUNCH_NOTICE));
                 let note = "";
                 if (closeOpen) { await punchOutNow(k, closeOpen, "Punched out when turned off"); note = " Punched out."; }
                 if (canCreate && pass) note = await createLogin(email, pass);
                 const action = replaceEk ? "emp-replace" : emCtx.restoring || (existing && existing.removed) ? "emp-restore" : emCtx.ek ? "emp-edit" : "emp-add";
-                const changes = action === "emp-edit" ? empChanges(before, record) : action === "emp-add" || action === "emp-replace" ? ["Schedule: " + schedText(schedule)].concat(record.spot ? ["Punch spot: " + spotLabel(record.spot)] : []) : [];
+                const changes = (action === "emp-edit" ? empChanges(before, record) : action === "emp-add" || action === "emp-replace" ? ["Schedule: " + schedText(schedule)].concat(record.spot ? ["Punch spot: " + spotLabel(record.spot)] : []) : [])
+                    .concat(noticeOn !== punchNoticeOn(before) && !(replaceEk && noticeOn === noticeWas) ? ["Punch time reminder: " + (noticeOn ? "on" : "off")] : []);
                 if (action !== "emp-edit" || changes.length) {
                     await logEmpAudit(k, action, changes, Object.assign({ name: displayName(record, email) }, replaceEk ? { from: empName(replaceEk) + " (" + String(replaceEk).replace(/,/g, ".") + ")" } : {}));
                 }
@@ -2448,11 +2478,11 @@
 
         // A new sign-in takes someone's place: their punches, requests and open shift move to it, in one write
         async function moveEmployee(from, to, record) {
-            const [sh, rq, op] = await Promise.all([P.shifts, P.requests, P.open].map(path => get(ref(db, path + "/" + from))));
+            const [sh, rq, op, ack] = await Promise.all([P.shifts, P.requests, P.open, P.noticeAcks].map(path => get(ref(db, path + "/" + from))));
             const vr = await get(ref(db, P.vanReports));
             const u = {};
             const move = (path, snap) => Object.entries(snap.val() || {}).forEach(([id, v]) => { u[path + "/" + to + "/" + id] = v; u[path + "/" + from + "/" + id] = null; });
-            move(P.shifts, sh); move(P.requests, rq);
+            move(P.shifts, sh); move(P.requests, rq); move(P.noticeAcks, ack);
             if (op.exists()) { u[P.open + "/" + to] = op.val(); u[P.open + "/" + from] = null; }
             for (const [id, r] of Object.entries(vr.val() || {})) if (r && r.ek === from) u[P.vanReports + "/" + id + "/ek"] = to;
             u[P.employees + "/" + from] = null;

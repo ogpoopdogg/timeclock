@@ -79,9 +79,18 @@ export const P = {
     spots: "timeclock/spots",
     oilPlan: "timeclock/oil_plan",
     oilLast: "timeclock/oil_last",
+    noticeAcks: "timeclock/notice_acks",
     gps: "developer/dispatch_dashboard/drivers",
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
+
+// The punch time reminder: a one-time message for the drivers an admin picks (Staff → Edit → employees/{ek}/notices/punch).
+// The driver's tap on its button is saved at notice_acks/{ek}/punch (server time) and it doesn't show again.
+// Turning it off and on again in Staff clears that, so it shows once more.
+export const PUNCH_NOTICE = "punch";
+export function noticeDue(emp, acks, id) {
+    return !!(emp && emp.notices && emp.notices[id] === true) && !(acks && typeof acks[id] === "number");
+}
 
 export const PAY_WEEK_START = 5; // pay weeks always run Friday to Thursday (payday is Friday)
 export const DEFAULT_SETTINGS = { reminderMinutes: 10, weekStart: PAY_WEEK_START, shopRadius: 500, longShiftHours: 14 };
