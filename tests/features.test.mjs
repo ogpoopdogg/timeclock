@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, farFromPlace, punchPlace, cleanSpots, shopShift, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, P } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -263,4 +263,17 @@ test('no signal: a late punch out counts from when it was pressed; a late punch 
   assert.strictEqual(countedOut({ in: t0, out: t0 + 9 * H, outTap: t0 - H }), t0);
   // A late punch in still counts from when it reached the server
   assert.strictEqual(shiftMs({ in: t0 + 2 * H, tap: t0, out: t0 + 9 * H }, 0), 7 * H);
+});
+
+test('punch time reminder: shows only when an admin turned it on and the driver has not agreed yet', () => {
+  assert.strictEqual(PUNCH_NOTICE, 'punch');
+  assert.strictEqual(P.noticeAcks, 'timeclock/notice_acks');
+  const on = { name: 'Kim', notices: { punch: true } };
+  assert.strictEqual(noticeDue(on, {}, 'punch'), true);
+  assert.strictEqual(noticeDue(on, { punch: 1762333320000 }, 'punch'), false);
+  assert.strictEqual(noticeDue({ name: 'Kim' }, {}, 'punch'), false);
+  assert.strictEqual(noticeDue({ notices: { punch: false } }, {}, 'punch'), false);
+  assert.strictEqual(noticeDue(null, {}, 'punch'), false);
+  assert.strictEqual(noticeDue(on, null, 'punch'), true);
+  assert.strictEqual(noticeDue(on, { punch: { '.sv': 'timestamp' } }, 'punch'), true); // only a saved time counts
 });

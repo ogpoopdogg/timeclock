@@ -622,6 +622,16 @@
         .textarea { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; line-height: 1.4; }
         .form-hint { color: var(--dim); font-size: 0.85rem; margin: -8px 0 14px; }
         .sheet-foot .primary-btn { flex: 1; height: 46px; margin: 0; font-size: 1.1rem; }
+        .form-kicker { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--yellow); }
+        .form-kicker::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
+
+        /* ---------- Punch time reminder (one time, for the drivers picked in Admin → Staff) ---------- */
+        .rm-list { display: grid; gap: 12px; margin: 4px 0 12px; }
+        .rm-row { display: flex; gap: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line); }
+        .rm-ic { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 204, 0, 0.12); color: var(--yellow); }
+        .rm-ic svg { width: 22px; height: 22px; }
+        .rm-row strong { display: block; font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; line-height: 1.15; margin-bottom: 3px; }
+        .rm-row p { color: var(--muted); font-size: 0.97rem; line-height: 1.4; }
 
         /* ---------- Responsive ---------- */
         @media (max-width: 900px) {
@@ -867,7 +877,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, longShift,
+            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, longShift, PUNCH_NOTICE, noticeDue,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -886,6 +896,7 @@
         let user = null, ek = null, emp = null, settings = settingsWithDefaults(null);
         let shifts = [], rawShifts = [], claims = {}, serverOffset = 0;
         let requests = {};                  // the driver's own "Fix a punch" requests
+        let acks = null;                    // the messages from the office the driver has agreed to (null until loaded)
         let shiftsSince = 0, shiftsUnsub = null;
         let oilPlans = null, oilLast = null;     // the oil check schedule and the last check of each vehicle (see "Oil check")
         let locSaving = 0;                  // locations still being written (don't reload the app meanwhile)
@@ -959,7 +970,7 @@
             authKnown = true; standIn = false;
             user = u; claims = {}; empLoaded = shiftsLoaded = false;
             if (!keep) { emp = null; shifts = []; rawShifts = []; offlineStart = false; online = true; }
-            requests = {}; netSeenAt = 0;
+            requests = {}; acks = null; netSeenAt = 0;
             if (!keep) { closeSheet(true); closeForm(true); }
             if (!u) { ek = null; clearOfflineCopy(); renderNet(); show("signinScreen"); return; }
             ek = emailKey(u.email);
@@ -984,6 +995,8 @@
             listen(ref(db, P.claims), s => { claims = s.val() || {}; if (sheetOpen) renderSheet(); render(); }, () => {});
             // Database rules not updated yet: these just stay empty
             listen(ref(db, P.requests + "/" + ek), s => { requests = s.val() || {}; renderRequests(); }, () => {});
+            // Not loaded (no signal yet, or the database rules not updated yet): the punch time reminder waits
+            listen(ref(db, P.noticeAcks + "/" + ek), s => { acks = s.val() || {}; render(); }, () => {});
         });
 
         // The driver's punches from shiftsSince on (going back in "My week" moves it earlier)
@@ -1115,6 +1128,7 @@
             }
             $("vanReportBtn").hidden = !(open && open.vehicleId && !lostVan(open));
             renderOilBox(open);
+            showPunchNotice();
 
             tickClock();
             renderWeek();
@@ -1848,7 +1862,7 @@
             formCancelFn = o.onCancel || null;
             formCloseFn = o.onClose || null;
             formMust = !!o.mustAnswer;
-            $("formTitle").textContent = o.title;
+            $("formTitle").innerHTML = (o.kicker ? '<span class="form-kicker">' + esc(o.kicker) + "</span>" : "") + esc(o.title);
             $("formSub").textContent = o.sub || "";
             $("formBody").innerHTML = o.body;
             $("formMsg").textContent = "";
@@ -2087,6 +2101,33 @@
         // Vehicle swap: the driver handing off a vehicle (or whose vehicle another driver took) is asked about its oil
         // right then, if they haven't ticked it yet. Some drivers only tick it at punch out, and the driver taking the
         // vehicle isn't responsible for its oil. The answer settles the shift's oil (see oilSettled() in tc-core.js).
+        // ---------- Punch time reminder ----------
+        // Shown one time to the drivers an admin picked (Staff → Edit), before anything else on the clock screen.
+        // Only the button closes it. The tap is saved with the server's time, and the admin sees it on Staff.
+        function showPunchNotice() {
+            if (!acks || formOpen || sheetOpen || holding || busy || $("success").classList.contains("show")) return;
+            if (!noticeDue(emp, acks, PUNCH_NOTICE)) return;
+            openForm({
+                kicker: "A note from the office",
+                title: "Punch time reminder",
+                sub: "Please remember to punch in and out correctly.",
+                body: '<div class="rm-list">' +
+                    '<div class="rm-row"><span class="rm-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>' +
+                    "<div><strong>Punch in when you arrive at work</strong><p>Punch in once you are at work and ready to start, not from home or on the way.</p></div></div>" +
+                    '<div class="rm-row"><span class="rm-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>' +
+                    "<div><strong>Punch out when your work is done</strong><p>Punch out when you finish for the day, before you leave for home.</p></div></div></div>",
+                submit: "I have read and understand",
+                noCancel: true,
+                mustAnswer: true,
+                offline: true, // with no signal it's sent once there's signal
+                onSubmit: () => {
+                    acks = Object.assign({}, acks, { [PUNCH_NOTICE]: Date.now() }); // closed for good on this phone right away
+                    set(ref(db, P.noticeAcks + "/" + ek + "/" + PUNCH_NOTICE), serverTimestamp())
+                        .catch(err => console.warn("Punch reminder answer not saved:", err));
+                }
+            });
+        }
+
         function needsHandoffOil(open) { return !!open && oilWanted(open) && !oilSettled(open); }
         function askOilAtHandoff(shiftId, vehicleName, then) {
             openForm({

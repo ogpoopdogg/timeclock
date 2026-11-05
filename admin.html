@@ -314,6 +314,15 @@
         .spot-row .spot-name { font-weight: 600; }
         .spot-row .spot-meta { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
         .person-spot { color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+        .nt-list { display: grid; gap: 8px; margin-bottom: 8px; }
+        .nt-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line); }
+        .nt-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+        .nt-pick input { width: 22px; height: 22px; flex: none; accent-color: var(--yellow); }
+        .nt-pick > span { display: flex; flex-direction: column; min-width: 0; }
+        .nt-name { font-weight: 600; }
+        .nt-status { color: var(--muted); font-size: 0.85rem; }
+        .nt-status:empty { display: none; }
+        .nt-status.ok { color: var(--green); }
         a.btn { text-decoration: none; }
 
         /* ---------- Employees ---------- */
@@ -675,7 +684,7 @@
         <section class="panel" id="panel-people" role="tabpanel" hidden>
             <div class="panel-head">
                 <div><h1 class="panel-title">Employees</h1><p class="panel-sub">Who can use the time clock, and when they're scheduled to start.</p></div>
-                <div class="panel-actions"><button type="button" class="btn ghost" id="showRemovedBtn" hidden>Show removed</button><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
+                <div class="panel-actions"><button type="button" class="btn ghost" id="showRemovedBtn" hidden>Show removed</button><button type="button" class="btn ghost" id="noticeBtn">Punch time reminder</button><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
             </div>
             <div class="emp-list" id="empList"></div>
         </section>
@@ -852,6 +861,21 @@
     </div>
 
     <!-- Export -->
+    <!-- Punch time reminder: who sees it -->
+    <div class="modal-backdrop" id="noticeModal">
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="ntTitle" id="noticeForm" novalidate>
+            <h2 id="ntTitle">Punch time reminder</h2>
+            <p class="modal-sub">Tick who should see it. Each driver sees it one time on their time clock (punch in when you arrive at work, punch out before you leave for home), and it stays until they tap “I have read and understand”.</p>
+            <div class="nt-list" id="ntList"></div>
+            <p class="modal-msg" id="ntMsg" role="alert"></p>
+            <div class="modal-foot">
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost" data-close>Cancel</button>
+                <button type="submit" class="btn primary" id="ntSave">Save</button>
+            </div>
+        </form>
+    </div>
+
     <div class="modal-backdrop" id="exportModal">
         <form class="modal" role="dialog" aria-modal="true" aria-labelledby="exTitle" id="exportForm" novalidate>
             <h2 id="exTitle">Export CSV</h2>
@@ -944,7 +968,7 @@
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, overlapping,
-            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS
+            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -963,6 +987,7 @@
         let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [];
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
         let spots = {}, spotsLoaded = false;               // punch spots other than the shop (cleanSpots of timeclock/spots)
+        let noticeAcks = {};                               // when each driver agreed to the punch time reminder (timeclock/notice_acks)
         let requestsAll = {}; // the Inbox: punch fixes (vehicle problems and oil checks are in Garage)
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
         let viewWeek = null, rangeStart = null;
@@ -1028,7 +1053,7 @@
             stopAll();
             user = u;
             employees = {}; shiftsByEk = {}; claims = {}; nicknames = {}; audit = [];
-            requestsAll = {}; settingsRaw = {}; reportCache = null; spots = {}; spotsLoaded = false;
+            requestsAll = {}; settingsRaw = {}; reportCache = null; spots = {}; spotsLoaded = false; noticeAcks = {};
             if (!u) {
                 $("gateTitle").textContent = "Admin sign in";
                 $("gateSub").textContent = "Only the time clock administrator can open this panel.";
@@ -1063,6 +1088,7 @@
                 if ($("empModal").classList.contains("show")) fillSpotSelect($("emSpot").value);
             });
             sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
+            sub(ref(db, P.noticeAcks), s => { noticeAcks = s.val() || {}; renderPeople(); if ($("noticeModal").classList.contains("show")) renderNoticeList(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
@@ -2307,7 +2333,8 @@
                 return '<div class="emp-row' + (e.active === false || e.removed ? " inactive" : "") + '" style="--i:' + i + '">' +
                     '<div class="avatar">' + esc(initials(name)) + "</div>" +
                     '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div>" +
-                    (e.spot && spots[e.spot] ? '<div class="person-spot">Punch spot: ' + esc(spots[e.spot].name) + "</div>" : "") + "</div>" +
+                    (e.spot && spots[e.spot] ? '<div class="person-spot">Punch spot: ' + esc(spots[e.spot].name) + "</div>" : "") +
+                    (punchNoticeOn(e) ? '<div class="person-spot">Punch time reminder: ' + esc(noticeText(e.ek)) + "</div>" : "") + "</div>" +
                     schedSummary(e) +
                     '<div class="emp-status">' + (e.removed ? '<span class="tag off">Removed</span>' : e.active === false ? '<span class="tag off">Inactive</span>'
                         : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
@@ -2375,6 +2402,65 @@
             if (!$("emName").value.trim()) $("emName").value = old.name || "";
             buildSchedEditor(old.schedule);
             if (old.spot && spots[old.spot]) fillSpotSelect(old.spot); // their punch spot comes along too
+        });
+
+        // Punch time reminder (see PUNCH_NOTICE in tc-core.js): on for this employee, and when they agreed to it
+        const punchNoticeOn = e => !!(e && e.notices && e.notices[PUNCH_NOTICE] === true);
+        const noticeAt = k => { const a = k && noticeAcks[k]; return a && typeof a[PUNCH_NOTICE] === "number" ? a[PUNCH_NOTICE] : 0; };
+        const noticeText = k => noticeAt(k) ? "agreed " + fmtDate(noticeAt(k)) + " at " + fmtTime(noticeAt(k)) : "not agreed yet";
+        const agreedText = k => "Agreed " + fmtDate(noticeAt(k)) + " at " + fmtTime(noticeAt(k));
+
+        // Staff → Punch time reminder: one list of everyone, tick who sees it. Each ticked driver sees it once, until they
+        // tap "I have read and understand". "Show again" clears their answer on Save, so they see it one more time.
+        let ntAgain = new Set();
+        function openNoticeModal() {
+            ntAgain = new Set();
+            renderNoticeList();
+            $("ntMsg").textContent = "";
+            openModal("noticeModal");
+        }
+        function renderNoticeList() {
+            const ticked = new Set([...$("ntList").querySelectorAll("input[data-nt]:checked")].map(i => i.dataset.nt));
+            const keep = $("noticeModal").classList.contains("show"); // redrawn while open: keep the ticks being made
+            const list = empList().filter(e => !e.removed); // turned-off people last
+            $("ntList").innerHTML = list.length ? list.map(e => {
+                const on = keep ? ticked.has(e.ek) : punchNoticeOn(e);
+                const again = ntAgain.has(e.ek);
+                const status = !on ? "" : again ? "Shows again after you save" : noticeAt(e.ek) ? agreedText(e.ek) : "Waiting for them to read it";
+                return '<div class="nt-row"><label class="nt-pick"><input type="checkbox" data-nt="' + esc(e.ek) + '"' + (on ? " checked" : "") + ">" +
+                    '<span><span class="nt-name">' + esc(displayName(e, e.email)) + (e.active === false ? ' <span class="tag off">Inactive</span>' : "") + "</span>" +
+                    '<span class="nt-status' + (on && noticeAt(e.ek) && !again ? " ok" : "") + '">' + esc(status) + "</span></span></label>" +
+                    (on && noticeAt(e.ek) && !again ? '<button type="button" class="btn sm ghost" data-nt-again="' + esc(e.ek) + '">Show again</button>' : "") + "</div>";
+            }).join("") : '<div class="empty-state">No employees yet.</div>';
+        }
+        $("noticeBtn").addEventListener("click", openNoticeModal);
+        $("ntList").addEventListener("change", e => { if (e.target.matches("input[data-nt]")) { if (!e.target.checked) ntAgain.delete(e.target.dataset.nt); renderNoticeList(); } });
+        $("ntList").addEventListener("click", e => {
+            const b = e.target.closest("[data-nt-again]");
+            if (b) { ntAgain.add(b.dataset.ntAgain); renderNoticeList(); }
+        });
+        $("noticeForm").addEventListener("submit", async ev => {
+            ev.preventDefault();
+            const btn = $("ntSave"), msg = $("ntMsg");
+            const u = {}, logs = [];
+            for (const i of $("ntList").querySelectorAll("input[data-nt]")) {
+                const k = i.dataset.nt, e = employees[k], on = i.checked, was = punchNoticeOn(e);
+                if (!e) continue;
+                if (on !== was) u[P.employees + "/" + k + "/notices/" + PUNCH_NOTICE] = on ? true : null;
+                // Turned on again after they'd agreed, or "Show again": clear their answer so they see it once more
+                const clear = on && noticeAt(k) && (ntAgain.has(k) || !was);
+                if (clear) u[P.noticeAcks + "/" + k + "/" + PUNCH_NOTICE] = null;
+                if (on !== was || clear) logs.push([k, e, on ? (clear && was ? "Punch time reminder: shown again" : "Punch time reminder: on") : "Punch time reminder: off"]);
+            }
+            if (!logs.length) { closeModal("noticeModal"); return; }
+            btn.disabled = true; msg.textContent = "";
+            try {
+                await update(ref(db), u);
+                for (const [k, e, text] of logs) await logEmpAudit(k, "emp-edit", [text], { name: displayName(e, e.email) });
+                closeModal("noticeModal");
+                toast("Punch time reminder saved.");
+            } catch (err) { msg.textContent = "Couldn't save: " + errText(err); }
+            btn.disabled = false;
         });
 
         // Punch spot choice: the shop, a spot from Settings → Punch spots, or a new one made on the map
@@ -2448,11 +2534,13 @@
 
         // A new sign-in takes someone's place: their punches, requests and open shift move to it, in one write
         async function moveEmployee(from, to, record) {
-            const [sh, rq, op] = await Promise.all([P.shifts, P.requests, P.open].map(path => get(ref(db, path + "/" + from))));
+            const [sh, rq, op, ack] = await Promise.all([P.shifts, P.requests, P.open, P.noticeAcks].map(path => get(ref(db, path + "/" + from))));
             const vr = await get(ref(db, P.vanReports));
             const u = {};
             const move = (path, snap) => Object.entries(snap.val() || {}).forEach(([id, v]) => { u[path + "/" + to + "/" + id] = v; u[path + "/" + from + "/" + id] = null; });
-            move(P.shifts, sh); move(P.requests, rq);
+            move(P.shifts, sh); move(P.requests, rq); move(P.noticeAcks, ack);
+            const old = employees[from];
+            if (old && old.notices) u[P.employees + "/" + to + "/notices"] = old.notices; // the punch time reminder comes along
             if (op.exists()) { u[P.open + "/" + to] = op.val(); u[P.open + "/" + from] = null; }
             for (const [id, r] of Object.entries(vr.val() || {})) if (r && r.ek === from) u[P.vanReports + "/" + id + "/ek"] = to;
             u[P.employees + "/" + from] = null;
