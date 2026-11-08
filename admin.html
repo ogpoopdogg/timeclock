@@ -684,7 +684,7 @@
         <section class="panel" id="panel-people" role="tabpanel" hidden>
             <div class="panel-head">
                 <div><h1 class="panel-title">Employees</h1><p class="panel-sub">Who can use the time clock, and when they're scheduled to start.</p></div>
-                <div class="panel-actions"><button type="button" class="btn ghost" id="showRemovedBtn" hidden>Show removed</button><button type="button" class="btn ghost" id="noticeBtn">Punch time reminder</button><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
+                <div class="panel-actions"><button type="button" class="btn ghost" id="showRemovedBtn" hidden>Show removed</button><button type="button" class="btn ghost" id="noticeBtn">Punch time reminder</button><button type="button" class="btn ghost" id="vehicleNoticeBtn">Change vehicle reminder</button><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
             </div>
             <div class="emp-list" id="empList"></div>
         </section>
@@ -861,11 +861,11 @@
     </div>
 
     <!-- Export -->
-    <!-- Punch time reminder: who sees it -->
+    <!-- Punch time / change vehicle reminder: who sees it (one list, filled for the reminder picked) -->
     <div class="modal-backdrop" id="noticeModal">
         <form class="modal" role="dialog" aria-modal="true" aria-labelledby="ntTitle" id="noticeForm" novalidate>
             <h2 id="ntTitle">Punch time reminder</h2>
-            <p class="modal-sub">Tick who should see it. Each driver sees it one time on their time clock (punch in when you arrive at work, punch out before you leave for home), and it stays until they tap “I have read and understand”.</p>
+            <p class="modal-sub" id="ntSub"></p>
             <div class="nt-list" id="ntList"></div>
             <p class="modal-msg" id="ntMsg" role="alert"></p>
             <div class="modal-foot">
@@ -968,7 +968,7 @@
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, overlapping,
-            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE
+            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE, VEHICLE_NOTICE
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -2334,7 +2334,7 @@
                     '<div class="avatar">' + esc(initials(name)) + "</div>" +
                     '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div>" +
                     (e.spot && spots[e.spot] ? '<div class="person-spot">Punch spot: ' + esc(spots[e.spot].name) + "</div>" : "") +
-                    (punchNoticeOn(e) ? '<div class="person-spot">Punch time reminder: ' + esc(noticeText(e.ek)) + "</div>" : "") + "</div>" +
+                    Object.keys(NOTICES).map(id => noticeOn(e, id) ? '<div class="person-spot">' + NOTICES[id].name + ": " + esc(noticeText(e.ek, id)) + "</div>" : "").join("") + "</div>" +
                     schedSummary(e) +
                     '<div class="emp-status">' + (e.removed ? '<span class="tag off">Removed</span>' : e.active === false ? '<span class="tag off">Inactive</span>'
                         : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
@@ -2404,36 +2404,48 @@
             if (old.spot && spots[old.spot]) fillSpotSelect(old.spot); // their punch spot comes along too
         });
 
-        // Punch time reminder (see PUNCH_NOTICE in tc-core.js): on for this employee, and when they agreed to it
-        const punchNoticeOn = e => !!(e && e.notices && e.notices[PUNCH_NOTICE] === true);
-        const noticeAt = k => { const a = k && noticeAcks[k]; return a && typeof a[PUNCH_NOTICE] === "number" ? a[PUNCH_NOTICE] : 0; };
-        const noticeText = k => noticeAt(k) ? "agreed " + fmtDate(noticeAt(k)) + " at " + fmtTime(noticeAt(k)) : "not agreed yet";
-        const agreedText = k => "Agreed " + fmtDate(noticeAt(k)) + " at " + fmtTime(noticeAt(k));
+        // One-time reminders (see PUNCH_NOTICE and VEHICLE_NOTICE in tc-core.js): on for this employee, and when they agreed to it
+        const NOTICES = {
+            [PUNCH_NOTICE]: { name: "Punch time reminder", about: "Punch in when you arrive at work, and punch out when your work is done." },
+            [VEHICLE_NOTICE]: { name: "Change vehicle reminder", about: "Tap Change vehicle every time you change vehicles, including swaps." }
+        };
+        const noticeOn = (e, id) => !!(e && e.notices && e.notices[id] === true);
+        const noticeAt = (k, id) => { const a = k && noticeAcks[k]; return a && typeof a[id] === "number" ? a[id] : 0; };
+        const noticeText = (k, id) => noticeAt(k, id) ? "agreed " + fmtDate(noticeAt(k, id)) + " at " + fmtTime(noticeAt(k, id)) : "not agreed yet";
+        const agreedText = (k, id) => "Agreed " + fmtDate(noticeAt(k, id)) + " at " + fmtTime(noticeAt(k, id));
 
-        // Staff → Punch time reminder: one list of everyone, tick who sees it. Each ticked driver sees it once, until they
-        // tap "I have read and understand". "Show again" clears their answer on Save, so they see it one more time.
-        let ntAgain = new Set();
-        function openNoticeModal() {
+        // Staff → Punch time reminder / Change vehicle reminder: one list of everyone, tick who sees it. Each ticked driver
+        // sees it once, until they tap "I have read and understand". "Show again" clears their answer on Save, so they see it
+        // one more time.
+        let ntAgain = new Set(), ntId = PUNCH_NOTICE;
+        function openNoticeModal(id) {
+            ntId = id;
             ntAgain = new Set();
+            $("ntTitle").textContent = NOTICES[id].name;
+            $("ntSub").textContent = "Tick who should see it. Each driver sees it one time on their time clock, and it stays until they tap " +
+                "“I have read and understand”. It says: " + NOTICES[id].about;
+            $("ntList").innerHTML = ""; // a fresh list, not the other reminder's ticks
             renderNoticeList();
             $("ntMsg").textContent = "";
             openModal("noticeModal");
         }
         function renderNoticeList() {
+            const id = ntId;
             const ticked = new Set([...$("ntList").querySelectorAll("input[data-nt]:checked")].map(i => i.dataset.nt));
             const keep = $("noticeModal").classList.contains("show"); // redrawn while open: keep the ticks being made
             const list = empList().filter(e => !e.removed); // turned-off people last
             $("ntList").innerHTML = list.length ? list.map(e => {
-                const on = keep ? ticked.has(e.ek) : punchNoticeOn(e);
+                const on = keep ? ticked.has(e.ek) : noticeOn(e, id);
                 const again = ntAgain.has(e.ek);
-                const status = !on ? "" : again ? "Shows again after you save" : noticeAt(e.ek) ? agreedText(e.ek) : "Waiting for them to read it";
+                const status = !on ? "" : again ? "Shows again after you save" : noticeAt(e.ek, id) ? agreedText(e.ek, id) : "Waiting for them to read it";
                 return '<div class="nt-row"><label class="nt-pick"><input type="checkbox" data-nt="' + esc(e.ek) + '"' + (on ? " checked" : "") + ">" +
                     '<span><span class="nt-name">' + esc(displayName(e, e.email)) + (e.active === false ? ' <span class="tag off">Inactive</span>' : "") + "</span>" +
-                    '<span class="nt-status' + (on && noticeAt(e.ek) && !again ? " ok" : "") + '">' + esc(status) + "</span></span></label>" +
-                    (on && noticeAt(e.ek) && !again ? '<button type="button" class="btn sm ghost" data-nt-again="' + esc(e.ek) + '">Show again</button>' : "") + "</div>";
+                    '<span class="nt-status' + (on && noticeAt(e.ek, id) && !again ? " ok" : "") + '">' + esc(status) + "</span></span></label>" +
+                    (on && noticeAt(e.ek, id) && !again ? '<button type="button" class="btn sm ghost" data-nt-again="' + esc(e.ek) + '">Show again</button>' : "") + "</div>";
             }).join("") : '<div class="empty-state">No employees yet.</div>';
         }
-        $("noticeBtn").addEventListener("click", openNoticeModal);
+        $("noticeBtn").addEventListener("click", () => openNoticeModal(PUNCH_NOTICE));
+        $("vehicleNoticeBtn").addEventListener("click", () => openNoticeModal(VEHICLE_NOTICE));
         $("ntList").addEventListener("change", e => { if (e.target.matches("input[data-nt]")) { if (!e.target.checked) ntAgain.delete(e.target.dataset.nt); renderNoticeList(); } });
         $("ntList").addEventListener("click", e => {
             const b = e.target.closest("[data-nt-again]");
@@ -2443,14 +2455,15 @@
             ev.preventDefault();
             const btn = $("ntSave"), msg = $("ntMsg");
             const u = {}, logs = [];
+            const id = ntId, name = NOTICES[id].name;
             for (const i of $("ntList").querySelectorAll("input[data-nt]")) {
-                const k = i.dataset.nt, e = employees[k], on = i.checked, was = punchNoticeOn(e);
+                const k = i.dataset.nt, e = employees[k], on = i.checked, was = noticeOn(e, id);
                 if (!e) continue;
-                if (on !== was) u[P.employees + "/" + k + "/notices/" + PUNCH_NOTICE] = on ? true : null;
+                if (on !== was) u[P.employees + "/" + k + "/notices/" + id] = on ? true : null;
                 // Turned on again after they'd agreed, or "Show again": clear their answer so they see it once more
-                const clear = on && noticeAt(k) && (ntAgain.has(k) || !was);
-                if (clear) u[P.noticeAcks + "/" + k + "/" + PUNCH_NOTICE] = null;
-                if (on !== was || clear) logs.push([k, e, on ? (clear && was ? "Punch time reminder: shown again" : "Punch time reminder: on") : "Punch time reminder: off"]);
+                const clear = on && noticeAt(k, id) && (ntAgain.has(k) || !was);
+                if (clear) u[P.noticeAcks + "/" + k + "/" + id] = null;
+                if (on !== was || clear) logs.push([k, e, name + (on ? (clear && was ? ": shown again" : ": on") : ": off")]);
             }
             if (!logs.length) { closeModal("noticeModal"); return; }
             btn.disabled = true; msg.textContent = "";
@@ -2458,7 +2471,7 @@
                 await update(ref(db), u);
                 for (const [k, e, text] of logs) await logEmpAudit(k, "emp-edit", [text], { name: displayName(e, e.email) });
                 closeModal("noticeModal");
-                toast("Punch time reminder saved.");
+                toast(name + " saved.");
             } catch (err) { msg.textContent = "Couldn't save: " + errText(err); }
             btn.disabled = false;
         });

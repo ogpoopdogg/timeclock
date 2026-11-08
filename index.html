@@ -354,6 +354,7 @@
         .swap-btn svg { width: 20px; height: 20px; }
         .swap-btn:hover, .swap-btn:focus-visible { outline: none; filter: brightness(1.08); }
         .swap-btn:active { transform: scale(0.96); }
+        @media (max-width: 360px) { .swap-btn { gap: 6px; padding: 0 12px; font-size: 1.02rem; } } /* "Change vehicle" fits beside "Your vehicle" */
         /* Another driver took this driver's van: they need to do a van swap */
         .vehicle-pill.alert { box-shadow: inset 0 0 0 2px var(--red); background: rgba(255, 107, 94, 0.08); }
         .vehicle-pill.alert .vp-icon, .vehicle-pill.alert .vp-label { color: var(--red); }
@@ -625,13 +626,33 @@
         .form-kicker { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--yellow); }
         .form-kicker::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
 
-        /* ---------- Punch time reminder (one time, for the drivers picked in Admin → Staff) ---------- */
+        /* ---------- One-time reminders (punch time, change vehicle), for the drivers picked in Admin → Staff ---------- */
         .rm-list { display: grid; gap: 12px; margin: 4px 0 12px; }
         .rm-row { display: flex; gap: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px var(--line); }
         .rm-ic { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 204, 0, 0.12); color: var(--yellow); }
         .rm-ic svg { width: 22px; height: 22px; }
         .rm-row strong { display: block; font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; line-height: 1.15; margin-bottom: 3px; }
         .rm-row p { color: var(--muted); font-size: 0.97rem; line-height: 1.4; }
+        .form-kicker.important { color: var(--red); }
+        .form-kicker.important::before { background: var(--red); box-shadow: 0 0 10px var(--red); }
+        /* Change vehicle reminder: a copy of the vehicle bar with an arrow to its button */
+        .rm-demo { position: relative; padding-top: 44px; }
+        .rm-demo-label { position: absolute; left: 2px; top: 4px; font-family: var(--font-display); font-weight: 700; font-size: 1.12rem; color: var(--yellow); white-space: nowrap; }
+        .rm-arrow { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: var(--yellow); pointer-events: none; }
+        .vehicle-pill.rm-demo-pill { width: 100%; margin: 4px 0 6px; animation: none; pointer-events: none; }
+        .rm-demo-pill .swap-btn { box-shadow: 0 0 0 4px rgba(255, 204, 0, 0.22); }
+        .rm-ticks { list-style: none; display: grid; gap: 10px; margin: 10px 0 12px; padding: 0; }
+        .rm-ticks li { display: flex; gap: 12px; align-items: center; font-size: 1rem; }
+        .rm-ticks .rm-ic { width: 32px; height: 32px; background: rgba(53, 208, 127, 0.12); color: var(--green); }
+        .rm-ticks .rm-ic svg { width: 18px; height: 18px; }
+        .rm-must { display: flex; gap: 12px; align-items: center; padding: 12px 14px; margin: 4px 0 10px; border-radius: 14px; background: rgba(255, 204, 0, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.3); }
+        .rm-must p { color: var(--muted); font-size: 0.93rem; line-height: 1.4; }
+        .rm-must strong { color: var(--text); }
+        .rm-must .rm-ic { width: 34px; height: 34px; }
+        .rm-must .rm-ic svg { width: 19px; height: 19px; }
+        .rm-call { display: flex; gap: 10px; align-items: flex-start; margin: 6px 2px 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+        .rm-call svg { width: 18px; height: 18px; flex: none; color: var(--yellow); margin-top: 2px; }
+        .rm-call p { color: var(--muted); font-size: 0.93rem; line-height: 1.4; }
 
         /* ---------- Responsive ---------- */
         @media (max-width: 900px) {
@@ -733,7 +754,7 @@
                     <span class="vp-text"><span class="vp-label" id="vpLabel">Your vehicle</span><span class="vp-name" id="vpName"></span></span>
                     <button type="button" class="swap-btn" id="changeVehicleBtn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>
-                        <span id="swapBtnText">Vehicle swap</span>
+                        <span id="swapBtnText">Change vehicle</span>
                     </button>
                 </div>
                 <button type="button" class="van-report-link" id="vanReportBtn" hidden>Something wrong with this vehicle? Report it</button>
@@ -877,7 +898,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, longShift, PUNCH_NOTICE, noticeDue,
+            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, noticeDue,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -1119,7 +1140,7 @@
                 $("vpLabel").textContent = lost ? (lost.by ? lost.by + " took vehicle " + lost.vehicleName : "Vehicle " + lost.vehicleName + " was taken")
                     : has ? "Your vehicle" : shop ? "Working in the" : "No vehicle selected";
                 $("vpName").textContent = lost ? "Pick your vehicle" : has ? (open.vehicleName || "—") : shop ? "Shop" : "Tap to pick one";
-                $("swapBtnText").textContent = has || lost ? "Vehicle swap" : "Pick vehicle";
+                $("swapBtnText").textContent = has || lost ? "Change vehicle" : "Pick vehicle";
                 showSwapBanner(open, lost);
                 if (lost && lost.vehicleName && needsHandoffOil(open) && !formOpen && !sheetOpen && handoffAsked !== open.id + "|" + lost.vehicleName) {
                     handoffAsked = open.id + "|" + lost.vehicleName;
@@ -1128,7 +1149,7 @@
             }
             $("vanReportBtn").hidden = !(open && open.vehicleId && !lostVan(open));
             renderOilBox(open);
-            showPunchNotice();
+            showNotices();
 
             tickClock();
             renderWeek();
@@ -1683,7 +1704,7 @@
             const lost = lostVan(open);
             const has = !!open.vehicleId && !lost;
             const shop = atShop(open);
-            $("sheetTitle").textContent = has || lost ? "Vehicle swap" : "Pick your vehicle";
+            $("sheetTitle").textContent = has || lost ? "Change vehicle" : "Pick your vehicle";
             $("sheetSub").textContent = lost ? (lost.by ? lost.by + " took vehicle " + lost.vehicleName + ". " : "") + "Tap the vehicle you're in now, or Shop."
                 : has ? "Tap the vehicle you're in now, or Shop if you're working in the shop. If another driver has the vehicle, they'll be unassigned and asked to pick theirs."
                 : shop ? "You're working in the shop. If you're driving now, tap your vehicle."
@@ -1862,7 +1883,7 @@
             formCancelFn = o.onCancel || null;
             formCloseFn = o.onClose || null;
             formMust = !!o.mustAnswer;
-            $("formTitle").innerHTML = (o.kicker ? '<span class="form-kicker">' + esc(o.kicker) + "</span>" : "") + esc(o.title);
+            $("formTitle").innerHTML = (o.kicker ? '<span class="form-kicker' + (o.important ? " important" : "") + '">' + esc(o.kicker) + "</span>" : "") + esc(o.title);
             $("formSub").textContent = o.sub || "";
             $("formBody").innerHTML = o.body;
             $("formMsg").textContent = "";
@@ -2101,12 +2122,21 @@
         // Vehicle swap: the driver handing off a vehicle (or whose vehicle another driver took) is asked about its oil
         // right then, if they haven't ticked it yet. Some drivers only tick it at punch out, and the driver taking the
         // vehicle isn't responsible for its oil. The answer settles the shift's oil (see oilSettled() in tc-core.js).
-        // ---------- Punch time reminder ----------
-        // Shown one time to the drivers an admin picked (Staff → Edit), before anything else on the clock screen.
-        // Only the button closes it. The tap is saved with the server's time, and the admin sees it on Staff.
-        function showPunchNotice() {
+        // ---------- One-time reminders (punch time, change vehicle) ----------
+        // Shown one time to the drivers an admin picked (Staff → Punch time reminder / Change vehicle reminder), before
+        // anything else on the clock screen, one after the other. Only the button closes each one. The tap is saved with
+        // the server's time, and the admin sees it on Staff.
+        function showNotices() {
             if (!acks || formOpen || sheetOpen || holding || busy || $("success").classList.contains("show")) return;
-            if (!noticeDue(emp, acks, PUNCH_NOTICE)) return;
+            if (noticeDue(emp, acks, PUNCH_NOTICE)) showPunchNotice();
+            else if (noticeDue(emp, acks, VEHICLE_NOTICE)) showVehicleNotice();
+        }
+        function saveNoticeAck(id) {
+            acks = Object.assign({}, acks, { [id]: Date.now() }); // closed for good on this phone right away
+            set(ref(db, P.noticeAcks + "/" + ek + "/" + id), serverTimestamp())
+                .catch(err => console.warn("Reminder answer not saved (" + id + "):", err));
+        }
+        function showPunchNotice() {
             openForm({
                 kicker: "A note from the office",
                 title: "Punch time reminder",
@@ -2120,13 +2150,53 @@
                 noCancel: true,
                 mustAnswer: true,
                 offline: true, // with no signal it's sent once there's signal
-                onSubmit: () => {
-                    acks = Object.assign({}, acks, { [PUNCH_NOTICE]: Date.now() }); // closed for good on this phone right away
-                    set(ref(db, P.noticeAcks + "/" + ek + "/" + PUNCH_NOTICE), serverTimestamp())
-                        .catch(err => console.warn("Punch reminder answer not saved:", err));
-                }
+                onSubmit: () => saveNoticeAck(PUNCH_NOTICE),
+                onClose: showNotices // the next reminder, if there is one
             });
         }
+
+        // Change vehicle reminder: tap Change vehicle on every vehicle change, swaps too. It shows a copy of the
+        // vehicle bar (not tappable) with an arrow to the button, drawn once the sheet is open (drawNoticeArrow).
+        const RM_CHECK = '<span class="rm-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.5 2.5L16 9.5"/></svg></span>';
+        function showVehicleNotice() {
+            openForm({
+                kicker: "Important",
+                important: true,
+                title: "Changing vehicles?",
+                sub: "Every time you change vehicles, tap this button and pick the vehicle you are in now.",
+                body: '<div class="rm-demo" aria-hidden="true"><span class="rm-demo-label">Tap this button</span>' +
+                    '<div class="vehicle-pill rm-demo-pill">' + $("vehiclePill").querySelector(".vp-icon").outerHTML +
+                    '<span class="vp-text"><span class="vp-label">Your vehicle</span><span class="vp-name">12</span></span>' +
+                    '<span class="swap-btn">' + $("changeVehicleBtn").querySelector("svg").outerHTML + "<span>Change vehicle</span></span></div>" +
+                    '<svg class="rm-arrow"></svg></div>' +
+                    '<ul class="rm-ticks">' +
+                    "<li>" + RM_CHECK + "<span>Swapping with a driver? You both tap it</span></li>" +
+                    "<li>" + RM_CHECK + "<span>Dispatch sees who is driving each vehicle from this</span></li></ul>" +
+                    '<div class="rm-must">' + RM_CHECK + "<p><strong>This is mandatory for every vehicle change.</strong> Thank you for helping dispatch keep things running smoothly.</p></div>" +
+                    '<div class="rm-call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>' +
+                    "<p>Questions? Please call or text and we will make sure everything is set up correctly.</p></div>",
+                submit: "I have read and understand",
+                noCancel: true,
+                mustAnswer: true,
+                offline: true,
+                afterOpen: drawNoticeArrow,
+                onSubmit: () => saveNoticeAck(VEHICLE_NOTICE),
+                onClose: showNotices
+            });
+        }
+        // The arrow from "Tap this button" to the button in the copy of the vehicle bar
+        function drawNoticeArrow() {
+            const box = $("formBody").querySelector(".rm-demo");
+            if (!box) return;
+            const r = box.getBoundingClientRect(), b = box.querySelector(".swap-btn").getBoundingClientRect();
+            const l = box.querySelector(".rm-demo-label").getBoundingClientRect();
+            const x = b.left - r.left + b.width / 2, y = b.top - r.top - 6, from = l.right - r.left + 14;
+            const svg = box.querySelector(".rm-arrow");
+            svg.setAttribute("viewBox", "0 0 " + r.width + " " + r.height);
+            svg.innerHTML = '<path d="M ' + from + " 16 C " + (x - 20) + " 10, " + x + " 14, " + x + " " + (y - 4) + '" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>' +
+                '<path d="M ' + (x - 6) + " " + (y - 8) + " L " + x + " " + y + " L " + (x + 6) + " " + (y - 8) + '" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>';
+        }
+        window.addEventListener("resize", () => { if (formOpen) drawNoticeArrow(); });
 
         function needsHandoffOil(open) { return !!open && oilWanted(open) && !oilSettled(open); }
         function askOilAtHandoff(shiftId, vehicleName, then) {

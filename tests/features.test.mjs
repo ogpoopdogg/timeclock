@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, farFromPlace, punchPlace, cleanSpots, shopShift, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, P } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, P } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -276,4 +276,13 @@ test('punch time reminder: shows only when an admin turned it on and the driver 
   assert.strictEqual(noticeDue(null, {}, 'punch'), false);
   assert.strictEqual(noticeDue(on, null, 'punch'), true);
   assert.strictEqual(noticeDue(on, { punch: { '.sv': 'timestamp' } }, 'punch'), true); // only a saved time counts
+});
+
+test('change vehicle reminder: its own switch and answer, separate from the punch time reminder', () => {
+  assert.strictEqual(VEHICLE_NOTICE, 'vehicle');
+  const both = { notices: { punch: true, vehicle: true } };
+  assert.strictEqual(noticeDue(both, { punch: 1762333320000 }, VEHICLE_NOTICE), true);
+  assert.strictEqual(noticeDue(both, { vehicle: 1762333320000 }, PUNCH_NOTICE), true);
+  assert.strictEqual(noticeDue(both, { vehicle: 1762333320000 }, VEHICLE_NOTICE), false);
+  assert.strictEqual(noticeDue({ notices: { punch: true } }, {}, VEHICLE_NOTICE), false);
 });

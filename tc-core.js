@@ -84,10 +84,12 @@ export const P = {
     nicknames: "developer/dispatch_dashboard/driver_nicknames"
 };
 
-// The punch time reminder: a one-time message for the drivers an admin picks (Staff → Edit → employees/{ek}/notices/punch).
-// The driver's tap on its button is saved at notice_acks/{ek}/punch (server time) and it doesn't show again.
-// Turning it off and on again in Staff clears that, so it shows once more.
+// One-time reminders for the drivers an admin picks in Staff (employees/{ek}/notices/{id} = true):
+// the punch time reminder and the change vehicle reminder. The driver's tap on its button is saved at
+// notice_acks/{ek}/{id} (server time) and it doesn't show again. Turning it off and on again in Staff clears that,
+// so it shows once more. The rules allow any id here, so a new reminder needs no rules change.
 export const PUNCH_NOTICE = "punch";
+export const VEHICLE_NOTICE = "vehicle";
 export function noticeDue(emp, acks, id) {
     return !!(emp && emp.notices && emp.notices[id] === true) && !(acks && typeof acks[id] === "number");
 }
