@@ -323,6 +323,25 @@
         .nt-status { color: var(--muted); font-size: 0.85rem; }
         .nt-status:empty { display: none; }
         .nt-status.ok { color: var(--green); }
+        .nt-back { margin: -4px 0 10px -6px; }
+        /* Staff → Notifications: the one-time reminders, grouped by category */
+        .nf-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--yellow); color: #111; font-size: 0.8rem; font-weight: 700; }
+        .nf-count[hidden] { display: none; }
+        .nf-cat { font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+        .nf-cat:first-child { margin-top: 4px; }
+        .nf-item {
+            width: 100%; display: flex; align-items: center; gap: 14px; text-align: left; padding: 14px; border: 0; border-radius: 12px; cursor: pointer;
+            font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 8px;
+            transition: box-shadow 0.2s;
+        }
+        .nf-item:hover, .nf-item:focus-visible { box-shadow: inset 0 0 0 1px var(--yellow); outline: none; }
+        .nf-ic { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 204, 0, 0.09); color: var(--yellow); }
+        .nf-ic svg { width: 22px; height: 22px; }
+        .nf-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        .nf-name { font-weight: 600; font-size: 1.05rem; }
+        .nf-about { color: var(--muted); font-size: 0.88rem; }
+        .nf-stats { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+        .nf-chev { flex: none; color: var(--muted); width: 20px; height: 20px; }
         a.btn { text-decoration: none; }
 
         /* ---------- Employees ---------- */
@@ -684,7 +703,7 @@
         <section class="panel" id="panel-people" role="tabpanel" hidden>
             <div class="panel-head">
                 <div><h1 class="panel-title">Employees</h1><p class="panel-sub">Who can use the time clock, and when they're scheduled to start.</p></div>
-                <div class="panel-actions"><button type="button" class="btn ghost" id="showRemovedBtn" hidden>Show removed</button><button type="button" class="btn ghost" id="noticeBtn">Punch time reminder</button><button type="button" class="btn ghost" id="vehicleNoticeBtn">Change vehicle reminder</button><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
+                <div class="panel-actions"><button type="button" class="btn ghost" id="showRemovedBtn" hidden>Show removed</button><button type="button" class="btn ghost" id="notifyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Notifications<span class="nf-count" id="notifyCount" hidden></span></button><button type="button" class="btn primary" id="addEmpBtn">+ Add employee</button></div>
             </div>
             <div class="emp-list" id="empList"></div>
         </section>
@@ -861,9 +880,23 @@
     </div>
 
     <!-- Export -->
+    <!-- Notifications: the one-time reminders, by category. Tap one to pick who sees it. -->
+    <div class="modal-backdrop" id="notifyModal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="nfTitle">
+            <h2 id="nfTitle">Notifications</h2>
+            <p class="modal-sub">One-time messages drivers must read on their time clock. Tap one to pick who sees it.</p>
+            <div id="nfList"></div>
+            <div class="modal-foot">
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost" data-close>Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Punch time / change vehicle reminder: who sees it (one list, filled for the reminder picked) -->
     <div class="modal-backdrop" id="noticeModal">
         <form class="modal" role="dialog" aria-modal="true" aria-labelledby="ntTitle" id="noticeForm" novalidate>
+            <button type="button" class="btn sm ghost nt-back" id="ntBack">‹ Notifications</button>
             <h2 id="ntTitle">Punch time reminder</h2>
             <p class="modal-sub" id="ntSub"></p>
             <div class="nt-list" id="ntList"></div>
@@ -1088,7 +1121,7 @@
                 if ($("empModal").classList.contains("show")) fillSpotSelect($("emSpot").value);
             });
             sub(ref(db, P.claims), s => { claims = s.val() || {}; renderAll(); });
-            sub(ref(db, P.noticeAcks), s => { noticeAcks = s.val() || {}; renderPeople(); if ($("noticeModal").classList.contains("show")) renderNoticeList(); });
+            sub(ref(db, P.noticeAcks), s => { noticeAcks = s.val() || {}; renderPeople(); if ($("noticeModal").classList.contains("show")) renderNoticeList(); if ($("notifyModal").classList.contains("show")) renderNotifyList(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
@@ -2323,6 +2356,7 @@
 
         function renderPeople() {
             const all = empList();
+            renderNotifyCount();
             const removedCount = all.filter(e => e.removed).length;
             $("showRemovedBtn").hidden = !removedCount;
             $("showRemovedBtn").textContent = showRemoved ? "Hide removed" : "Show removed (" + removedCount + ")";
@@ -2334,7 +2368,7 @@
                     '<div class="avatar">' + esc(initials(name)) + "</div>" +
                     '<div style="min-width:0"><div class="person-name">' + esc(name) + '</div><div class="person-email">' + esc(e.email) + "</div>" +
                     (e.spot && spots[e.spot] ? '<div class="person-spot">Punch spot: ' + esc(spots[e.spot].name) + "</div>" : "") +
-                    Object.keys(NOTICES).map(id => noticeOn(e, id) ? '<div class="person-spot">' + NOTICES[id].name + ": " + esc(noticeText(e.ek, id)) + "</div>" : "").join("") + "</div>" +
+                    "</div>" +
                     schedSummary(e) +
                     '<div class="emp-status">' + (e.removed ? '<span class="tag off">Removed</span>' : e.active === false ? '<span class="tag off">Inactive</span>'
                         : open ? '<span class="tag live">On the clock</span>' : '<span class="tag">Active</span>') +
@@ -2405,18 +2439,50 @@
         });
 
         // One-time reminders (see PUNCH_NOTICE and VEHICLE_NOTICE in tc-core.js): on for this employee, and when they agreed to it
+        // Shown in Staff → Notifications under their category, in this order.
         const NOTICES = {
-            [PUNCH_NOTICE]: { name: "Punch time reminder", about: "Punch in when you arrive at work, and punch out when your work is done." },
-            [VEHICLE_NOTICE]: { name: "Change vehicle reminder", about: "Tap Change vehicle every time you change vehicles, including swaps." }
+            [PUNCH_NOTICE]: { name: "Punch time reminder", category: "Punching", about: "Punch in when you arrive at work, and punch out when your work is done.",
+                icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
+            [VEHICLE_NOTICE]: { name: "Change vehicle reminder", category: "Vehicles", about: "Tap Change vehicle every time you change vehicles, including swaps.",
+                icon: '<path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>' }
         };
         const noticeOn = (e, id) => !!(e && e.notices && e.notices[id] === true);
         const noticeAt = (k, id) => { const a = k && noticeAcks[k]; return a && typeof a[id] === "number" ? a[id] : 0; };
-        const noticeText = (k, id) => noticeAt(k, id) ? "agreed " + fmtDate(noticeAt(k, id)) + " at " + fmtTime(noticeAt(k, id)) : "not agreed yet";
         const agreedText = (k, id) => "Agreed " + fmtDate(noticeAt(k, id)) + " at " + fmtTime(noticeAt(k, id));
 
-        // Staff → Punch time reminder / Change vehicle reminder: one list of everyone, tick who sees it. Each ticked driver
+        // Staff → Notifications → a reminder: one list of everyone, tick who sees it. Each ticked driver
         // sees it once, until they tap "I have read and understand". "Show again" clears their answer on Save, so they see it
         // one more time.
+        // Staff → Notifications: every reminder by category, with how many drivers agreed and how many are still waiting.
+        // The yellow count on the button is how many drivers still have one to read.
+        const noticePeople = id => empList().filter(e => !e.removed && noticeOn(e, id));
+        function renderNotifyCount() {
+            const waiting = empList().filter(e => !e.removed && Object.keys(NOTICES).some(id => noticeOn(e, id) && !noticeAt(e.ek, id))).length;
+            $("notifyCount").hidden = !waiting;
+            $("notifyCount").textContent = waiting;
+            $("notifyBtn").setAttribute("aria-label", "Notifications" + (waiting ? ", " + waiting + " driver" + (waiting === 1 ? "" : "s") + " still to read" : ""));
+            if ($("notifyModal").classList.contains("show")) renderNotifyList();
+        }
+        function renderNotifyList() {
+            const cats = [];
+            for (const id of Object.keys(NOTICES)) if (!cats.includes(NOTICES[id].category)) cats.push(NOTICES[id].category);
+            $("nfList").innerHTML = cats.map(cat => '<div class="nf-cat">' + esc(cat) + "</div>" + Object.keys(NOTICES).filter(id => NOTICES[id].category === cat).map(id => {
+                const n = NOTICES[id], list = noticePeople(id);
+                const agreed = list.filter(e => noticeAt(e.ek, id)).length, waiting = list.length - agreed;
+                const stats = !list.length ? '<span class="tag">Nobody picked</span>' :
+                    (agreed ? '<span class="tag live">' + agreed + " agreed</span>" : "") + (waiting ? '<span class="tag gps">' + waiting + " waiting</span>" : "");
+                return '<button type="button" class="nf-item" data-nf="' + esc(id) + '"><span class="nf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                    n.icon + '</svg></span><span class="nf-text"><span class="nf-name">' + esc(n.name) + '</span><span class="nf-about">' + esc(n.about) + '</span><span class="nf-stats">' + stats + "</span></span>" +
+                    '<svg class="nf-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>';
+            }).join("")).join("");
+        }
+        $("notifyBtn").addEventListener("click", () => { renderNotifyList(); openModal("notifyModal"); });
+        $("nfList").addEventListener("click", e => {
+            const b = e.target.closest("[data-nf]");
+            if (b) { closeModal("notifyModal"); openNoticeModal(b.dataset.nf); }
+        });
+        $("ntBack").addEventListener("click", () => { closeModal("noticeModal"); renderNotifyList(); openModal("notifyModal"); });
+
         let ntAgain = new Set(), ntId = PUNCH_NOTICE;
         function openNoticeModal(id) {
             ntId = id;
@@ -2444,8 +2510,6 @@
                     (on && noticeAt(e.ek, id) && !again ? '<button type="button" class="btn sm ghost" data-nt-again="' + esc(e.ek) + '">Show again</button>' : "") + "</div>";
             }).join("") : '<div class="empty-state">No employees yet.</div>';
         }
-        $("noticeBtn").addEventListener("click", () => openNoticeModal(PUNCH_NOTICE));
-        $("vehicleNoticeBtn").addEventListener("click", () => openNoticeModal(VEHICLE_NOTICE));
         $("ntList").addEventListener("change", e => { if (e.target.matches("input[data-nt]")) { if (!e.target.checked) ntAgain.delete(e.target.dataset.nt); renderNoticeList(); } });
         $("ntList").addEventListener("click", e => {
             const b = e.target.closest("[data-nt-again]");

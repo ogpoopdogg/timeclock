@@ -320,17 +320,25 @@ ones. Hover over any cell or bar for the numbers.
   moved to a new sign-in), can be filtered to one person, and loads older changes on
   request.
 
+## Notifications (one-time reminders)
+
+All the one-time reminders are in **Staff → Notifications**, grouped by category
+(**Punching**: Punch time reminder; **Vehicles**: Change vehicle reminder). Each one shows how
+many ticked drivers have agreed and how many are still waiting. Tap one to open its tick list
+(**‹ Notifications** goes back). The yellow number on the button is how many drivers still have
+a reminder to read. A new reminder goes in `NOTICES` in `admin.html` with its category.
+
 ## Punch time reminder
 
 A one-time message for drivers who punch in before they get to work or punch out after
-they get home. In **Staff → Punch time reminder**, tick the drivers who should see it and
+they get home. In **Staff → Notifications → Punch time reminder**, tick the drivers who should see it and
 save. The next time each of them opens the clock, a pop-up asks them to punch in when they
 arrive at work and punch out before they leave for home. Tapping outside it doesn't close it. Only the
 **I have read and understand** button does.
 
 - Which drivers get it is saved at `employees/<ek>/notices/punch`. Their tap is saved with the
   server's time at `timeclock/notice_acks/<ek>/punch`. The list shows *Waiting for them to
-  read it* or *Agreed …*, and Staff shows *Punch time reminder: agreed …* under their name.
+  read it* or *Agreed …*.
 - It shows once per driver, on any phone. **Show again** next to someone who agreed (then
   Save) clears their answer, so they see it one more time. Unticking and ticking someone
   who agreed does the same.
@@ -356,7 +364,7 @@ arrive at work and punch out before they leave for home. Tapping outside it does
 
 ## Change vehicle reminder
 
-A second one-time message, set up the same way: **Staff → Change vehicle reminder**, tick
+A second one-time message, set up the same way: **Staff → Notifications → Change vehicle reminder**, tick
 the drivers, save. The pop-up (marked *Important* in red) asks them to tap **Change vehicle**
 every time they change vehicles, including swaps where both drivers must tap it, because
 dispatch sees who is driving each vehicle from it. It shows a copy of the vehicle bar with an
@@ -364,7 +372,7 @@ arrow pointing at the button, says it's mandatory for every vehicle change, and 
 *Questions? Please call or text…*. Only **I have read and understand** closes it.
 
 - Saved at `employees/<ek>/notices/vehicle` and `timeclock/notice_acks/<ek>/vehicle`, with the
-  same **Show again**, Staff status line and **Takes the place of** behaviour as the punch
+  same **Show again** and **Takes the place of** behaviour as the punch
   time reminder.
 - A driver ticked for both sees the punch time reminder first, then this one.
 - **No rules change:** the `notice_acks` rules above work for any reminder.
