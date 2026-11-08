@@ -74,18 +74,15 @@
         .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; white-space: nowrap; }
         .brand-sub { font-size: 0.8rem; color: var(--yellow); letter-spacing: 0.1em; text-transform: uppercase; }
         .top-right { display: flex; align-items: center; gap: 16px; }
-        /* "Install app": pulses until the app is installed (pwa.js hides it after) */
+        /* "Install app": shows until the app is installed (pwa.js hides it after). It stays still: its old endless glowing
+           pulse made the browser repaint the whole page 60 times a second, which some Android phones showed as the page
+           flashing and parts of it going black. */
         .install-btn {
             display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: #111 !important; background: var(--yellow) !important;
-            box-shadow: none; animation: installPulse 1.8s ease-out infinite;
+            box-shadow: none;
         }
         .install-btn svg { width: 16px; height: 16px; flex: none; }
         .install-btn:hover, .install-btn:focus-visible { background: #ffd633 !important; }
-        @keyframes installPulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.7); }
-            70% { box-shadow: 0 0 0 12px rgba(255, 204, 0, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
-        }
         @media (max-width: 380px) { .install-btn .ib-long { display: none; } }
 
         .clock { text-align: right; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -141,7 +138,7 @@
 
         .panel { animation: panelIn 0.5s var(--ease-out) both; padding-bottom: 60px; }
         @keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-        .redraw > * { animation: none !important; } /* a list updated in place (see draw()): no fade-in again */
+        .redraw > *, .redraw .kpi { animation: none !important; } /* a list updated in place (see draw()): no fade-in again */
 
         .panel-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
         .panel-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 0.95; }
@@ -1185,6 +1182,7 @@
             moveInk();
             // Opening a tab fades its lists in once
             $("panel-" + name).querySelectorAll("[data-drawn]").forEach(el => { delete el.dataset.drawn; el.classList.remove("redraw"); });
+            if (name === "reports") reportFailed = ""; // opening Reports tries a failed load again
             renderAll();
             try { history.replaceState(null, "", "#" + name); } catch (e) {}
         }
@@ -2212,7 +2210,9 @@
         });
 
         // ---------- Reports: overtime by person, hours per van ----------
-        let reportCache = null, reportLoading = false;
+        // reportFailed: the period whose punches couldn't be loaded. It isn't tried again on every punch and every minute
+        // (that flashed "Loading…" over and over), only when the dates change or the tab is opened again.
+        let reportCache = null, reportLoading = false, reportFailed = "";
         // The days the report covers: last pay week (Friday to Thursday), last calendar month, last calendar year, or a custom range
         function reportPeriod() {
             const today = dayKey(now()), v = $("repRange").value;
@@ -2258,24 +2258,29 @@
         async function renderReports() {
             $("repCustom").hidden = $("repRange").value !== "custom";
             const period = reportPeriod();
-            if (period.err) { $("reports").innerHTML = '<div class="empty-state">' + esc(period.err) + "</div>"; return; }
+            if (period.err) { draw($("reports"), '<div class="empty-state">' + esc(period.err) + "</div>"); return; }
             const { from, to } = period;
             const key = reportKey(period);
             if (!reportCache || reportCache.key !== key) {
-                if (reportLoading) return;
+                if (reportLoading || reportFailed === key) return;
                 reportLoading = true;
-                $("reports").innerHTML = '<div class="empty-state">Loading punches for ' + esc(fmtKey(from)) + " – " + esc(fmtKey(to)) + "…</div>";
+                draw($("reports"), '<div class="empty-state">Loading punches for ' + esc(fmtKey(from)) + " – " + esc(fmtKey(to)) + "…</div>");
                 try { reportCache = { key: key, byEk: await loadRange(from, to, Object.keys(employees)) }; }
-                catch (err) { $("reports").innerHTML = '<div class="empty-state">Couldn\'t load punches: ' + esc(errText(err)) + "</div>"; reportLoading = false; return; }
-                reportLoading = false;
+                catch (err) {
+                    reportFailed = key; reportLoading = false;
+                    draw($("reports"), '<div class="empty-state">Couldn\'t load punches: ' + esc(errText(err)) + "</div>");
+                    return;
+                }
+                reportLoading = false; reportFailed = "";
                 if (activeTab !== "reports") return;
                 if (reportKey(reportPeriod()) !== key) { renderReports(); return; } // the period changed while loading
             }
             drawReports(reportCache.byEk, from, to, now());
         }
-        $("repRange").addEventListener("change", renderReports);
-        $("repFrom").addEventListener("change", renderReports);
-        $("repTo").addEventListener("change", renderReports);
+        const pickReport = () => { reportFailed = ""; renderReports(); };
+        $("repRange").addEventListener("change", pickReport);
+        $("repFrom").addEventListener("change", pickReport);
+        $("repTo").addEventListener("change", pickReport);
 
         function drawReports(byEk, from, to, t) {
             const cols = reportColumns(from, to);
@@ -2326,7 +2331,8 @@
                 }).join("") + "</div>" : '<p class="hint">No vehicle time in this period.</p>') + "</div>";
             const withYear = k => fmtKey(k) + (k.slice(0, 4) !== dayKey(t).slice(0, 4) ? ", " + k.slice(0, 4) : "");
             $("repSub").textContent = "Overtime by person and hours per vehicle, " + withYear(from) + " – " + withYear(to) + ".";
-            $("reports").innerHTML = kpis + otCard + vanCard;
+            // Drawn again on every punch and every minute: only replaced when a number changed, and without the fade-in
+            draw($("reports"), kpis + otCard + vanCard);
         }
 
         // Hover details for the report cells and bars
