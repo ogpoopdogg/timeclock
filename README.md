@@ -159,7 +159,7 @@ open (or the next check) picks it up.
   it is released. They can switch between Shop and a van any time while on the clock.
   The admin live board and timesheet show a **Shop** tag, the CSV's GPS column says
   *Shop*, and the admin can set or remove Shop when editing a punch.
-- **Van swap.** While on the clock, the big **Van swap** button under the punch ring
+- **Change vehicle.** While on the clock, the big **Change vehicle** button under the punch ring
   opens the van list. Vans other drivers have can be picked too. The app asks "Van 7 is
   assigned to Matt. Take it?", then:
   - The van moves to the driver who took it (and its RouteWatcher nickname with it).
@@ -265,7 +265,7 @@ punches. Only email and password sign-in is used, which doesn't need it.
   When the vehicle isn't due, nothing is asked.
 - **Vehicle swaps:** the driver handing a vehicle off is the one responsible for its oil.
   If they haven't ticked the oil check yet that shift, they're asked *Did you check the
-  oil?* about that vehicle right away: when they tap **Vehicle swap** and pick another
+  oil?* about that vehicle right away: when they tap **Change vehicle** and pick another
   vehicle, or, when another driver takes theirs, as soon as their app sees it (and before
   they pick the vehicle they're in now). The answer, yes or no, settles the shift's oil: no
   more oil questions that shift, not at punch out either. The driver getting a vehicle
@@ -335,7 +335,7 @@ arrive at work and punch out before they leave for home. Tapping outside it does
   Save) clears their answer, so they see it one more time. Unticking and ticking someone
   who agreed does the same.
 - **Takes the place of** carries the tick and the answer over to the new sign-in.
-- **Database rules:** drivers can only save their own answer, only once, only while the
+- **Database rules:** drivers can only save their own answer, only once, only while
   they're ticked, and only with the server's time. Paste this block inside
   `"timeclock": { … }` in the Firebase console, right above `"vehicle_claims": {`:
 
@@ -354,6 +354,20 @@ arrive at work and punch out before they leave for home. Tapping outside it does
   Until those rules are published, the pop-up doesn't show at all (the clock can't read
   the answers yet), so nothing breaks if the pages update first.
 
+## Change vehicle reminder
+
+A second one-time message, set up the same way: **Staff → Change vehicle reminder**, tick
+the drivers, save. The pop-up (marked *Important* in red) asks them to tap **Change vehicle**
+every time they change vehicles, including swaps where both drivers must tap it, because
+dispatch sees who is driving each vehicle from it. It shows a copy of the vehicle bar with an
+arrow pointing at the button, says it's mandatory for every vehicle change, and ends with
+*Questions? Please call or text…*. Only **I have read and understand** closes it.
+
+- Saved at `employees/<ek>/notices/vehicle` and `timeclock/notice_acks/<ek>/vehicle`, with the
+  same **Show again**, Staff status line and **Takes the place of** behaviour as the punch
+  time reminder.
+- A driver ticked for both sees the punch time reminder first, then this one.
+- **No rules change:** the `notice_acks` rules above work for any reminder.
 ## Punch locations
 
 Each punch in, punch out and van swap saves where the phone was: latitude, longitude
