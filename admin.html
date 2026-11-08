@@ -56,8 +56,9 @@
         html { background: var(--bg); -webkit-text-size-adjust: 100%; }
         body {
             min-height: 100vh; font-family: var(--font-body); font-size: 1rem; line-height: 1.5; color: var(--text);
+            /* the yellow glow only covers the top of the page (not painted again down the whole page while scrolling) */
             background:
-                radial-gradient(1100px 520px at 90% -10%, rgba(255, 204, 0, 0.07), transparent 60%),
+                radial-gradient(1100px 520px at 90% -10%, rgba(255, 204, 0, 0.07), transparent 60%) top / 100% 560px no-repeat,
                 var(--bg);
             -webkit-font-smoothing: antialiased; overflow-x: hidden;
             padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
@@ -136,7 +137,9 @@
         }
         .tab[aria-selected="true"] .tab-count { background: rgba(0, 0, 0, 0.15); color: #111; }
 
-        .panel { animation: panelIn 0.5s var(--ease-out) both; padding-bottom: 60px; }
+        /* Fade-ins use "backwards" (not "both"): once finished they let go of the element, so the phone doesn't keep
+           every card as a separate layer to draw while scrolling */
+        .panel { animation: panelIn 0.5s var(--ease-out) backwards; padding-bottom: 60px; }
         @keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         .redraw > *, .redraw .kpi { animation: none !important; } /* a list updated in place (see draw()): no fade-in again */
 
@@ -150,7 +153,7 @@
         .kpi {
             position: relative; overflow: hidden; padding: 18px; border-radius: 16px;
             background: linear-gradient(180deg, var(--asphalt-2), rgba(23, 26, 29, 0.5)); box-shadow: inset 0 0 0 1px var(--line);
-            animation: panelIn 0.5s var(--ease-out) both;
+            animation: panelIn 0.5s var(--ease-out) backwards;
         }
         .kpi:nth-child(2) { animation-delay: 0.05s; } .kpi:nth-child(3) { animation-delay: 0.1s; } .kpi:nth-child(4) { animation-delay: 0.15s; }
         .kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--k, var(--yellow)); }
@@ -163,17 +166,16 @@
         .person {
             position: relative; padding: 16px; border-radius: 16px; overflow: hidden;
             background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
-            animation: panelIn 0.5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms);
-            transition: box-shadow 0.3s, transform 0.3s var(--ease-out);
+            animation: panelIn 0.5s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 40ms);
+            transition: box-shadow 0.3s;
         }
-        .person:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--shoulder), 0 14px 30px rgba(0, 0, 0, 0.35); }
+        .person:hover { box-shadow: inset 0 0 0 1px var(--shoulder); }
         .person.in { box-shadow: inset 0 0 0 1px rgba(53, 208, 127, 0.35); }
         .person.late { box-shadow: inset 0 0 0 1px rgba(255, 107, 94, 0.5); }
         .person.in::after {
             content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
-            background: linear-gradient(90deg, transparent, var(--green), transparent); animation: slide 2.4s linear infinite;
+            background: linear-gradient(90deg, transparent, var(--green), transparent);
         }
-        @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
         .person-top { display: flex; align-items: center; gap: 12px; }
         .avatar {
             width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; position: relative;
@@ -183,9 +185,8 @@
         .person.late .avatar { background: var(--red); }
         .person.done .avatar { background: var(--yellow); }
         .person.in .avatar::after {
-            content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--green); animation: ping 2s ease-out infinite;
+            content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid rgba(53, 208, 127, 0.45);
         }
-        @keyframes ping { from { transform: scale(0.85); opacity: 0.9; } to { transform: scale(1.35); opacity: 0; } }
         .person-name { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; line-height: 1.05; }
         .person-email { font-size: 0.82rem; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .person-state { margin-top: 12px; font-weight: 600; }
@@ -239,7 +240,7 @@
         .sheet-card {
             border-radius: 18px; overflow: hidden; margin-bottom: 18px;
             background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
-            animation: panelIn 0.5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 50ms);
+            animation: panelIn 0.5s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 50ms);
         }
         .sheet-card-head {
             display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line);
@@ -346,7 +347,7 @@
         .emp-row {
             display: grid; grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1.6fr) auto auto; align-items: center; gap: 16px;
             padding: 14px 16px; border-radius: 14px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
-            animation: panelIn 0.45s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 35ms);
+            animation: panelIn 0.45s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 35ms);
         }
         .emp-row.inactive { opacity: 0.55; }
         .emp-row .avatar { background: var(--yellow); width: 40px; height: 40px; font-size: 1rem; }
@@ -364,7 +365,7 @@
         .gps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
         .gps-card {
             position: relative; padding: 16px; border-radius: 16px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
-            animation: panelIn 0.45s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 35ms); overflow: hidden;
+            animation: panelIn 0.45s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 35ms); overflow: hidden;
         }
         .gps-card.taken { box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.35); }
         .gps-card .gps-name { font-family: var(--font-display); font-weight: 800; font-size: 2rem; line-height: 1; display: flex; align-items: center; gap: 10px; }
@@ -399,15 +400,17 @@
         .log-item .why { color: var(--muted); font-style: italic; }
 
         /* ---------- Modal ---------- */
+        /* A closed pop-up is hidden completely (not just see-through), so the phone never draws it over the page.
+           No blur behind an open one: blurring the whole screen is slow on phones. */
         .modal-backdrop {
             position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
-            background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-            opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease-out);
+            background: rgba(0, 0, 0, 0.72);
+            opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.3s var(--ease-out), visibility 0s linear 0.3s;
         }
-        .modal-backdrop.show { opacity: 1; pointer-events: auto; }
+        .modal-backdrop.show { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.3s var(--ease-out); }
         .modal {
             width: min(600px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; border-radius: 20px; padding: 22px;
-            background: linear-gradient(180deg, #1b1f23, #141719); box-shadow: 0 0 0 1px var(--shoulder), 0 30px 80px rgba(0, 0, 0, 0.6);
+            background: linear-gradient(180deg, #1b1f23, #141719); box-shadow: 0 0 0 1px var(--shoulder), 0 12px 28px rgba(0, 0, 0, 0.45);
             transform: translateY(16px) scale(0.97); transition: transform 0.45s var(--ease-spring);
         }
         .modal-backdrop.show .modal { transform: none; }
@@ -447,8 +450,8 @@
         .gate { min-height: calc(100vh - 120px); display: grid; place-items: center; padding: 20px 0 60px; }
         .gate-card {
             width: 100%; max-width: 420px; padding: clamp(26px, 6vw, 40px); border-radius: 22px; position: relative; overflow: hidden;
-            background: linear-gradient(180deg, var(--asphalt-2), var(--asphalt)); box-shadow: 0 0 0 1px var(--line), 0 30px 80px rgba(0, 0, 0, 0.5);
-            animation: panelIn 0.6s var(--ease-out) both;
+            background: linear-gradient(180deg, var(--asphalt-2), var(--asphalt)); box-shadow: 0 0 0 1px var(--line), 0 10px 24px rgba(0, 0, 0, 0.35);
+            animation: panelIn 0.6s var(--ease-out) backwards;
         }
         .gate-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--yellow); }
         .gate-card h1 { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 0.95; margin-bottom: 6px; }
@@ -478,7 +481,7 @@
         .inbox-col .ib-late-hint { margin: -4px 0 10px; color: var(--muted); font-size: 0.88rem; }
         .inbox-item {
             padding: 14px; border-radius: 14px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line);
-            animation: panelIn 0.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms);
+            animation: panelIn 0.4s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 30ms);
         }
         .inbox-item.done { opacity: 0.6; }
         .inbox-item.waiting { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
@@ -1053,8 +1056,9 @@
         // ---------- Header clock ----------
         function tickHeader() {
             const t = now();
-            $("clockTime").textContent = fmtTime(t);
-            $("clockDate").textContent = fmtKey(dayKey(t), true);
+            const time = fmtTime(t), date = fmtKey(dayKey(t), true); // only touched when it changes (no redraw every second)
+            if ($("clockTime").textContent !== time) $("clockTime").textContent = time;
+            if ($("clockDate").textContent !== date) $("clockDate").textContent = date;
         }
         tickHeader();
 
