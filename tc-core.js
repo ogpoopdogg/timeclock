@@ -9,14 +9,16 @@
 //       spot                             the id of their punch spot (timeclock/spots), when it isn't the shop
 //       removed                          true once the admin removes them: they can't punch in and are hidden from the
 //                                        live board, but their punches still show on timesheets and exports
-//   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, shop, src, edited,
+//   timeclock/shifts/{ek}/{shiftId}    { in, out, vehicleId, vehicleName, nickname, shop, noVehicle, src, edited,
 //                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint, oil }
 //       vehicleId/vehicleName/nickname   the van the driver has now
 //       shop                             true while they're working in the shop instead of driving
+//       noVehicle                        true when the driver picked No vehicle (not driving, not in the shop)
 //       inLoc / outLoc                   where the phone was at the punch: { lat, lng, acc, at } or { err }
 //       inAddr / outAddr                 the street address for it, added by the admin panel (Google geocoder)
 //       vans/{id}                        every van change in the shift: { at, vehicleId, vehicleName, how, by, loc, addr }
 //                                        how: "pick" | "swap" | "shop" (moved to the shop, no vehicle)
+//                                           | "none" (picked No vehicle)
 //                                           | "taken" (another driver took it; written by the server)
 //                                           | "admin" (changed by an admin: the van, or none when vehicleId is missing)
 //       tap / outTap                     the phone's time when the punch button was pressed (server-corrected). The
@@ -314,7 +316,7 @@ export function scheduleFor(emp, key) {
 // ---------- Oil check ----------
 // shifts/{ek}/{id}/oil = { done, at, how, seenBy, seenAt }: whether the driver checked the oil on a shift with a
 // vehicle. how: "box" (they ticked the glowing box) or "out" (asked at punch out). seenBy/seenAt: an admin dealt with
-// a "not checked" in the Inbox. Shop and "Not driving today" shifts have no oil check.
+// a "not checked" in the Inbox. Shop and No vehicle shifts have no oil check.
 export function hadVehicle(shift) {
     return !!shift && (!!shift.vehicleId || Object.values(shift.vans || {}).some(v => v && v.vehicleId));
 }

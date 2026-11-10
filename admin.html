@@ -1294,7 +1294,8 @@
                         (st.open.vehicleName ? '<span class="tag gps">GPS ' + esc(st.open.vehicleName) + "</span>"
                             : st.open.shop ? '<span class="tag shop">Shop</span>'
                             : st.open.swapHint ? '<span class="tag warn" title="' + esc((st.open.swapHint.by || "Another driver") + " took vehicle " + (st.open.swapHint.vehicleName || "")) + '">Needs vehicle swap</span>'
-                            : '<span class="tag">No vehicle</span>') + oilTag(st.open) +
+                            : st.open.noVehicle ? '<span class="tag" title="The driver picked No vehicle (not driving)">No vehicle</span>'
+                            : '<span class="tag warn" title="The driver hasn\'t picked a vehicle, Shop or No vehicle yet">No vehicle picked</span>') + oilTag(st.open) +
                         '<button type="button" class="btn sm" data-punchout="' + esc(e.ek) + '" data-id="' + esc(st.open.id) + '">Punch out</button>';
                 } else if (st.kind === "turnedoff") {
                     state = '<div class="person-state late">Turned off</div>';
@@ -1475,12 +1476,14 @@
         function vanCell(k, s) {
             const list = vanHistory(s);
             if (!list.length) return s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>"
-                : s.shop ? '<span class="tag shop">Shop</span>' : '<span class="muted">—</span>';
+                : s.shop ? '<span class="tag shop">Shop</span>' : s.noVehicle ? '<span class="tag">No vehicle</span>' : '<span class="muted">—</span>';
             return '<div class="vans">' + list.map(v => {
                 if (v.how === "taken") return '<div class="van-step taken"><span class="tag warn">' + esc(v.takenName || "Vehicle") + " taken</span>" +
                     '<span class="muted">' + esc(fmtTime(v.at)) + (v.by ? " · by " + esc(v.by) : "") + "</span></div>";
                 const when = esc(fmtTime(v.at)) + (dayKey(v.at) !== dayKey(s.in) ? " " + esc(fmtKey(dayKey(v.at))) : "");
                 if (v.how === "shop") return '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">' + when + (v.by ? " · set by admin" : "") + "</span>" +
+                    locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
+                if (v.how === "none") return '<div class="van-step"><span class="tag">No vehicle</span><span class="muted">' + when + "</span>" +
                     locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
                 if (v.how === "admin") return '<div class="van-step">' + (v.vehicleId ? '<span class="arrow" aria-label="changed to">⇄</span><span class="tag gps">' + esc(v.vehicleName || v.vehicleId) + "</span>"
                     : '<span class="tag">No vehicle</span>') + '<span class="muted">' + when + " · set by admin</span></div>";
@@ -1494,7 +1497,7 @@
             if (which === "in") return { loc: s.inLoc, addr: s.inAddr, addrErr: s.inAddrErr, label: "Punch in", at: s.in };
             if (which === "out") return { loc: s.outLoc, addr: s.outAddr, addrErr: s.outAddrErr, label: "Punch out", at: s.out };
             const v = s.vans && s.vans[which.slice(4)];
-            return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: v.how === "shop" ? "Moved to the shop" : (v.how === "swap" ? "Vehicle swap to " : "Picked vehicle ") + v.vehicleName, at: v.at } : null;
+            return v ? { loc: v.loc, addr: v.addr, addrErr: v.addrErr, label: v.how === "shop" ? "Moved to the shop" : v.how === "none" ? "Picked No vehicle" : (v.how === "swap" ? "Vehicle swap to " : "Picked vehicle ") + v.vehicleName, at: v.at } : null;
         }
 
         // ---------- Google Maps (the same browser key as RouteWatcher, maps-config.js) ----------
@@ -1685,6 +1688,7 @@
                 : (addr ? addr + " " : "") + "(" + coordsText(loc) + ")";
             const vans = s => vanHistory(s).map(v => v.how === "taken" ? (v.takenName || "vehicle") + " taken by " + (v.by || "another driver") + " " + fmtTime(v.at)
                 : v.how === "shop" ? "Shop " + fmtTime(v.at) + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")
+                : v.how === "none" ? "No vehicle " + fmtTime(v.at) + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")
                 : v.how === "admin" ? (v.vehicleId ? v.vehicleName || v.vehicleId : "No vehicle") + " (set by admin " + fmtTime(v.at) + ")"
                 : v.vehicleName + " " + fmtTime(v.at) + (v.how === "swap" ? " (swap)" : "") + (hasCoords(v.loc) ? " at " + place(v.loc, v.addr) : "")).join("; ");
             const rows = kind === "summary"
@@ -1715,7 +1719,7 @@
                             typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
                             fmtTime(roundPunch(s.in)), typeof s.out === "number" ? fmtTime(roundPunch(countedOut(s))) : "",
                             fmtHours(shiftMs(s, t)), fmtHours(split.regular), fmtHours(split.overtime),
-                            s.vehicleName || (s.shop ? "Shop" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
+                            s.vehicleName || (s.shop ? "Shop" : s.noVehicle ? "No vehicle" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
                             place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]);
                     });
                 });
@@ -1930,6 +1934,7 @@
                 if (beforeOut !== (r.out || null)) put("out", r.out || null);
                 if (vanChanged) {
                     put("vehicleId", vehicleId); put("vehicleName", vehicleName); put("nickname", nickname); put("shop", shop || null);
+                    if (before.noVehicle) put("noVehicle", null); // the driver's No vehicle is replaced by the admin's choice
                     const entry = { at: serverTimestamp(), how: shop ? "shop" : "admin", by: String(user.email).slice(0, 60) };
                     if (vehicleId) { entry.vehicleId = vehicleId; entry.vehicleName = vehicleName; }
                     u[base + "/vans/" + push(ref(db, base + "/vans")).key] = entry;
@@ -1939,7 +1944,7 @@
                 else if (r.out && beforeOut !== null && beforeOut !== r.out && typeof before.outTap === "number") put("outTap", null);
                 if (before.swapHint && (r.out || vehicleId || shop)) put("swapHint", null); // no van swap needed any more
                 put("edited", edited);
-                data = Object.assign({}, before, { in: r.in, out: r.out || null }, vanChanged ? { vehicleId: vehicleId, vehicleName: vehicleName, shop: shop || null } : {});
+                data = Object.assign({}, before, { in: r.in, out: r.out || null }, vanChanged ? { vehicleId: vehicleId, vehicleName: vehicleName, shop: shop || null, noVehicle: null } : {});
             }
             if (!r.out) u[P.open + "/" + k] = id; // their open shift (the rules allow one at a time)
             await update(ref(db), u);
@@ -1968,7 +1973,7 @@
         function strip(s) {
             if (!s) return null;
             const o = {};
-            ["in", "out", "vehicleId", "vehicleName", "shop", "src"].forEach(k => { if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
+            ["in", "out", "vehicleId", "vehicleName", "shop", "noVehicle", "src"].forEach(k => { if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
             return o;
         }
         function logAudit(k, shiftId, action, before, after, note) {

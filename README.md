@@ -227,7 +227,9 @@ right after it, so it isn't lost if the app is closed before the signal comes ba
 
 Picking a vehicle needs signal, because the server decides who has which vehicle. With
 none, the vehicle picker says so, and the list loads by itself when the signal is back
-(or the driver taps **Try again**, or closes it and picks later). Signing out works with
+(or the driver taps **Try again**). Off the clock with no signal, the driver can still
+punch in without a pick; once the signal is back, the picker opens by itself and only a
+pick closes it (see *Pick a vehicle before punching in*). Signing out works with
 no signal too, but while a punch is still waiting to be sent it asks first: the punch is
 only sent from that phone, once the same person signs in on it again.
 
@@ -243,6 +245,33 @@ Sign-in is set up without Firebase's pop-up/redirect helper (`initializeAuth` in
 Firebase would say who is signed in, which held up the driver's data and the sending of
 punches. Only email and password sign-in is used, which doesn't need it.
 
+## Pick a vehicle before punching in
+
+Off the clock, the punch button is locked (*Pick your vehicle first*) until the driver
+picks a **vehicle**, **Shop** (working in the shop) or **No vehicle** (not driving).
+Pressing the button opens the picker; the bar under the button shows the pick and
+**Change vehicle** changes it.
+
+- The database only takes a vehicle for a shift that's punched in, so the pick waits on
+  the phone (`tc_prepick_<ek>`, for that day) and is saved right after the punch in. Then
+  the Vehicle Check and the oil reminder follow, as before. Until then other drivers still
+  see the vehicle as free; if someone takes it first, the driver is asked to pick again
+  (before punching in if the app already sees it, else right after).
+- Picking a vehicle another driver has asks first, and they're unassigned when this driver
+  punches in (a vehicle swap: no Vehicle Check or oil question for the one taking it).
+- **No vehicle** is saved on the shift (`noVehicle: true`, and a `how: "none"` entry in
+  its van history), so the admin sees it was the driver's choice: *No vehicle* on the live
+  board, versus *No vehicle picked* when there's no choice yet. No Vehicle Check, no oil
+  check; punches are checked against the driver's punch spot like any driver shift. Shop
+  shifts are still checked against the shop.
+- On the clock with no choice (punched in with no signal, a shift from before this
+  version, a pick that couldn't be saved), the picker opens by itself and tapping outside
+  it doesn't close it. Only a vehicle, Shop or No vehicle does. With no signal it can be
+  closed, and it opens again once the signal is back.
+- **Database rules:** `noVehicle` and the van history's `"none"` need the rules from
+  November 10, 2026. Until they're published, a driver's No vehicle is kept on their phone
+  only (the office sees *No vehicle picked*).
+
 ## Requests, the Inbox and Reports
 
 **Employees** have a **Requests** card on the clock:
@@ -255,7 +284,7 @@ punches. Only email and password sign-in is used, which doesn't need it.
 - **Vehicle Check:** after picking a vehicle, the app asks if anything is wrong with it
   (tap **All good** to skip). The *Something wrong with this vehicle? Report it* link
   under the vehicle sends a report any time.
-- **Oil check:** on a shift with a vehicle (not Shop or *Not driving today*) whose oil
+- **Oil check:** on a shift with a vehicle (not Shop or *No vehicle*) whose oil
   check is due (see **Garage → Oil schedule**), a
   *Please check your oil* reminder pops up after the Vehicle Check, and a glowing **Oil
   check** box stays under the vehicle until the driver taps it and ticks *I checked the

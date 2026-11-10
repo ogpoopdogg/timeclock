@@ -556,7 +556,8 @@
             animation: shimmer 0.9s linear infinite;
         }
         .gps.flash-taken { animation: shake 0.45s var(--ease-out); }
-        .gps.shop { --gps-color: #9fb3c8; }
+        .gps.shop, .gps.none { --gps-color: #9fb3c8; }
+        .punch.locked .pb-hint { color: var(--yellow); font-weight: 600; }
 
         .sheet-msg { min-height: 1.4em; color: var(--red); font-size: 0.92rem; margin-top: 12px; }
 
@@ -848,7 +849,7 @@
             <p class="sheet-msg" id="sheetMsg" role="alert"></p>
         </div>
         <div class="sheet-foot">
-            <button type="button" class="chip-btn" id="sheetSkip">Not driving today</button>
+            <button type="button" class="chip-btn" id="sheetSkip">Close</button>
         </div>
     </section>
 
@@ -925,7 +926,7 @@
         let unsubs = [];
         let empLoaded = false, shiftsLoaded = false;
         let busy = false;
-        let afterPunchInPick = false;       // open the vehicle picker once the success overlay closes
+        let afterPunchInPick = false;       // save the vehicle picked before punching in (or ask for one) once the success overlay closes
         let handoffAsked = null;            // the shift and taken vehicle the handoff oil question last opened for by itself
         let afterPunchOutOil = null;        // the shift to ask "Did you check the oil?" about once it closes
         let afterPunchOutLong = null;       // a long shift to ask "Did you forget to punch out?" about once it closes
@@ -1131,15 +1132,25 @@
             $("punchBtn").setAttribute("aria-label", (open ? "Punch out" : "Punch in") + ". Press and hold for " + (HOLD_MS / 1000) + " seconds.");
 
             const pill = $("vehiclePill");
-            pill.hidden = !open;
+            pill.hidden = false;
+            if (!open) {
+                // Off the clock: what they picked to punch in with (the punch button stays locked until they pick)
+                const pp = loadPrePick();
+                pill.classList.toggle("alert", !pp);
+                $("vpLabel").textContent = !pp ? "Your vehicle" : pp.kind === "vehicle" ? "Your vehicle" : pp.kind === "shop" ? "Working in the" : "Not driving";
+                $("vpName").textContent = !pp ? "None" : pp.kind === "vehicle" ? pp.name : pp.kind === "shop" ? "Shop" : "No vehicle";
+                $("swapBtnText").textContent = pp ? "Change vehicle" : "Pick vehicle";
+            }
+            renderPunchLock();
             if (open) {
                 const lost = lostVan(open);
                 const has = !!open.vehicleId && !lost;
                 const shop = atShop(open);
+                const none = !has && !shop && !lost && choseNoVehicle(open);
                 pill.classList.toggle("alert", !!lost);
                 $("vpLabel").textContent = lost ? (lost.by ? lost.by + " took vehicle " + lost.vehicleName : "Vehicle " + lost.vehicleName + " was taken")
-                    : has ? "Your vehicle" : shop ? "Working in the" : "No vehicle selected";
-                $("vpName").textContent = lost ? "Pick your vehicle" : has ? (open.vehicleName || "—") : shop ? "Shop" : "Tap to pick one";
+                    : has ? "Your vehicle" : shop ? "Working in the" : none ? "Not driving" : "No vehicle selected";
+                $("vpName").textContent = lost ? "Pick your vehicle" : has ? (open.vehicleName || "—") : shop ? "Shop" : none ? "No vehicle" : "Tap to pick one";
                 $("swapBtnText").textContent = has || lost ? "Change vehicle" : "Pick vehicle";
                 showSwapBanner(open, lost);
                 if (lost && lost.vehicleName && needsHandoffOil(open) && !formOpen && !sheetOpen && handoffAsked !== open.id + "|" + lost.vehicleName) {
@@ -1150,11 +1161,19 @@
             $("vanReportBtn").hidden = !(open && open.vehicleId && !lostVan(open));
             renderOilBox(open);
             showNotices();
+            queueForcePick();
 
             tickClock();
             renderWeek();
             renderPayWeek();
             renderRequests();
+        }
+
+        // Off the clock with no pick, the punch button is locked (with no signal it isn't: the list can't load)
+        function renderPunchLock() {
+            const locked = !!user && !current() && !loadPrePick() && online && !standIn;
+            $("punch").classList.toggle("locked", locked);
+            $("punchHint").textContent = locked ? "Pick your vehicle first" : "Press and hold";
         }
 
         function tickClock() {
@@ -1318,6 +1337,7 @@
         function startHold(e) {
             if (busy || holding || !user || !emp) return;
             if (e && e.button !== undefined && e.button !== 0) return;
+            if (!current() && !pickReady()) return;
             holding = true;
             holdStart = performance.now();
             $("punchMsg").textContent = "";
@@ -1410,6 +1430,8 @@
             if (current()) throw new Error("You're already punched in.");
             const id = push(ref(db, P.shifts + "/" + ek)).key;
             const tap = now();
+            const pp = loadPrePick();
+            if (pp) savePrePick(Object.assign({}, pp, { shiftId: id })); // saved on the shift once the punch in is in (applyPrePick)
             addPending({ kind: "in", id: id, tap: tap });
             const sent = !standIn && await waitFor(deliver({ kind: "in", id: id, tap: tap }), SEND_WAIT_MS);
             hideBanner();
@@ -1557,9 +1579,10 @@
         function setOnline(v) {
             online = v;
             clearTimeout(offlineTimer);
-            if (v) { netSeenAt = Date.now(); renderNet(); flushPending(); if (sheetOpen && !sheetReady) fillSheet(); }
+            if (v) { netSeenAt = Date.now(); forceWaitSignal = false; renderNet(); flushPending(); if (sheetOpen && !sheetReady) fillSheet(); queueForcePick(); }
             // Firebase reports "not connected" for a moment at start and on brief drops; only say so after a few seconds
             else offlineTimer = setTimeout(renderNet, 3000);
+            if (user && ek) renderPunchLock();
         }
         function renderNet() {
             const bar = $("netBar");
@@ -1597,6 +1620,9 @@
 
         async function punchOut(open) {
             const tap = now();
+            const pp = loadPrePick();
+            if (pp && pp.shiftId === open.id) savePrePick(null);
+            if (choseNoVehicle(open)) rememberNoVehicle(null);
             const p = { kind: "out", id: open.id, tap: tap, vehicleId: open.vehicleId || null, nickname: open.nickname || null };
             addPending(p);
             return { id: open.id, tap: tap, sent: !standIn && await waitFor(deliver(p), SEND_WAIT_MS) };
@@ -1616,7 +1642,7 @@
         }
         function hideSuccess() {
             $("success").classList.remove("show");
-            if (afterPunchInPick) { afterPunchInPick = false; setTimeout(() => openSheet(), 250); }
+            if (afterPunchInPick) { afterPunchInPick = false; setTimeout(afterPunchIn, 250); }
             const oilShift = afterPunchOutOil, longOne = afterPunchOutLong;
             afterPunchOutOil = afterPunchOutLong = null;
             const askOil = oilShift ? () => askOilAtPunchOut(oilShift) : null;
@@ -1631,6 +1657,130 @@
         const SHOP = Symbol("shop"); // picking the Shop tile
         // Working in the shop, not driving (the Shop tile in the vehicle picker)
         function atShop(open) { return !!(open && open.shop && !open.vehicleId); }
+        const NONE = Symbol("none"); // picking the No vehicle tile
+
+        // ---------- Pick first, then punch in ----------
+        // Off the clock the punch button stays locked until the driver picks a vehicle, Shop or No vehicle. The database
+        // only takes a vehicle for a shift that's punched in, so the pick waits on this phone and is saved on the shift
+        // right after the punch in (applyPrePick); the Vehicle Check and the oil reminder follow as before.
+        // With no signal the list can't load, so they can punch in without a pick and are asked once the signal is back.
+        // { kind: "vehicle" | "shop" | "none", id, name, manual, holderEk, holderName, day, shiftId (once punched in) }
+        let prePickMem = null, listFailed = false, applying = false, forceWaitSignal = false, forceT = 0;
+        const prePickKey = () => "tc_prepick_" + ek;
+        function loadPrePick() {
+            let p = prePickMem;
+            try { p = JSON.parse(localStorage.getItem(prePickKey()) || "null"); } catch (e) {}
+            if (!p || !["vehicle", "shop", "none"].includes(p.kind) || (p.kind === "vehicle" && !p.id)) return null;
+            if (!p.shiftId && p.day !== dayKey(now())) return null; // picked on another day and never punched in
+            return p;
+        }
+        function savePrePick(p) {
+            prePickMem = p || null;
+            try { if (p) localStorage.setItem(prePickKey(), JSON.stringify(p)); else localStorage.removeItem(prePickKey()); } catch (e) {}
+        }
+        const pickName = p => p.kind === "vehicle" ? "vehicle " + p.name : p.kind === "shop" ? "Shop" : "No vehicle";
+
+        // No vehicle on this shift: saved on the shift (noVehicle), and on this phone for database rules from before it
+        const NO_VEHICLE_KEY = "tc_novehicle";
+        let noVehicleMem = null;
+        function choseNoVehicle(open) {
+            if (!open) return false;
+            if (open.noVehicle === true) return true;
+            let id = noVehicleMem;
+            try { id = localStorage.getItem(NO_VEHICLE_KEY) || id; } catch (e) {}
+            return !!id && id === open.id;
+        }
+        function rememberNoVehicle(id) {
+            noVehicleMem = id || null;
+            try { if (id) localStorage.setItem(NO_VEHICLE_KEY, id); else localStorage.removeItem(NO_VEHICLE_KEY); } catch (e) {}
+        }
+
+        // The punch in is still on this phone, not on the server yet
+        const inWaiting = open => loadPending().some(x => x.kind === "in" && x.id === open.id);
+        // On the clock with no choice made: no vehicle, not Shop, not No vehicle (a vehicle taken by another driver has
+        // its own banner), and no pick from before the punch in still waiting to be saved
+        function needsPick(open) {
+            if (!open || open.vehicleId || open.shop || open.swapHint || choseNoVehicle(open)) return false;
+            const pp = loadPrePick();
+            return !(pp && pp.shiftId === open.id);
+        }
+
+        // Pressing the punch button off the clock: true when the punch in can go ahead
+        function pickReady() {
+            let pp = loadPrePick();
+            if (pp && pp.shiftId) { savePrePick(null); pp = null; } // from a punch in that never stayed in
+            if (pp && pp.kind === "vehicle") {
+                const c = claims[pp.id];
+                if (c && c.ek !== ek && c.ek !== pp.holderEk) {
+                    savePrePick(null);
+                    render();
+                    openSheet("Someone else took vehicle " + pp.name + " since you picked it. Pick again.");
+                    return false;
+                }
+            }
+            if (pp || standIn || !online || listFailed) return true; // no signal: punch now, pick once it's back
+            openSheet("Pick your vehicle first, then hold the button to punch in.");
+            return false;
+        }
+
+        // Off the clock: keeps the pick on this phone until the punch in
+        function prePickVehicle(g) {
+            const c = claims[g.id];
+            const holder = c && c.ek !== ek ? c : null;
+            const holderName = holder ? holder.nickname || holder.name || "another driver" : "";
+            if (holder && !confirm("Vehicle " + g.name + " is assigned to " + holderName + ". Take it?\n\n" + holderName +
+                " will be unassigned when you punch in and asked to pick the vehicle they're in.")) return;
+            savePrePick({ kind: "vehicle", id: g.id, name: g.name, manual: !!g.manual, holderEk: holder ? holder.ek : null,
+                holderName: holder ? holderName : null, day: dayKey(now()) });
+            closeSheet();
+            render();
+            toast("Vehicle " + g.name + " picked. Now hold the button to punch in.");
+        }
+        function prePickOther(kind) {
+            savePrePick({ kind: kind, day: dayKey(now()) });
+            closeSheet();
+            render();
+            toast((kind === "shop" ? "Shop" : "No vehicle") + " picked. Now hold the button to punch in.");
+        }
+
+        // Right after the punch in: saves the pick made before it (then Vehicle Check and oil), or asks for one
+        function afterPunchIn() {
+            const open = current();
+            if (!open) return;
+            const pp = loadPrePick();
+            if (pp && pp.shiftId === open.id) { applyPrePick(); return; } // waits for the signal if the punch is still on this phone
+            if (needsPick(open)) openSheet();
+        }
+        async function applyPrePick() {
+            const open = current(), pp = loadPrePick();
+            if (applying || !open || !pp || pp.shiftId !== open.id || inWaiting(open) || !online || standIn) return;
+            applying = true;
+            savePrePick(null);
+            try {
+                if (pp.kind === "shop") await pickShop(null);
+                else if (pp.kind === "none") await pickNone(null);
+                else await pickVehicle({ id: pp.id, name: pp.name, manual: !!pp.manual }, null, pp);
+            } finally { applying = false; }
+        }
+
+        // On the clock with no choice made (punched in with no signal, a shift from before this update, the vehicle was
+        // taken before the pick was saved): the picker opens by itself and only a pick closes it
+        function queueForcePick() { clearTimeout(forceT); forceT = setTimeout(maybeForcePick, 300); }
+        function maybeForcePick() {
+            const open = current();
+            if (!open || $("clockScreen").hidden || !online || standIn || busy || holding || formOpen || sheetOpen || picking || applying ||
+                afterPunchInPick || $("success").classList.contains("show") || inWaiting(open)) return;
+            const pp = loadPrePick();
+            if (pp && pp.shiftId === open.id) { applyPrePick(); return; }
+            if (needsPick(open) && !forceWaitSignal) openSheet();
+        }
+        // The picker can't be closed while a choice is needed and the list has loaded
+        function sheetLocked() { return sheetOpen && sheetReady && needsPick(current()); }
+        function dismissSheet() {
+            if (sheetLocked()) return;
+            if (needsPick(current())) forceWaitSignal = true; // no list (no signal): asked again once the signal is back
+            closeSheet();
+        }
 
         // false when there was no answer in time (no signal)
         async function loadGps() {
@@ -1647,9 +1797,11 @@
             return true;
         }
 
-        async function openSheet() {
+        // msg: shown at the top of the list (also used as a click handler: anything but a string is ignored)
+        async function openSheet(msg) {
+            msg = typeof msg === "string" ? msg : "";
+            if (sheetOpen) { if (msg) $("sheetMsg").textContent = msg; return; }
             const open = current();
-            if (!open) return;
             const lost = lostVan(open);
             if (lost && lost.vehicleName && needsHandoffOil(open) && !formOpen) { askOilAtHandoff(open.id, lost.vehicleName, openSheet); return; }
             sheetOpen = true;
@@ -1657,23 +1809,29 @@
             const sheet = $("sheet");
             sheet.classList.add("show");
             sheet.setAttribute("aria-hidden", "false");
-            await fillSheet();
+            await fillSheet(msg);
         }
 
         // Loads the vehicle list into the open sheet. Picking a vehicle needs signal (the server decides who has which
         // vehicle), so with none the sheet says so and tries again by itself when the signal comes back.
-        async function fillSheet() {
+        async function fillSheet(msg) {
             sheetReady = false;
-            $("sheetMsg").textContent = "";
+            $("sheetMsg").textContent = typeof msg === "string" ? msg : "";
             renderSheetHead();
             if (online) {
                 $("gpsGrid").innerHTML = '<p class="empty">Loading vehicles…</p>';
                 const ok = await loadGps();
                 if (!sheetOpen || sheetReady) return;
-                if (ok) { sheetReady = true; renderSheet(); return; }
+                if (ok) { sheetReady = true; listFailed = false; forceWaitSignal = false; renderSheet(); return; }
             }
-            $("gpsGrid").innerHTML = '<p class="empty">No signal, so the vehicle list can\'t load. It loads by itself when you\'re back online, or close this and tap ' +
-                esc($("swapBtnText").textContent) + ' later.</p><button type="button" class="chip-btn" id="sheetRetry">Try again</button>';
+            listFailed = true;
+            renderSheetHead();
+            $("gpsGrid").innerHTML = (current()
+                ? '<p class="empty">No signal, so the vehicle list can\'t load. It loads by itself when you\'re back online, or close this and tap ' +
+                    esc($("swapBtnText").textContent) + ' later.</p>'
+                : '<p class="empty">No signal, so the vehicle list can\'t load. You can still punch in: close this and hold the button. ' +
+                    "You'll be asked to pick your vehicle once you're back online.</p>") +
+                '<button type="button" class="chip-btn" id="sheetRetry">Try again</button>';
         }
 
         function closeSheet(instant) {
@@ -1700,30 +1858,48 @@
 
         function renderSheetHead() {
             const open = current();
-            if (!open) return;
+            const skip = $("sheetSkip");
+            if (!open) { // before the punch in
+                const pp = loadPrePick();
+                $("sheetTitle").textContent = "Pick your vehicle";
+                $("sheetSub").textContent = "Pick the vehicle you're driving today, then punch in. Tap Shop if you're working in the shop, or No vehicle if you're not driving.";
+                skip.textContent = pp ? "Keep " + pickName(pp) : "Close";
+                skip.hidden = false;
+                return;
+            }
             const lost = lostVan(open);
             const has = !!open.vehicleId && !lost;
             const shop = atShop(open);
+            const none = !has && !shop && !lost && choseNoVehicle(open);
             $("sheetTitle").textContent = has || lost ? "Change vehicle" : "Pick your vehicle";
             $("sheetSub").textContent = lost ? (lost.by ? lost.by + " took vehicle " + lost.vehicleName + ". " : "") + "Tap the vehicle you're in now, or Shop."
                 : has ? "Tap the vehicle you're in now, or Shop if you're working in the shop. If another driver has the vehicle, they'll be unassigned and asked to pick theirs."
                 : shop ? "You're working in the shop. If you're driving now, tap your vehicle."
-                : "Please choose the vehicle you're driving today, or Shop if you're working in the shop.";
-            $("sheetSkip").textContent = has ? "Keep vehicle " + open.vehicleName : shop ? "Stay in the shop" : lost ? "Close" : "Not driving today";
+                : none ? "You're not driving. If you're driving now, tap your vehicle."
+                : "Please choose the vehicle you're driving today. Tap Shop if you're working in the shop, or No vehicle if you're not driving.";
+            skip.textContent = has ? "Keep vehicle " + open.vehicleName : shop ? "Stay in the shop" : none ? "Keep No vehicle" : "Close";
+            skip.hidden = sheetReady && needsPick(open); // only a pick closes it (with no signal it can be closed, and comes back)
         }
 
         function renderSheet() {
             const open = current();
-            if (!open) { closeSheet(); return; }
+            if (!open && !sheetOpen) return;
             renderSheetHead();
             if (!sheetReady) return; // still loading, or no signal
             const grid = $("gpsGrid");
             const lost = lostVan(open);
-            const shop = atShop(open);
+            const pp = open ? null : loadPrePick(); // before the punch in: what they picked so far
+            const shop = open ? atShop(open) : !!pp && pp.kind === "shop";
+            const none = open ? !open.vehicleId && !open.shop && !lost && choseNoVehicle(open) : !!pp && pp.kind === "none";
+            const myPick = pp && pp.kind === "vehicle" ? pp.id : null;
             const shopTile = '<button type="button" class="gps shop' + (shop ? " mine" : "") + (picking === SHOP ? " picking" : "") + '" data-shop="1"' +
-                ' style="--i:0" aria-label="Shop, ' + (shop ? "you're working here" : "not driving") + '">' +
+                ' style="--i:0" aria-label="Shop, ' + (shop ? (open ? "you're working here" : "your pick") : "working in the shop") + '">' +
                 '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 17h10"/></svg></span>' +
-                '<span class="gps-name">Shop</span><span class="gps-state">' + (shop ? "You're here" : "Not driving") + "</span></button>";
+                '<span class="gps-name">Shop</span><span class="gps-state">' + (shop ? (open ? "You're here" : "Your pick") : "Working in the shop") + "</span></button>" +
+                '<button type="button" class="gps none' + (none ? " mine" : "") + (picking === NONE ? " picking" : "") + '" data-none="1"' +
+                ' style="--i:1" aria-label="No vehicle, ' + (none ? "your pick" : "not driving") + '">' +
+                '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M3 3l18 18"/></svg></span>' +
+                '<span class="gps-name">No vehicle</span><span class="gps-state">' + (none ? "Your pick" : "Not driving") + "</span></button>";
             if (gpsError) $("sheetMsg").textContent = gpsError;
             if (!gpsUnits.length) { grid.innerHTML = shopTile + (gpsError ? "" : '<p class="empty">No vehicles are set up yet.</p>'); return; }
             const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gps : null;
@@ -1732,14 +1908,14 @@
             const list = suggestId ? gpsUnits.filter(g => g.id === suggestId).concat(gpsUnits.filter(g => g.id !== suggestId)) : gpsUnits;
             grid.innerHTML = shopTile + list.map((g, i) => {
                 const c = claims[g.id];
-                const mine = c && c.ek === ek && !lost;
+                const mine = open ? c && c.ek === ek && !lost : g.id === myPick;
                 const taken = c && c.ek !== ek;
                 const suggest = g.id === suggestId;
-                const state = mine ? "Your vehicle" : taken ? (c.nickname || c.name || "Another driver") + " has it · tap to take"
+                const state = mine ? (open ? "Your vehicle" : "Your pick") : taken ? (c.nickname || c.name || "Another driver") + " has it · tap to take"
                     : suggest ? "Likely yours" + (lost.by ? " · " + lost.by + "'s old vehicle" : "") : "Available";
                 return '<button type="button" class="gps' + (mine ? " mine" : "") + (taken ? " taken" : "") + (suggest ? " suggest" : "") +
                     (picking === g.id ? " picking" : "") + '" data-gps="' + esc(g.id) + '"' +
-                    ' style="--i:' + (i + 1) + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
+                    ' style="--i:' + (i + 2) + ';--gps-color:' + esc(g.color) + '" aria-label="Vehicle ' + esc(g.name) + ", " + esc(state) + '">' +
                     '<span class="gps-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></span>' +
                     '<span class="gps-name">' + esc(g.name) + '</span><span class="gps-state">' + esc(state) + "</span></button>";
             }).join("");
@@ -1750,25 +1926,29 @@
             if (e.target.closest("#sheetRetry")) { fillSheet(); return; }
             const btn = e.target.closest(".gps");
             if (!btn || btn.disabled || picking) return;
-            // The pick would wait for the server until the signal is back
-            if (!online) { $("sheetMsg").textContent = "No signal right now. Try again when you're back online."; return; }
+            // The pick would wait for the server until the signal is back (before the punch in it's kept on this phone)
+            if (!online && current()) { $("sheetMsg").textContent = "No signal right now. Try again when you're back online."; return; }
             if (btn.dataset.shop) { pickShop(btn); return; }
+            if (btn.dataset.none) { pickNone(btn); return; }
             const g = gpsUnits.find(u => u.id === btn.dataset.gps);
             if (g) pickVehicle(g, btn);
         });
 
-        async function pickVehicle(g, btn) {
+        // pre: the pick made before the punch in, saved now (applyPrePick); the driver already agreed to take it from
+        // pre.holderEk, so there's no question, and if someone else has it now they're asked to pick again
+        async function pickVehicle(g, btn, pre) {
             const open = current();
-            if (!open) return;
+            if (!open) { prePickVehicle(g); return; }
             const lost = lostVan(open);
             if (open.vehicleId === g.id && !lost) { closeSheet(); return; }
             // Taking a van another driver has: they get unassigned, and the server tells them to do a van swap
-            const holder = claims[g.id] && claims[g.id].ek !== ek ? claims[g.id] : null;
-            const holderName = holder ? holder.nickname || holder.name || "another driver" : "";
-            if (holder && !confirm("Vehicle " + g.name + " is assigned to " + holderName + ". Take it?\n\n" + holderName +
+            const holder = pre ? (pre.holderEk && claims[g.id] && claims[g.id].ek === pre.holderEk ? claims[g.id] : null)
+                : claims[g.id] && claims[g.id].ek !== ek ? claims[g.id] : null;
+            const holderName = holder ? holder.nickname || holder.name || (pre && pre.holderName) || "another driver" : "";
+            if (holder && !pre && !confirm("Vehicle " + g.name + " is assigned to " + holderName + ". Take it?\n\n" + holderName +
                 " will be unassigned and asked to pick the vehicle they're in.")) return;
             picking = g.id;
-            btn.classList.add("picking");
+            if (btn) btn.classList.add("picking");
             $("sheetMsg").textContent = "";
             const where = readLocation();
             const nick = nicknameFor(emp, user.email);
@@ -1790,13 +1970,16 @@
                 });
                 if (!res.committed) {
                     picking = null;
+                    if (!sheetOpen) { openSheet("Someone else just took vehicle " + g.name + ". Pick again."); return; }
                     renderSheet();
                     const el = $("gpsGrid").querySelector('[data-gps="' + CSS.escape(g.id) + '"]');
                     if (el) { el.classList.add("flash-taken"); }
                     $("sheetMsg").textContent = "Someone else just took vehicle " + g.name + ". Pick again.";
                     return;
                 }
-                await update(ref(db, P.shifts + "/" + ek + "/" + open.id), { vehicleId: g.id, vehicleName: g.name, nickname: nick, shop: null });
+                await update(ref(db, P.shifts + "/" + ek + "/" + open.id), Object.assign({ vehicleId: g.id, vehicleName: g.name, nickname: nick, shop: null },
+                    open.noVehicle ? { noVehicle: null } : {}));
+                rememberNoVehicle(null);
                 const entry = push(ref(db, P.shifts + "/" + ek + "/" + open.id + "/vans"));
                 await set(entry, { at: serverTimestamp(), vehicleId: g.id, vehicleName: g.name, how: prevId || lost ? "swap" : "pick" })
                     .catch(err => console.warn("Van history not saved:", err));
@@ -1817,6 +2000,7 @@
                 setTimeout(askHandoff ? () => askOilAtHandoff(open.id, handedOff, next) : next, 450);
             } catch (err) {
                 picking = null;
+                if (!sheetOpen) { openSheet("Couldn't take vehicle " + g.name + ": " + errText(err)); return; }
                 renderSheet();
                 $("sheetMsg").textContent = "Couldn't take vehicle " + g.name + ": " + errText(err);
             }
@@ -1825,11 +2009,11 @@
         // Working in the shop: gives up the van (if any) and records the change in the van history
         async function pickShop(btn) {
             const open = current();
-            if (!open) return;
+            if (!open) { prePickOther("shop"); return; }
             if (atShop(open)) { closeSheet(); return; }
             const lost = lostVan(open);
             picking = SHOP;
-            btn.classList.add("picking");
+            if (btn) btn.classList.add("picking");
             $("sheetMsg").textContent = "";
             const where = readLocation();
             const prevId = open.vehicleId && !lost ? open.vehicleId : null;
@@ -1838,7 +2022,9 @@
             try {
                 const change = { shop: true, vehicleId: null, vehicleName: null, nickname: null };
                 if (open.swapHint) change.swapHint = null; // no van swap needed (stops the reminders)
+                if (open.noVehicle) change.noVehicle = null;
                 await update(ref(db, shiftPath), change);
+                rememberNoVehicle(null);
                 const entry = push(ref(db, shiftPath + "/vans"));
                 await set(entry, { at: serverTimestamp(), how: "shop" }).catch(err => console.warn("Van history not saved:", err));
                 saveLocation(shiftPath + "/vans/" + entry.key + "/loc", where);
@@ -1848,8 +2034,49 @@
                 toast((prevId ? "Vehicle " + prevName + " released. " : "") + "You're working in the shop.");
             } catch (err) {
                 picking = null;
+                if (!sheetOpen) { openSheet("Couldn't switch to Shop: " + errText(err)); return; }
                 renderSheet();
                 $("sheetMsg").textContent = "Couldn't switch to Shop: " + errText(err);
+            }
+        }
+
+        // Not driving and not in the shop: gives up the vehicle (if any). Saved on the shift (noVehicle) so the office sees
+        // it was the driver's choice, with the change in the van history. No Vehicle Check and no oil check for it.
+        async function pickNone(btn) {
+            const open = current();
+            if (!open) { prePickOther("none"); return; }
+            const lost = lostVan(open);
+            if (!open.vehicleId && !open.shop && !lost && choseNoVehicle(open)) { closeSheet(); return; }
+            picking = NONE;
+            if (btn) btn.classList.add("picking");
+            $("sheetMsg").textContent = "";
+            const where = readLocation();
+            const prevId = open.vehicleId && !lost ? open.vehicleId : null;
+            const prevName = open.vehicleName;
+            const path = P.shifts + "/" + ek + "/" + open.id;
+            try {
+                const change = { vehicleId: null, vehicleName: null, nickname: null };
+                if (open.shop) change.shop = null;
+                if (open.swapHint) change.swapHint = null; // no van swap needed (stops the reminders)
+                try { await update(ref(db, path), Object.assign({ noVehicle: true }, change)); }
+                catch (err) {
+                    if (!isDenied(err)) throw err;
+                    await update(ref(db, path), change); // database rules from before No vehicle: the choice is kept on this phone
+                }
+                rememberNoVehicle(open.id);
+                const entry = push(ref(db, path + "/vans"));
+                const logged = await set(entry, { at: serverTimestamp(), how: "none" }).then(() => true, err => { console.warn("Van history not saved:", err); return false; });
+                if (logged) saveLocation(path + "/vans/" + entry.key + "/loc", where);
+                if (prevId) await releaseVehicle(prevId, open.nickname).catch(err => console.warn("Vehicle release:", err));
+                picking = null;
+                closeSheet();
+                render();
+                toast((prevId ? "Vehicle " + prevName + " released. " : "") + "Saved: no vehicle, you're not driving.");
+            } catch (err) {
+                picking = null;
+                if (!sheetOpen) { openSheet("Couldn't save No vehicle: " + errText(err)); return; }
+                renderSheet();
+                $("sheetMsg").textContent = "Couldn't save No vehicle: " + errText(err);
             }
         }
 
@@ -1865,11 +2092,11 @@
 
         $("changeVehicleBtn").addEventListener("click", openSheet);
         $("vanReportBtn").addEventListener("click", () => { const o = current(); if (o && o.vehicleId) openVanCheck(o.vehicleId, o.vehicleName || o.vehicleId, false); });
-        $("sheetBackdrop").addEventListener("click", () => closeSheet());
-        $("sheetSkip").addEventListener("click", () => closeSheet());
+        $("sheetBackdrop").addEventListener("click", dismissSheet);
+        $("sheetSkip").addEventListener("click", dismissSheet);
         document.addEventListener("keydown", e => {
             if (e.key !== "Escape") return;
-            if (formOpen) cancelForm(); else if (sheetOpen) closeSheet();
+            if (formOpen) cancelForm(); else if (sheetOpen) dismissSheet();
         });
 
         // ---------- Form sheet: Fix a punch, Vehicle Check, Oil check ----------
@@ -1909,6 +2136,7 @@
             f.setAttribute("aria-hidden", "true");
             if (!instant) punchBtn.focus({ preventScroll: true });
             if (after) setTimeout(after, 350); // once the sheet has slid away
+            queueForcePick();
         }
         function cancelForm() {
             if (formMust) return; // a tap outside it or Escape doesn't count as an answer
@@ -2023,7 +2251,7 @@
         }
 
         // ---------- Oil check ----------
-        // Shifts with a vehicle (hadVehicle: not just Shop or "Not driving today") whose oil check is due: a reminder after the vehicle is picked, a glowing box until the driver ticks
+        // Shifts with a vehicle (hadVehicle: not just Shop or No vehicle) whose oil check is due: a reminder after the vehicle is picked, a glowing box until the driver ticks
         // "I checked the oil", and the same question at punch out if they never did. The answer is saved on the shift
         // (shifts/{ek}/{id}/oil = { done, at, how: "box" | "out" }) and shows in the admin Inbox. It's saved on the
         // phone first, like a punch, so it works with no signal.
