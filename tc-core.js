@@ -13,6 +13,9 @@
 //                                        inLoc, inAddr, outLoc, outAddr, vans, swapHint, oil }
 //       vehicleId/vehicleName/nickname   the van the driver has now
 //       shop                             true while they're working in the shop instead of driving
+//       src / edited                     src "admin": added by the office. edited { by, at, note, req }: last office change;
+//                                        req is the driver's "Fix a punch" request it was for. The driver sees the change
+//                                        only when they asked for it (fixAskedFor()); otherwise it shows as a normal punch
 //       inLoc / outLoc                   where the phone was at the punch: { lat, lng, acc, at } or { err }
 //       inAddr / outAddr                 the street address for it, added by the admin panel (Google geocoder)
 //       vans/{id}                        every van change in the shift: { at, vehicleId, vehicleName, how, by, loc, addr }
@@ -271,6 +274,27 @@ export function punchForFix(list, day, kind) {
     }
     if (!onDay.length) return null;
     return kind === "out" ? (onDay.filter(s => typeof s.out !== "number").pop() || onDay[onDay.length - 1]) : onDay[0];
+}
+
+// Whether the driver asked for this punch to be fixed ("Fix a punch"). The driver only sees "Changed by the office" or
+// "Added by the office" on a punch they asked about; any other office change shows as a normal punch. Returns the request's
+// id (or "asked" for a fix made before edited.req was saved) or null. reqs: that driver's timeclock/requests/{ek}.
+//   edited.req                 saved since 2026-11 when the office saves a punch from the driver's request (kept on later edits)
+//   a done request for it      the request names the punch (shiftId)
+//   "Driver asked: …" note     the note the admin panel fills in from a request (older fixes, or a request with no punch)
+export function fixAskedFor(s, reqs) {
+    if (!s) return null;
+    const e = s.edited && typeof s.edited === "object" ? s.edited : null;
+    if (e && typeof e.req === "string" && e.req) return e.req;
+    for (const [id, r] of Object.entries(reqs || {})) if (r && r.status === "done" && s.id && r.shiftId === s.id) return id;
+    if (e && typeof e.note === "string" && /^Driver asked:/.test(e.note)) return "asked";
+    return null;
+}
+
+// The note under a punch on the driver's My week: only for an office change the driver asked for
+export function officeNote(s, reqs) {
+    if (!s || (s.src !== "admin" && !s.edited) || !fixAskedFor(s, reqs)) return "";
+    return s.src === "admin" ? "Added by the office." : "Changed by the office.";
 }
 
 // The other punches that share time with a punch from inTs to outTs (null: still on the clock), so hours aren't counted twice

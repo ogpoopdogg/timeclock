@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, farFromPlace, punchPlace, cleanSpots, shopShift, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, P } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, fixAskedFor, officeNote, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, P } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -285,4 +285,29 @@ test('change vehicle reminder: its own switch and answer, separate from the punc
   assert.strictEqual(noticeDue(both, { vehicle: 1762333320000 }, PUNCH_NOTICE), true);
   assert.strictEqual(noticeDue(both, { vehicle: 1762333320000 }, VEHICLE_NOTICE), false);
   assert.strictEqual(noticeDue({ notices: { punch: true } }, {}, VEHICLE_NOTICE), false);
+});
+
+test('office changes: the driver only sees ones they asked for', () => {
+  const s = { id: 's1', in: t0, out: t0 + 8 * H };
+  const edited = (extra) => Object.assign({ by: 'justin@ec.com', at: t0, note: 'Fixed times' }, extra);
+  // Not changed: nothing
+  assert.strictEqual(officeNote(s, {}), '');
+  // Changed or added by the office without a request: looks like a normal punch
+  assert.strictEqual(officeNote(Object.assign({}, s, { edited: edited() }), {}), '');
+  assert.strictEqual(officeNote(Object.assign({}, s, { src: 'admin', edited: edited() }), {}), '');
+  assert.strictEqual(officeNote(Object.assign({}, s, { edited: edited({ note: 'Used the time pressed on the phone (no signal)' }) }), null), '');
+  // Saved from the driver's request
+  assert.strictEqual(fixAskedFor(Object.assign({}, s, { edited: edited({ req: 'r1' }) }), {}), 'r1');
+  assert.strictEqual(officeNote(Object.assign({}, s, { edited: edited({ req: 'r1' }) }), {}), 'Changed by the office.');
+  assert.strictEqual(officeNote(Object.assign({}, s, { src: 'admin', edited: edited({ req: 'r1' }) }), {}), 'Added by the office.');
+  // Older fixes: a done request naming the punch, or the "Driver asked:" note
+  const reqs = { r2: { kind: 'wrong', shiftId: 's1', status: 'done' }, r3: { kind: 'out', shiftId: 's1', status: 'declined' } };
+  assert.strictEqual(fixAskedFor(Object.assign({}, s, { edited: edited() }), reqs), 'r2');
+  assert.strictEqual(fixAskedFor(Object.assign({}, s, { edited: edited() }), { r3: reqs.r3 }), null); // declined
+  assert.strictEqual(fixAskedFor(Object.assign({}, s, { edited: edited() }), { r4: { kind: 'wrong', shiftId: 's1', status: 'open' } }), null); // still waiting
+  assert.strictEqual(fixAskedFor(Object.assign({}, s, { id: 's9', edited: edited() }), reqs), null); // another punch
+  assert.strictEqual(fixAskedFor(Object.assign({}, s, { src: 'admin', edited: edited({ note: 'Driver asked: I missed a whole shift' }) }), {}), 'asked');
+  // A request marked done for a punch the office never changed: still nothing to show
+  assert.strictEqual(officeNote(s, reqs), '');
+  assert.strictEqual(fixAskedFor(null, reqs), null);
 });

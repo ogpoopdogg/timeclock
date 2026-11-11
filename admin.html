@@ -1000,7 +1000,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, overlapping,
+            oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, fixAskedFor, overlapping,
             longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE, VEHICLE_NOTICE
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
@@ -1861,7 +1861,7 @@
             const btn = $("smSave");
             btn.disabled = true;
             try {
-                if (!(await saveShift(k, smCtx.shift, r, $("smNote").value.trim(), smCtx.shift ? "edit" : "add"))) {
+                if (!(await saveShift(k, smCtx.shift, r, $("smNote").value.trim(), smCtx.shift ? "edit" : "add", smCtx.request && smCtx.request.id))) {
                     $("smMsg").textContent = "Not saved. Pick another vehicle, or save again and move it.";
                     btn.disabled = false;
                     return;
@@ -1897,7 +1897,9 @@
         // Only the fields the admin changed are written, so a van pick or punch out the driver makes at the same moment
         // isn't wiped out. A van change goes into the shift's van history. Returns false if nothing was saved
         // (the admin chose not to take a GPS another driver has).
-        async function saveShift(k, before, r, note, action) {
+        // reqId: the driver's "Fix a punch" request this saves (from Fix it in the Inbox). Only then does the driver see
+        // "Changed by the office" on the punch (see fixAskedFor); a punch they asked about keeps it through later edits.
+        async function saveShift(k, before, r, note, action, reqId) {
             const id = before ? before.id : push(ref(db, P.shifts + "/" + k)).key;
             const base = P.shifts + "/" + k + "/" + id;
             const emp = employees[k];
@@ -1918,6 +1920,8 @@
 
             const u = {};
             const edited = { by: user.email, at: serverTimestamp(), note: note || "" };
+            const req = reqId || (before ? fixAskedFor(before, requestsAll[k]) : null);
+            if (req) edited.req = String(req).slice(0, 60);
             let data;
             if (!before) {
                 data = { in: r.in, out: r.out || null, vehicleId: vehicleId, vehicleName: vehicleName, nickname: nickname, shop: shop || null, src: "admin", edited: edited };
@@ -2119,7 +2123,10 @@
             if (clash && !confirm("Starting at " + fmtTime(tap) + " overlaps another punch for " + empName(k) + ": " + fmtKey(dayKey(clash.in)) + ", " + fmtTime(clash.in) +
                 ".\n\nSaving both counts those hours twice. Use the phone's time anyway?")) return;
             const note = "Used the time pressed on the phone (no signal)";
-            await update(ref(db, P.shifts + "/" + k + "/" + id), { in: tap, edited: { by: user.email, at: serverTimestamp(), note: note } });
+            const edited = { by: user.email, at: serverTimestamp(), note: note };
+            const req = fixAskedFor(s, requestsAll[k]); // a punch the driver asked about still shows them it was changed
+            if (req) edited.req = String(req).slice(0, 60);
+            await update(ref(db, P.shifts + "/" + k + "/" + id), { in: tap, edited: edited });
             flashRow = k + "/" + id;
             await logAudit(k, id, "edit", s, Object.assign({}, s, { in: tap }), note);
             toast(empName(k) + "'s punch in now counts from " + fmtTime(tap) + ".");
