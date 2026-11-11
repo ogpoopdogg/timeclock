@@ -273,22 +273,56 @@
         .day-cell.today { background: rgba(255, 204, 0, 0.05); }
         .day-cell.today .dn { color: var(--yellow); }
 
-        table.punches { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-        .punches th {
-            text-align: left; font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase;
-            color: var(--dim); padding: 10px 18px 6px;
+        /* One shift: day + hours | what happened, in time order | flags | Edit */
+        .shift {
+            display: grid; grid-template-columns: 132px minmax(0, 1fr) minmax(170px, 260px) auto; gap: 18px; align-items: start;
+            padding: 16px 18px; border-top: 1px solid var(--line); transition: background 0.2s; font-variant-numeric: tabular-nums;
         }
-        .punches td { padding: 10px 18px; border-top: 1px solid var(--line); vertical-align: middle; }
-        .punches tr { transition: background 0.2s; }
-        .punches tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
-        .punches tr.flash { animation: rowFlash 1.6s var(--ease-out); }
+        .shift:first-child { border-top: 0; }
+        .shift:hover { background: rgba(255, 255, 255, 0.02); }
+        .shift.flash { animation: rowFlash 1.6s var(--ease-out); }
         @keyframes rowFlash { 0% { background: rgba(255, 204, 0, 0.22); } 100% { background: transparent; } }
-        .punches .num { text-align: right; font-weight: 600; }
-        .punches .actions { text-align: right; white-space: nowrap; width: 1%; }
-        .punches .muted { color: var(--muted); }
-        .punches .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .shift-date { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
+        .shift-hrs { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; line-height: 1.1; margin-top: 6px; }
+        .shift-hrs small { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-left: 2px; }
+        .shift-dur { color: var(--muted); font-size: 0.82rem; }
+        .shift.is-live .shift-hrs { color: var(--green); }
+        .shift-side .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .shift-note { margin-top: 8px; color: var(--muted); font-size: 0.85rem; font-style: italic; line-height: 1.35; overflow-wrap: anywhere; }
+        .shift-act { text-align: right; }
+
+        /* The timeline: a line down the left joins the steps; each kind has its own colour and icon */
+        .timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+        .ev { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding-bottom: 12px; }
+        .ev:last-child { padding-bottom: 0; }
+        .ev:not(:last-child)::before { content: ""; position: absolute; left: 13px; top: 28px; bottom: 0; width: 2px; background: var(--line); }
+        .ev-ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; }
+        .ev-ic svg { width: 15px; height: 15px; }
+        .ev-main { min-width: 0; padding-top: 3px; }
+        .ev-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+        .ev-label { font-family: var(--font-display); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .ev-time { font-weight: 700; font-size: 1.05rem; }
+        .ev-date { color: var(--muted); font-weight: 400; font-size: 0.82rem; }
+        .ev-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+        .ev-flags { margin-top: 4px; }
+        .ev-what { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+        .ev-arrow { color: var(--muted); font-weight: 700; }
+        .ev-by { color: var(--muted); font-size: 0.8rem; }
+        .ev-in .ev-ic { background: rgba(53, 208, 127, 0.16); color: var(--green); }
+        .ev-in .ev-label { color: var(--green); }
+        .ev-out .ev-ic { background: rgba(255, 107, 94, 0.16); color: var(--red); }
+        .ev-out .ev-label { color: var(--red); }
+        .ev-live .ev-ic { background: rgba(53, 208, 127, 0.16); color: var(--green); box-shadow: 0 0 0 2px rgba(53, 208, 127, 0.35); }
+        .ev-live .ev-label { color: var(--green); }
+        /* Vehicle steps sit in their own lighter box so they don't read as punches */
+        .ev-van .ev-ic { width: 22px; height: 22px; margin: 3px; background: rgba(255, 204, 0, 0.12); color: var(--yellow); }
+        .ev-van .ev-ic svg { width: 13px; height: 13px; }
+        .ev-van .ev-main { justify-self: start; max-width: 100%; padding: 7px 12px; border-radius: 10px; background: rgba(255, 204, 0, 0.04); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.14); }
+        .ev-van .ev-label { color: var(--yellow); font-size: 0.72rem; }
+        .ev-van .ev-time { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+        .ev-van .ev-what { margin-top: 3px; }
+        .ev-van .loc { margin-top: 4px; }
         .no-punches { padding: 16px 18px; color: var(--dim); }
-        .punches td.when { vertical-align: top; }
         .counted { color: var(--dim); font-size: 0.78rem; margin-top: 2px; }
         .loc {
             display: flex; align-items: flex-start; gap: 4px; max-width: 260px; margin-top: 3px; padding: 0; border: 0; background: none;
@@ -298,10 +332,6 @@
         .loc:hover span, .loc:focus-visible span { text-decoration: underline; }
         .loc:focus-visible { outline: none; }
         .loc.none { color: var(--dim); cursor: default; }
-        .vans { display: flex; flex-direction: column; gap: 6px; }
-        .van-step { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 0.85rem; }
-        .van-step .loc { flex-basis: 100%; margin-top: 0; }
-        .van-step .arrow { color: var(--muted); }
         .map-modal { width: min(720px, 100%); }
         .map-addr { font-weight: 600; font-size: 1.05rem; }
         .map-meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
@@ -563,19 +593,12 @@
             .clock { display: none; }
             .tab .tab-text { display: none; }
             .tab { padding: 0 14px; }
-            .punches thead { display: none; }
-            .punches, .punches tbody, .punches tr, .punches td { display: block; width: 100%; }
-            .punches tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 10px 16px; border-top: 1px solid var(--line); }
-            .punches td { border: 0; padding: 2px 0; }
-            .punches td[data-l]::before { content: attr(data-l) " "; color: var(--dim); font-size: 0.8rem; }
-            .punches td.day { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
-            .punches .num { text-align: right; }
-            .punches .actions { grid-column: 1 / -1; text-align: left; width: auto; padding-top: 6px; }
-            .punches .tagcell, .punches .vancell { grid-column: 1 / -1; }
-            /* Day and hours on top, then each punch (with its address) on its own full-width line */
-            .punches td.day { order: 0; } .punches td.num { order: 1; }
-            .punches td.when { order: 2; grid-column: 1 / -1; }
-            .punches .vancell { order: 3; } .punches .tagcell { order: 4; } .punches .actions { order: 5; }
+            .shift { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 14px 16px; }
+            .shift-day { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+            .shift-hrs { margin-top: 0; font-size: 1.3rem; }
+            .timeline, .shift-side { grid-column: 1 / -1; }
+            .shift-side:empty { display: none; }
+            .shift-act { grid-column: 2; grid-row: 1; }
             .loc { max-width: none; }
             .day-cell { padding: 8px 2px; font-size: 0.82rem; }
             .modal-grid { grid-template-columns: 1fr; }
@@ -1409,32 +1432,7 @@
                         '</div><div class="dh' + (ms ? "" : " zero") + '">' + (ms ? esc(fmtHours(ms)) : "—") + "</div>" +
                         (ot > 0 ? '<div class="dot">' + esc(fmtHours(ot)) + " OT</div>" : "") + "</div>";
                 }).join("");
-                const rows = days.flatMap(k => byDay[k].shifts).map(s => {
-                    const live = typeof s.out !== "number";
-                    const tags = [];
-                    if (live) tags.push('<span class="tag live">On the clock</span>');
-                    const split = byShift[s.id];
-                    if (split && split.overtime >= 60000) tags.push('<span class="tag ot">OT ' + esc(fmtHours(split.overtime)) + "</span>");
-                    const late = sentLate(s);
-                    if (late.in) tags.push('<span class="tag late" title="No signal: the punch in reached the server at ' + esc(fmtTime(s.in)) + '. It counts from then until you choose in the Inbox (Late punches).">Punch in sent late · pressed ' + esc(fmtTime(late.in)) + "</span>");
-                    if (late.out) tags.push('<span class="tag late" title="No signal: the punch out reached the server at ' + esc(fmtTime(s.out)) + '. The hours count to when it was pressed.">Punch out sent late · counted from ' + esc(fmtTime(late.out)) + "</span>");
-                    const long = longShift(s, settings, t);
-                    if (long) tags.push('<span class="tag warn" title="' + esc("At least " + settings.longShiftHours + " hours (Settings → Long shift). A forgotten punch out?") + '">Long shift · ' + esc(fmtDur(long)) + "</span>");
-                    const oil = oilTag(s);
-                    if (oil) tags.push(oil);
-                    if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
-                    else if (s.edited) tags.push('<span class="tag edit" title="' + esc((s.edited.note || "") + " — " + (s.edited.by || "")) + '">Edited</span>');
-                    if (s.edited && s.edited.note) tags.push('<span class="tag" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note.length > 34 ? s.edited.note.slice(0, 33) + "…" : s.edited.note) + "”</span>");
-                    return '<tr data-row="' + esc(e.ek + "/" + s.id) + '">' +
-                        '<td class="day">' + esc(fmtKey(dayKey(s.in))) + "</td>" +
-                        '<td data-l="In" class="when">' + esc(fmtTime(s.in)) + countedLine(s.in) + locLine(e.ek, s.id, "in", s.inLoc, s.inAddr, s.inAddrErr) + "</td>" +
-                        '<td data-l="Out" class="when">' + (live ? '<span class="muted">—</span>' : esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="muted">(' + esc(fmtKey(dayKey(s.out))) + ")</span>" : "") + countedLine(s.out, countedOut(s)) +
-                            locLine(e.ek, s.id, "out", s.outLoc, s.outAddr, s.outAddrErr)) + "</td>" +
-                        '<td class="num">' + esc(fmtHours(shiftMs(s, t))) + "</td>" +
-                        '<td data-l="GPS" class="vancell">' + vanCell(e.ek, s) + "</td>" +
-                        '<td class="tagcell"><div class="tags">' + tags.join("") + "</div></td>" +
-                        '<td class="actions"><button type="button" class="btn sm" data-edit="' + esc(e.ek) + '" data-id="' + esc(s.id) + '">Edit</button></td></tr>';
-                }).join("");
+                const rows = days.flatMap(k => byDay[k].shifts).map(s => shiftBlock(e.ek, s, byShift[s.id], t)).join("");
                 return '<article class="sheet-card" style="--i:' + i + '">' +
                     '<div class="sheet-card-head"><div class="avatar">' + esc(initials(name)) + '</div><div class="sheet-card-name">' +
                     '<div class="person-name">' + esc(name) + (e.removed ? ' <span class="tag off">Removed</span>' : "") + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
@@ -1442,7 +1440,7 @@
                     '<div class="sheet-card-total">' + esc(fmtHours(total)) + "<small>hours · " + esc(fmtDur(total)) + "</small>" +
                     '<span class="split">Reg ' + esc(fmtHours(regular)) + ' · <b>OT ' + esc(fmtHours(overtime)) + "</b></span></div></div>" +
                     '<div class="day-strip">' + strip + "</div>" +
-                    (rows ? '<table class="punches"><thead><tr><th>Day</th><th>In</th><th>Out</th><th class="num">Hours</th><th>GPS</th><th>Notes</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
+                    (rows ? '<div class="shifts">' + rows + "</div>"
                         : '<p class="no-punches">No punches this week.</p>') + "</article>";
             }).join(""));
             if (flashRow) {
@@ -1457,6 +1455,82 @@
         const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>';
         const coordsText = loc => loc.lat.toFixed(5) + ", " + loc.lng.toFixed(5);
         function placeText(loc, addr, addrErr) { return addr || (addrErr || !MAPS_KEY || mapsFailed ? coordsText(loc) : "Finding address… (" + coordsText(loc) + ")"); }
+
+        // One shift on the timesheet: the day and hours on the left, then what happened in time order (punch in, each
+        // vehicle pick or change, punch out), each kind in its own colour, then the shift's flags and the Edit button.
+        const EV_ICONS = {
+            in: '<path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>',
+            out: '<path d="M14 17l5-5-5-5"/><path d="M19 12H7"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+            van: '<path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
+            live: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'
+        };
+        function evIcon(kind) {
+            return '<span class="ev-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + EV_ICONS[kind] + "</svg></span>";
+        }
+        // kind: in / out / van / live. label: what happened. time: shown big for punches. body: what goes under it.
+        function ev(kind, label, time, body) {
+            return '<li class="ev ev-' + kind + '">' + evIcon(kind) + '<div class="ev-main"><div class="ev-head"><span class="ev-label">' + esc(label) + "</span>" +
+                (time ? '<span class="ev-time">' + time + "</span>" : "") + "</div>" + (body || "") + "</div></li>";
+        }
+        function shiftBlock(k, s, split, t) {
+            const live = typeof s.out !== "number";
+            const late = sentLate(s);
+            const ms = shiftMs(s, t);
+            const events = [];
+            events.push({ at: s.in, html: ev("in", "Punch in", esc(fmtTime(s.in)),
+                countedLine(s.in) + locLine(k, s.id, "in", s.inLoc, s.inAddr, s.inAddrErr) +
+                (late.in ? '<div class="ev-flags"><span class="tag late" title="No signal: the punch in reached the server at ' + esc(fmtTime(s.in)) + '. It counts from then until you choose in the Inbox (Late punches).">Sent late · pressed ' + esc(fmtTime(late.in)) + "</span></div>" : "")) });
+            vanEvents(k, s).forEach(v => events.push(v));
+            if (live) events.push({ at: Infinity, html: ev("live", "Still on the clock", "", '<div class="ev-sub">No punch out yet</div>') });
+            else events.push({ at: s.out, html: ev("out", "Punch out", esc(fmtTime(s.out)) + (dayKey(s.out) !== dayKey(s.in) ? ' <span class="ev-date">' + esc(fmtKey(dayKey(s.out))) + "</span>" : ""),
+                countedLine(s.out, countedOut(s)) + locLine(k, s.id, "out", s.outLoc, s.outAddr, s.outAddrErr) +
+                (late.out ? '<div class="ev-flags"><span class="tag late" title="No signal: the punch out reached the server at ' + esc(fmtTime(s.out)) + '. The hours count to when it was pressed.">Sent late · counted from ' + esc(fmtTime(late.out)) + "</span></div>" : "")) });
+            // Time order; a vehicle picked in the same minute as the punch in still comes after it, and the punch out last
+            const order = events.map((x, i) => ({ x, i })).sort((a, b) => (a.x.at - b.x.at) || (a.i - b.i)).map(o => o.x.html);
+
+            const tags = [];
+            if (split && split.overtime >= 60000) tags.push('<span class="tag ot">Overtime ' + esc(fmtDur(split.overtime)) + "</span>");
+            const long = longShift(s, settings, t);
+            if (long) tags.push('<span class="tag warn" title="' + esc("At least " + settings.longShiftHours + " hours (Settings → Long shift). A forgotten punch out?") + '">Long shift · ' + esc(fmtDur(long)) + "</span>");
+            const oil = oilTag(s);
+            if (oil) tags.push(oil);
+            if (s.src === "admin") tags.push('<span class="tag edit">Added by admin</span>');
+            else if (s.edited) tags.push('<span class="tag edit" title="' + esc((s.edited.note || "") + " — " + (s.edited.by || "")) + '">Edited</span>');
+            const note = s.edited && s.edited.note ? '<div class="shift-note" title="' + esc(s.edited.note) + '">“' + esc(s.edited.note) + "”</div>" : "";
+
+            return '<div class="shift' + (live ? " is-live" : "") + '" data-row="' + esc(k + "/" + s.id) + '">' +
+                '<div class="shift-day"><div class="shift-date">' + esc(fmtKey(dayKey(s.in))) + "</div>" +
+                '<div class="shift-hrs">' + esc(fmtHours(ms)) + "<small>h</small></div>" +
+                '<div class="shift-dur">' + esc(fmtDur(ms)) + (live ? " so far" : "") + "</div></div>" +
+                '<ol class="timeline">' + order.join("") + "</ol>" +
+                '<div class="shift-side">' + (tags.length || note ? '<div class="tags">' + tags.join("") + "</div>" + note : "") + "</div>" +
+                '<div class="shift-act"><button type="button" class="btn sm" data-edit="' + esc(k) + '" data-id="' + esc(s.id) + '">Edit</button></div></div>';
+        }
+        // The vehicle steps of a shift as timeline entries ({ at, html }), with where each change happened
+        function vanEvents(k, s) {
+            const list = vanHistory(s);
+            const name = n => '<span class="tag gps">' + esc(n) + "</span>";
+            const when = at => esc(fmtTime(at)) + (dayKey(at) !== dayKey(s.in) ? ' <span class="ev-date">' + esc(fmtKey(dayKey(at))) + "</span>" : "");
+            const line = (what, extra) => '<div class="ev-what">' + what + (extra ? '<span class="ev-by">' + extra + "</span>" : "") + "</div>";
+            if (!list.length) {
+                if (s.vehicleName) return [{ at: s.in, html: ev("van", "Vehicle", "", line(name(s.vehicleName))) }];
+                if (s.shop) return [{ at: s.in, html: ev("van", "Shop shift", "", line('<span class="tag shop">Shop</span>')) }];
+                return [];
+            }
+            let prev = null;
+            const out = list.map(v => {
+                let html;
+                if (v.how === "taken") html = ev("van", "Vehicle taken", when(v.at), line('<span class="tag warn">' + esc(v.takenName || "Vehicle") + "</span>", v.by ? "by " + esc(v.by) : ""));
+                else if (v.how === "shop") html = ev("van", "Moved to the shop", when(v.at), line('<span class="tag shop">Shop</span>', v.by ? "set by admin" : "") + locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr));
+                else if (v.how === "admin") html = ev("van", "Vehicle set by admin", when(v.at), line(v.vehicleId ? name(v.vehicleName || v.vehicleId) : '<span class="tag">No vehicle</span>'));
+                else if (v.how === "swap") html = ev("van", "Changed vehicle", when(v.at), line((prev ? name(prev) + '<span class="ev-arrow" aria-label="to">→</span>' : "") + name(v.vehicleName)) + locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr));
+                else html = ev("van", "Picked vehicle", when(v.at), line(name(v.vehicleName)) + locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr));
+                if (v.vehicleName) prev = v.vehicleName;
+                return { at: v.at, html };
+            });
+            if (s.shop && list[list.length - 1].how !== "shop") out.push({ at: list[list.length - 1].at, html: ev("van", "Shop shift", "", line('<span class="tag shop">Shop</span>', "set by admin")) });
+            return out;
+        }
 
         // The address under a punch time; tap it for the map. Punches from before locations were saved show nothing.
         // Hours count to the minute; show the counted time when it differs from the punch
@@ -1483,25 +1557,6 @@
         function placeForShift(k, shiftId) { return punchPlace(employees[k], findShift(k, shiftId), spots, settings); }
         // "shop" / "the shop" for the shop, else the spot's name
         function placeName(place, the) { return place.id ? place.name : the ? "the shop" : "shop"; }
-
-        // Every van in the shift, in order, with where each change happened
-        function vanCell(k, s) {
-            const list = vanHistory(s);
-            if (!list.length) return s.vehicleName ? '<span class="tag gps">' + esc(s.vehicleName) + "</span>"
-                : s.shop ? '<span class="tag shop">Shop</span>' : '<span class="muted">—</span>';
-            return '<div class="vans">' + list.map(v => {
-                if (v.how === "taken") return '<div class="van-step taken"><span class="tag warn">' + esc(v.takenName || "Vehicle") + " taken</span>" +
-                    '<span class="muted">' + esc(fmtTime(v.at)) + (v.by ? " · by " + esc(v.by) : "") + "</span></div>";
-                const when = esc(fmtTime(v.at)) + (dayKey(v.at) !== dayKey(s.in) ? " " + esc(fmtKey(dayKey(v.at))) : "");
-                if (v.how === "shop") return '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">' + when + (v.by ? " · set by admin" : "") + "</span>" +
-                    locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
-                if (v.how === "admin") return '<div class="van-step">' + (v.vehicleId ? '<span class="arrow" aria-label="changed to">⇄</span><span class="tag gps">' + esc(v.vehicleName || v.vehicleId) + "</span>"
-                    : '<span class="tag">No vehicle</span>') + '<span class="muted">' + when + " · set by admin</span></div>";
-                return '<div class="van-step">' + (v.how === "swap" ? '<span class="arrow" aria-label="swapped to">⇄</span>' : "") +
-                    '<span class="tag gps">' + esc(v.vehicleName) + '</span><span class="muted">' + esc(fmtTime(v.at)) + "</span>" +
-                    locLine(k, s.id, "van:" + v.id, v.loc, v.addr, v.addrErr) + "</div>";
-            }).join("") + (s.shop && list[list.length - 1].how !== "shop" ? '<div class="van-step"><span class="tag shop">Shop</span><span class="muted">set by admin</span></div>' : "") + "</div>";
-        }
 
         function placeFor(s, which) {
             if (which === "in") return { loc: s.inLoc, addr: s.inAddr, addrErr: s.inAddrErr, label: "Punch in", at: s.in };

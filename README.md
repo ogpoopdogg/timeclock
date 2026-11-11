@@ -91,6 +91,15 @@ the Reports hours and overtime, and the employees' My week. The decimal hours sh
 it, and the CSV's **Counted out** column has that time. The rule is `punchMinute` in
 `tc-core.js`. `tests/overtime.test.mjs` checks the rules.
 
+### Timesheet layout
+
+Each shift on **Admin → Timesheets** reads top to bottom in the order things happened:
+**Punch in** (green), each vehicle pick or change (in its own yellow box, e.g. *Changed
+vehicle Van 3 → Van 7*, with where it happened), then **Punch out** (red), or *Still on
+the clock*. The day and its hours are on the left; overtime, oil, long shift, edits and
+the admin's note are on the right. Pick one employee with the buttons above the
+timesheets, or **All employees**.
+
 ## Installing the app, and how updates reach it
 
 Both pages install as apps: the time clock as **E&C Clock**, the admin panel as
@@ -173,8 +182,8 @@ open (or the next check) picks it up.
   - The app can't tell which van a driver is sitting in. It only knows what drivers pick.
     That's why the bumped driver is asked rather than moved automatically.
 - **Van history.** Every van pick, swap, move to the shop and "taken by" is saved on the shift with its time
-  (and location). The admin timesheet shows the whole list, and the CSV has a
-  **Van changes** column.
+  (and location). The admin timesheet shows each one in its own yellow box between the
+  punch in and punch out, in time order, and the CSV has a **Van changes** column.
 - **Punch out** frees the GPS and removes the nickname the driver gave it (only if
   nobody has changed it since, and only if another driver hasn't taken the van).
 - **Late.** If an employee is scheduled today and hasn't punched in by *start time +
@@ -216,14 +225,14 @@ minutes apart:
 
 - **Punch out sent late:** the hours count to the time it was pressed (`countedOut` in
   `tc-core.js`). That can only lower the hours, so it can't be used to gain time. The
-  timesheet shows **Punch out sent late · counted from 5:00 PM**, and the driver's My week
+  timesheet shows **Sent late · counted from 5:00 PM** under the punch out, and the driver's My week
   says *counted from when you pressed it*.
 - **Punch in sent late:** it counts from when it reached the server until the office
   chooses, because a phone's time can be changed. It shows in **Admin → Inbox → Late
   punches** (from the punches loaded, about the last three weeks): **Use the phone's time**
   moves the punch in to the time pressed (logged like any edit), **Keep the server's time**
-  keeps it (saved as `lateSeen` on the shift). The timesheet tags it **Punch in sent late ·
-  pressed 7:02 AM**, and editing the punch also has a **Use the phone's time** link.
+  keeps it (saved as `lateSeen` on the shift). The timesheet shows **Sent late · pressed
+  7:02 AM** under the punch in, and editing the punch also has a **Use the phone's time** link.
 
 An admin who changes a punch out's time replaces the phone's time (`outTap` is removed).
 
