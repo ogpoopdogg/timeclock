@@ -10,7 +10,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
   .replace(/^import .*?;\n/gm, '');
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={},ALLOWED_EMAIL="justin@ec.com";\n' + src);
-const { weekTotals, weekDays, keyToEpoch, roundPunch, shiftMs } = await import(pathToFileURL(tmp).href);
+const { weekTotals, weekDays, keyToEpoch, punchMinute, shiftMs } = await import(pathToFileURL(tmp).href);
 const H = 3600000, days = weekDays('2026-10-12'); // Mon 12 – Sun 18
 const at = (k, hh) => keyToEpoch(k, hh);
 let n = 0;
@@ -66,25 +66,26 @@ test('shifts outside the week are ignored; open shift counts up to now', () => {
   assert.deepStrictEqual([h(r.total), h(r.regular), h(r.overtime)], [10, 8, 2]);
 });
 
-// Hours count in 15-minute blocks: each punch goes to the nearest quarter hour (7 min down, 8 up)
-test('punches round to the nearest 15 minutes', () => {
+// Hours count to the minute: each punch is the minute on the clock, seconds don't count
+test('punches count to the minute', () => {
   const t = (hhmm, sec) => at(days[0], hhmm) + (sec || 0) * 1000;
-  assert.equal(roundPunch(t('17:01')), t('17:00'));
-  assert.equal(roundPunch(t('17:07', 59)), t('17:00')); // seconds don't count
-  assert.equal(roundPunch(t('17:08')), t('17:15'));
-  assert.equal(roundPunch(t('17:14')), t('17:15'));
-  assert.equal(roundPunch(t('17:17')), t('17:15'));
-  assert.equal(roundPunch(t('17:23')), t('17:30'));
-  assert.equal(roundPunch(t('17:53')), t('18:00'));
-  assert.equal(roundPunch(t('23:55')), at(days[1], '00:00'));
+  assert.equal(punchMinute(t('17:01')), t('17:01'));
+  assert.equal(punchMinute(t('17:07', 59)), t('17:07')); // seconds don't count
+  assert.equal(punchMinute(t('17:08', 1)), t('17:08'));
+  assert.equal(punchMinute(t('23:59', 59)), t('23:59'));
 });
 
-test('hours and overtime use the rounded punches', () => {
-  // 6:53 to 3:08 is 8 h 15 counted (7:00 to 3:15): 8 regular + 0.25 overtime
-  const s = { id: 'r', in: at(days[0], '06:53'), out: at(days[0], '15:08') };
-  assert.equal(shiftMs(s), 8.25 * H);
+test('hours and overtime count to the minute', () => {
+  // 7:58:40 to 4:03:10 counts as 7:58 to 4:03: 8 h 05 m, so 8 regular + 5 minutes overtime
+  const s = { id: 'r', in: at(days[0], '07:58') + 40000, out: at(days[0], '16:03') + 10000 };
+  assert.equal(shiftMs(s), 8 * H + 5 * 60000);
   const r = sum([s]);
-  assert.equal(r.reg, 8); assert.equal(r.ot, 0.25);
-  // A 5-minute punch counts as nothing
-  assert.equal(shiftMs({ in: at(days[0], '09:01'), out: at(days[0], '09:06') }), 0);
+  assert.equal(r.r.regular, 8 * H); assert.equal(r.r.overtime, 5 * 60000);
+  // 6:53 to 3:08 is 8 h 15 m: no rounding to quarter hours any more
+  assert.equal(shiftMs({ in: at(days[0], '06:53'), out: at(days[0], '15:08') }), 8 * H + 15 * 60000);
+  // A 5-minute punch counts as 5 minutes
+  assert.equal(shiftMs({ in: at(days[0], '09:01'), out: at(days[0], '09:06') }), 5 * 60000);
+  // One minute past 8 hours is one minute of overtime
+  const one = sum([{ id: 'o', in: at(days[0], '08:00'), out: at(days[0], '16:01') }]).r;
+  assert.equal(one.regular, 8 * H); assert.equal(one.overtime, 60000);
 });

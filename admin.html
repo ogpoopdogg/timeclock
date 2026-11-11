@@ -998,7 +998,7 @@
         const {
             app, auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, isAdminEmail, displayName, initials, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
-            fmtClockDur, fmtHours, shiftList, shiftMs, roundPunch, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
+            fmtClockDur, fmtHours, shiftList, shiftMs, punchMinute, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, fixAskedFor, overlapping,
             longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE, VEHICLE_NOTICE
@@ -1446,12 +1446,12 @@
         function placeText(loc, addr, addrErr) { return addr || (addrErr || !MAPS_KEY || mapsFailed ? coordsText(loc) : "Finding address… (" + coordsText(loc) + ")"); }
 
         // The address under a punch time; tap it for the map. Punches from before locations were saved show nothing.
-        // Punches count to the nearest 15 minutes; show the counted time when it differs from the punch
+        // Hours count to the minute; show the counted time when it differs from the punch
         // (from: the time the hours count from, when it isn't the punch itself: a punch out sent late counts from when it was pressed)
         function countedLine(ts, from) {
-            const c = roundPunch(typeof from === "number" ? from : ts);
+            const c = punchMinute(typeof from === "number" ? from : ts);
             if (typeof ts !== "number" || fmtTime(c) === fmtTime(ts)) return "";
-            return '<div class="counted" title="Hours are counted in 15-minute blocks">Counts as ' + esc(fmtTime(c)) + "</div>";
+            return '<div class="counted" title="Hours count from when the punch out was pressed">Counts as ' + esc(fmtTime(c)) + "</div>";
         }
         function locLine(k, shiftId, which, loc, addr, addrErr) {
             if (!loc) return "";
@@ -1713,7 +1713,7 @@
                         wk.ms += split.regular + split.overtime; wk.reg += split.regular; wk.ot += split.overtime;
                         rows.push([name, e.email, dayKey(s.in), fmtTime(s.in),
                             typeof s.out === "number" ? fmtTime(s.out) + (dayKey(s.out) !== dayKey(s.in) ? " (" + dayKey(s.out) + ")" : "") : "still on the clock",
-                            fmtTime(roundPunch(s.in)), typeof s.out === "number" ? fmtTime(roundPunch(countedOut(s))) : "",
+                            fmtTime(punchMinute(s.in)), typeof s.out === "number" ? fmtTime(punchMinute(countedOut(s))) : "",
                             fmtHours(shiftMs(s, t)), fmtHours(split.regular), fmtHours(split.overtime),
                             s.vehicleName || (s.shop ? "Shop" : ""), s.edited || s.src === "admin" ? "yes" : "", (s.edited && s.edited.note) || "",
                             place(s.inLoc, s.inAddr), typeof s.out === "number" ? place(s.outLoc, s.outAddr) : "", vans(s)]);
@@ -1842,7 +1842,7 @@
 
         function updateCalc() {
             const r = readShiftForm();
-            $("smCalc").innerHTML = r.error ? "" : (r.out ? "Counted <strong>" + esc(fmtDur(shiftMs(r, r.out))) + "</strong> (" + esc(fmtHours(shiftMs(r, r.out))) + " h, in 15-minute blocks)"
+            $("smCalc").innerHTML = r.error ? "" : (r.out ? "Counted <strong>" + esc(fmtDur(shiftMs(r, r.out))) + "</strong> (" + esc(fmtHours(shiftMs(r, r.out))) + " h)"
                 : "On the clock since <strong>" + esc(fmtTime(r.in)) + "</strong>");
         }
 
