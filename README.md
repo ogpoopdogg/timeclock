@@ -186,9 +186,13 @@ open (or the next check) picks it up.
   finished. Every shift that long (or still on the clock that long) also shows in
   **Admin → Inbox → Long shifts** and is tagged **Long shift** on the timesheet, until an
   admin edits it or taps **It's right** (saved as `longSeen` on the shift).
-- **Admin edits** show as *Changed by the office* (or *Added by the office*) when the
-  driver taps that day in My week, and each one is saved to the change log
-  (`timeclock/audit`) with the reason.
+- **Admin edits** are saved to the change log (`timeclock/audit`) with the reason, and
+  admins see them tagged on the timesheet. The driver only sees *Changed by the office*
+  (or *Added by the office*) in My week on a punch they asked about with **Fix a punch**
+  (saved from **Fix it** in the Inbox, as `edited.req`; older fixes are spotted by their
+  "Driver asked:" note or a finished request for that punch). A punch they asked about
+  keeps the label if the office changes it again later. Any other office change shows to
+  the driver as a normal punch with the new times.
 
 ## Time
 

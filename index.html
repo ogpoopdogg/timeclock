@@ -898,7 +898,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, noticeDue,
+            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, officeNote, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, noticeDue,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -1015,7 +1015,7 @@
             unsubs.push(() => { if (shiftsUnsub) { shiftsUnsub(); shiftsUnsub = null; } });
             listen(ref(db, P.claims), s => { claims = s.val() || {}; if (sheetOpen) renderSheet(); render(); }, () => {});
             // Database rules not updated yet: these just stay empty
-            listen(ref(db, P.requests + "/" + ek), s => { requests = s.val() || {}; renderRequests(); }, () => {});
+            listen(ref(db, P.requests + "/" + ek), s => { requests = s.val() || {}; renderRequests(); renderWeek(); }, () => {}); // My week: which office changes they asked for
             // Not loaded (no signal yet, or the database rules not updated yet): the punch time reminder waits
             listen(ref(db, P.noticeAcks + "/" + ek), s => { acks = s.val() || {}; render(); }, () => {});
         });
@@ -1234,7 +1234,7 @@
                 // A punch out sent late (no signal) counts from when it was pressed
                 const notes = [s.pending ? "Saved on this phone, sent when there's signal." : "",
                     !s.pending && closed && sentLate(s).out ? "No signal at punch out: counted from when you pressed it." : "",
-                    s.src === "admin" ? "Added by the office." : s.edited ? "Changed by the office." : ""].filter(Boolean);
+                    officeNote(s, requests)].filter(Boolean); // an office change shows only when the driver asked for it
                 return '<div class="dd-shift"><div class="dd-times">In <b>' + when(s.in, k) + "</b> · Out <b>" + (closed ? when(countedOut(s), k) : "on the clock") + "</b></div>" +
                     '<div class="dd-hrs">' + esc(fmtDur(byShift[s.id].regular + byShift[s.id].overtime)) + "</div>" +
                     notes.map(n => '<div class="dd-note">' + esc(n) + "</div>").join("") + "</div>";
