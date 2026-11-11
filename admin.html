@@ -218,6 +218,16 @@
 
         /* ---------- Timesheets ---------- */
         .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+        /* Timesheets: one small button per employee, as many to a line as fit */
+        .emp-pick { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 18px; }
+        .emp-chip {
+            height: 32px; padding: 0 12px; border: 0; border-radius: 999px; font: inherit; font-size: 0.88rem; font-weight: 600; white-space: nowrap; cursor: pointer;
+            color: var(--text); background: var(--asphalt-3); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); transition: background 0.2s, color 0.2s;
+        }
+        .emp-chip:hover { background: var(--asphalt-4); }
+        .emp-chip.off { color: var(--muted); }
+        .emp-chip[aria-pressed="true"] { background: var(--yellow); color: #111; box-shadow: none; }
+        .emp-chip:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
         .week-switch { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 12px; background: var(--asphalt-2); box-shadow: inset 0 0 0 1px var(--line); }
         .week-switch .week-label { padding: 0 10px; min-width: 190px; text-align: center; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
         .icon-btn {
@@ -694,8 +704,8 @@
                     <button type="button" class="icon-btn" id="wkNext" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
                 </div>
                 <button type="button" class="btn sm ghost" id="wkToday">This week</button>
-                <select class="select" id="empFilter" aria-label="Employee"></select>
             </div>
+            <div class="emp-pick" id="empFilter" role="group" aria-label="Employee"></div>
             <div id="sheets"></div>
         </section>
 
@@ -1361,13 +1371,16 @@
         });
 
         // ---------- Timesheets ----------
+        // The employee buttons above the timesheets: "All employees" or one person (sheetEmp: "all" or an employee key)
+        let sheetEmp = "all";
         function renderEmpFilter() {
-            const sel = $("empFilter");
-            const cur = sel.value || "all";
-            const opts = '<option value="all">All employees</option>' + empList().filter(e => !e.removed || shiftsOf(e.ek).length || e.ek === cur).map(e =>
-                '<option value="' + esc(e.ek) + '">' + esc(displayName(e, e.email)) + (e.removed ? " (removed)" : e.active === false ? " (inactive)" : "") + "</option>").join("");
-            if (sel.dataset.html !== opts) { sel.innerHTML = opts; sel.dataset.html = opts; }
-            sel.value = Array.from(sel.options).some(o => o.value === cur) ? cur : "all";
+            const box = $("empFilter");
+            const list = empList().filter(e => !e.removed || shiftsOf(e.ek).length || e.ek === sheetEmp);
+            if (sheetEmp !== "all" && !list.some(e => e.ek === sheetEmp)) sheetEmp = "all";
+            const chip = (ek, label, off) => '<button type="button" class="emp-chip' + (off ? " off" : "") + '" data-sheet-emp="' + esc(ek) + '" aria-pressed="' + (ek === sheetEmp) + '">' + esc(label) + "</button>";
+            const html = chip("all", "All employees", false) + list.map(e =>
+                chip(e.ek, displayName(e, e.email) + (e.removed ? " (removed)" : e.active === false ? " (inactive)" : ""), e.removed || e.active === false)).join("");
+            if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
         }
 
         function renderSheets() {
@@ -1381,7 +1394,7 @@
             $("wkLabel").textContent = (viewWeek === thisWeek ? "This week · " : "") + fmtKey(days[0]) + " – " + fmtKey(days[6]);
             $("wkNext").disabled = viewWeek >= thisWeek;
             $("wkToday").hidden = viewWeek === thisWeek;
-            const filter = $("empFilter").value;
+            const filter = sheetEmp;
             const people = empList().filter(e => filter === "all" ? ((e.active !== false && !e.removed) || weekTotals(shiftsOf(e.ek), days, t).total > 0) : e.ek === filter);
             if (!people.length) {
                 draw($("sheets"), '<div class="empty-state"><strong>No employees</strong>Add employees in the Employees tab.</div>');
@@ -1614,7 +1627,12 @@
             const add = e.target.closest("[data-add-for]");
             if (add) openShiftModal(add.dataset.addFor, null);
         });
-        $("empFilter").addEventListener("change", renderSheets);
+        $("empFilter").addEventListener("click", e => {
+            const b = e.target.closest("[data-sheet-emp]");
+            if (!b || b.dataset.sheetEmp === sheetEmp) return;
+            sheetEmp = b.dataset.sheetEmp;
+            renderSheets();
+        });
         function setWeek(k) { viewWeek = k; syncShiftListeners(); renderSheets(); }
         $("wkPrev").addEventListener("click", () => setWeek(addDaysKey(viewWeek, -7)));
         $("wkNext").addEventListener("click", () => setWeek(addDaysKey(viewWeek, 7)));
@@ -1635,8 +1653,8 @@
             $("exFrom").value = from; $("exTo").value = to;
         }
         $("exportBtn").addEventListener("click", () => {
-            const filter = $("empFilter").value;
-            $("exSub").textContent = (filter === "all" ? "All employees" : empName(filter)) + ". Change who's included with the employee list on the Timesheets tab.";
+            const filter = sheetEmp;
+            $("exSub").textContent = (filter === "all" ? "All employees" : empName(filter)) + ". Change who's included with the employee buttons on the Timesheets tab.";
             setExportRange(null);
             $("exKind").value = "detail";
             $("exMsg").textContent = "";
@@ -1664,7 +1682,7 @@
             const btn = $("exGo");
             btn.disabled = true; msg.textContent = "";
             try {
-                const filter = $("empFilter").value;
+                const filter = sheetEmp;
                 const people = empList().filter(p => filter === "all" || p.ek === filter);
                 const byEk = await loadRange(from, to, people.map(p => p.ek));
                 const csv = buildCsv(people, byEk, from, to, kind, now());
