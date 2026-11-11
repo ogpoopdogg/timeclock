@@ -244,18 +244,15 @@ export function shiftList(obj) {
         .sort((a, b) => a.in - b.in);
 }
 
-// Hours are paid in 15-minute blocks: each punch counts as the nearest quarter hour.
-// 7 minutes or less past a quarter rounds down, 8 or more rounds up (5:07 -> 5:00, 5:08 -> 5:15).
-// Seconds are ignored, so the time on the clock decides. The saved punch times are not changed.
-export const ROUND_MINUTES = 15;
-export function roundPunch(ts) {
-    const min = Math.floor(ts / 60000);
-    return Math.round(min / ROUND_MINUTES) * ROUND_MINUTES * 60000;
+// Hours are counted to the minute: each punch counts as the minute on the clock, and seconds are ignored
+// (5:52:59 counts as 5:52). The saved punch times are not changed.
+export function punchMinute(ts) {
+    return Math.floor(ts / 60000) * 60000;
 }
 
 export function shiftMs(s, now) {
     const end = typeof s.out === "number" ? countedOut(s) : now;
-    return Math.max(0, roundPunch(end) - roundPunch(s.in));
+    return Math.max(0, punchMinute(end) - punchMinute(s.in));
 }
 
 export function openShift(list) {
@@ -418,7 +415,7 @@ export function oilDue(plan, last, t) {
 
 // ---------- Long shifts (a forgotten punch out) ----------
 // How long the shift has been, when it's at least the office's limit (Settings → Long shifts); null otherwise.
-// Measured from punch in to punch out (or now, still on the clock), before rounding.
+// Measured from punch in to punch out (or now, still on the clock), to the second.
 export function longShift(s, settings, now) {
     if (!s || typeof s.in !== "number") return null;
     const ms = (typeof s.out === "number" ? countedOut(s) : now) - s.in;
