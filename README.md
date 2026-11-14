@@ -342,6 +342,11 @@ many ticked drivers have agreed and how many are still waiting. Tap one to open 
 (**‹ Notifications** goes back). The yellow number on the button is how many drivers still have
 a reminder to read. A new reminder goes in `NOTICES` in `admin.html` with its category.
 
+Each reminder's tick list starts with **What drivers see**: a picture of the pop-up as it looks on
+the driver's phone (tap it, or **See full size**, to see it full size). The pictures are in `reminders/`
+(`punch.png`, `vehicle.png`, `oil.png`), taken from the driver app at phone size. When a reminder's
+wording or look changes, take its picture again, and give a new reminder a picture (`pic` in `NOTICES`).
+
 ## Punch time reminder
 
 A one-time message for drivers who punch in before they get to work or punch out after

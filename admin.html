@@ -362,6 +362,16 @@
         .nt-status:empty { display: none; }
         .nt-status.ok { color: var(--green); }
         .nt-back { margin: -4px 0 10px -6px; }
+        /* "What drivers see": a picture of the reminder's pop-up on the driver's time clock (reminders/*.png) */
+        .nt-preview { display: flex; gap: 14px; align-items: center; padding: 12px; margin: -6px 0 16px; border-radius: 12px; background: rgba(255, 204, 0, 0.05); box-shadow: inset 0 0 0 1px var(--line); }
+        .nt-shot { flex: none; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 12px; line-height: 0; box-shadow: 0 0 0 1px var(--line), 0 6px 18px rgba(0, 0, 0, 0.4); }
+        .nt-shot img { width: 96px; height: auto; aspect-ratio: 390 / 844; border-radius: 12px; display: block; }
+        .nt-pv-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .nt-pv-text strong { font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--yellow); }
+        .nt-pv-text span { color: var(--muted); font-size: 0.9rem; }
+        .nt-pv-text .btn { align-self: flex-start; margin-top: 4px; }
+        .pv-box { z-index: 95; background: rgba(0, 0, 0, 0.82); grid-template-rows: 1fr auto; gap: 12px; }
+        .pv-box img { max-height: calc(100vh - 100px); max-width: 100%; border-radius: 18px; box-shadow: 0 0 0 1px var(--line), 0 20px 60px rgba(0, 0, 0, 0.6); align-self: end; }
         /* Staff → Notifications: the one-time reminders, grouped by category */
         .nf-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--yellow); color: #111; font-size: 0.8rem; font-weight: 700; }
         .nf-count[hidden] { display: none; }
@@ -931,7 +941,12 @@
         <form class="modal" role="dialog" aria-modal="true" aria-labelledby="ntTitle" id="noticeForm" novalidate>
             <button type="button" class="btn sm ghost nt-back" id="ntBack">‹ Notifications</button>
             <h2 id="ntTitle">Punch time reminder</h2>
-            <p class="modal-sub" id="ntSub"></p>
+            <p class="modal-sub" id="ntSub">Tick who should see it. Each driver sees it one time.</p>
+            <div class="nt-preview">
+                <button type="button" class="nt-shot" id="ntShot" aria-label="See what drivers see, full size"><img id="ntShotImg" alt=""></button>
+                <div class="nt-pv-text"><strong>What drivers see</strong><span>This pop-up shows on their time clock. It closes only when they tap “I have read and understand”.</span>
+                    <button type="button" class="btn sm ghost" id="ntShotBtn">See full size</button></div>
+            </div>
             <div class="nt-list" id="ntList"></div>
             <p class="modal-msg" id="ntMsg" role="alert"></p>
             <div class="modal-foot">
@@ -940,6 +955,12 @@
                 <button type="submit" class="btn primary" id="ntSave">Save</button>
             </div>
         </form>
+    </div>
+
+    <!-- A reminder's picture, full size (over the reminder's list) -->
+    <div class="modal-backdrop pv-box" id="pvModal">
+        <img id="pvImg" alt="">
+        <button type="button" class="btn" data-close>Close</button>
     </div>
 
     <div class="modal-backdrop" id="exportModal">
@@ -2529,13 +2550,14 @@
         });
 
         // One-time reminders (see PUNCH_NOTICE, VEHICLE_NOTICE and OIL_NOTICE in tc-core.js): on for this employee, and when they agreed to it
-        // Shown in Staff → Notifications under their category, in this order.
+        // Shown in Staff → Notifications under their category, in this order. pic: a picture of the pop-up drivers see,
+        // taken from the driver app. Take it again when a reminder's wording or look changes.
         const NOTICES = {
-            [PUNCH_NOTICE]: { name: "Punch time reminder", category: "Punching", about: "Punch in when you arrive at work, and punch out when your work is done.",
+            [PUNCH_NOTICE]: { name: "Punch time reminder", category: "Punching", pic: "reminders/punch.png", about: "Punch in when you arrive at work, and punch out when your work is done.",
                 icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
-            [VEHICLE_NOTICE]: { name: "Change vehicle reminder", category: "Vehicles", about: "Tap Change vehicle every time you change vehicles, including swaps.",
+            [VEHICLE_NOTICE]: { name: "Change vehicle reminder", category: "Vehicles", pic: "reminders/vehicle.png", about: "Tap Change vehicle every time you change vehicles, including swaps.",
                 icon: '<path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>' },
-            [OIL_NOTICE]: { name: "Oil check reminder", category: "Vehicles", about: "We noticed you didn’t check your oil on multiple days this week. Please make sure you’re checking it, and tick the box when you do.",
+            [OIL_NOTICE]: { name: "Oil check reminder", category: "Vehicles", pic: "reminders/oil.png", about: "We noticed you didn’t check your oil on multiple days this week. Please make sure you’re checking it, and tick the box when you do.",
                 icon: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>' }
         };
         const noticeOn = (e, id) => !!(e && e.notices && e.notices[id] === true);
@@ -2580,13 +2602,15 @@
             ntId = id;
             ntAgain = new Set();
             $("ntTitle").textContent = NOTICES[id].name;
-            $("ntSub").textContent = "Tick who should see it. Each driver sees it one time on their time clock, and it stays until they tap " +
-                "“I have read and understand”. It says: " + NOTICES[id].about;
+            $("ntShotImg").src = NOTICES[id].pic;
             $("ntList").innerHTML = ""; // a fresh list, not the other reminder's ticks
             renderNoticeList();
             $("ntMsg").textContent = "";
             openModal("noticeModal");
         }
+        function openNoticePic() { $("pvImg").src = NOTICES[ntId].pic; $("pvImg").alt = NOTICES[ntId].name + ", as drivers see it"; openModal("pvModal"); }
+        $("ntShot").addEventListener("click", openNoticePic);
+        $("ntShotBtn").addEventListener("click", openNoticePic);
         function renderNoticeList() {
             const id = ntId;
             const ticked = new Set([...$("ntList").querySelectorAll("input[data-nt]:checked")].map(i => i.dataset.nt));
