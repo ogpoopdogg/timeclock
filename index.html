@@ -653,6 +653,9 @@
         .rm-call { display: flex; gap: 10px; align-items: flex-start; margin: 6px 2px 4px; padding-top: 12px; border-top: 1px solid var(--line); }
         .rm-call svg { width: 18px; height: 18px; flex: none; color: var(--yellow); margin-top: 2px; }
         .rm-call p { color: var(--muted); font-size: 0.93rem; line-height: 1.4; }
+        .oil-box.rm-demo-oil { width: 100%; margin: 4px 0 8px; pointer-events: none; animation: none; box-shadow: inset 0 0 0 1.5px var(--yellow), 0 0 22px 3px rgba(255, 204, 0, 0.42); }
+        .rm-step { font-family: var(--font-display); font-weight: 700; font-size: 1.12rem; color: var(--yellow); margin: 8px 2px; }
+        .check-row.rm-demo-tick { pointer-events: none; margin-bottom: 10px; }
 
         /* ---------- Responsive ---------- */
         @media (max-width: 900px) {
@@ -898,7 +901,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, officeNote, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, noticeDue,
+            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, officeNote, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, noticeDue,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -2122,7 +2125,7 @@
         // Vehicle swap: the driver handing off a vehicle (or whose vehicle another driver took) is asked about its oil
         // right then, if they haven't ticked it yet. Some drivers only tick it at punch out, and the driver taking the
         // vehicle isn't responsible for its oil. The answer settles the shift's oil (see oilSettled() in tc-core.js).
-        // ---------- One-time reminders (punch time, change vehicle) ----------
+        // ---------- One-time reminders (punch time, change vehicle, oil check) ----------
         // Shown one time to the drivers an admin picked (Staff → Notifications), before
         // anything else on the clock screen, one after the other. Only the button closes each one. The tap is saved with
         // the server's time, and the admin sees it on Staff.
@@ -2130,6 +2133,7 @@
             if (!acks || formOpen || sheetOpen || holding || busy || $("success").classList.contains("show")) return;
             if (noticeDue(emp, acks, PUNCH_NOTICE)) showPunchNotice();
             else if (noticeDue(emp, acks, VEHICLE_NOTICE)) showVehicleNotice();
+            else if (noticeDue(emp, acks, OIL_NOTICE)) showOilNotice();
         }
         function saveNoticeAck(id) {
             acks = Object.assign({}, acks, { [id]: Date.now() }); // closed for good on this phone right away
@@ -2184,19 +2188,46 @@
                 onClose: showNotices
             });
         }
-        // The arrow from "Tap this button" to the button in the copy of the vehicle bar
+        // The arrow from "Tap this button" to the button in the copy of the vehicle bar (or from "Tap this box" to the
+        // copy of the Oil check box, a bit right of its middle)
         function drawNoticeArrow() {
             const box = $("formBody").querySelector(".rm-demo");
             if (!box) return;
-            const r = box.getBoundingClientRect(), b = box.querySelector(".swap-btn").getBoundingClientRect();
+            const oil = box.querySelector(".rm-demo-oil");
+            const r = box.getBoundingClientRect(), b = (oil || box.querySelector(".swap-btn")).getBoundingClientRect();
             const l = box.querySelector(".rm-demo-label").getBoundingClientRect();
-            const x = b.left - r.left + b.width / 2, y = b.top - r.top - 6, from = l.right - r.left + 14;
+            const x = b.left - r.left + b.width * (oil ? 0.72 : 0.5), y = b.top - r.top - 6, from = l.right - r.left + 14;
             const svg = box.querySelector(".rm-arrow");
             svg.setAttribute("viewBox", "0 0 " + r.width + " " + r.height);
             svg.innerHTML = '<path d="M ' + from + " 16 C " + (x - 20) + " 10, " + x + " 14, " + x + " " + (y - 4) + '" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>' +
                 '<path d="M ' + (x - 6) + " " + (y - 8) + " L " + x + " " + y + " L " + (x + 6) + " " + (y - 8) + '" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>';
         }
         window.addEventListener("resize", () => { if (formOpen) drawNoticeArrow(); });
+
+        // Oil check reminder: for drivers who often haven't ticked the oil box. It shows the two steps with copies (not
+        // tappable) of the glowing Oil check box and the "I checked the oil" tick.
+        function showOilNotice() {
+            const box = $("oilBox");
+            openForm({
+                kicker: "Important",
+                important: true,
+                title: "Oil check reminder",
+                sub: "We noticed you didn’t check your oil on multiple days this week. Please make sure you’re checking it, and tick the box when you do.",
+                body: '<div class="rm-demo" aria-hidden="true"><span class="rm-demo-label">1. Tap this box</span>' +
+                    '<div class="oil-box rm-demo-oil">' + box.querySelector("svg").outerHTML +
+                    "<span class=\"ob-text\"><strong>Oil check</strong><small>Tap here once you've checked the oil</small></span></div>" +
+                    '<svg class="rm-arrow"></svg></div>' +
+                    '<p class="rm-step">2. Tick this and tap Save</p>' +
+                    '<div class="check-row rm-demo-tick" aria-hidden="true"><input type="checkbox" checked tabindex="-1"><span>I checked the oil</span></div>',
+                submit: "I have read and understand",
+                noCancel: true,
+                mustAnswer: true,
+                offline: true,
+                afterOpen: drawNoticeArrow,
+                onSubmit: () => saveNoticeAck(OIL_NOTICE),
+                onClose: showNotices
+            });
+        }
 
         function needsHandoffOil(open) { return !!open && oilWanted(open) && !oilSettled(open); }
         function askOilAtHandoff(shiftId, vehicleName, then) {

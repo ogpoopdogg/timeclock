@@ -337,7 +337,7 @@ ones. Hover over any cell or bar for the numbers.
 ## Notifications (one-time reminders)
 
 All the one-time reminders are in **Staff → Notifications**, grouped by category
-(**Punching**: Punch time reminder; **Vehicles**: Change vehicle reminder). Each one shows how
+(**Punching**: Punch time reminder; **Vehicles**: Change vehicle reminder, Oil check reminder). Each one shows how
 many ticked drivers have agreed and how many are still waiting. Tap one to open its tick list
 (**‹ Notifications** goes back). The yellow number on the button is how many drivers still have
 a reminder to read. A new reminder goes in `NOTICES` in `admin.html` with its category.
@@ -390,6 +390,22 @@ arrow pointing at the button, says it's mandatory for every vehicle change, and 
   time reminder.
 - A driver ticked for both sees the punch time reminder first, then this one.
 - **No rules change:** the `notice_acks` rules above work for any reminder.
+
+## Oil check reminder
+
+A third one-time message, set up the same way: **Staff → Notifications → Oil check reminder**
+(under **Vehicles**), tick the drivers, save. It's for drivers who often haven't ticked the oil
+box. The pop-up (marked *Important* in red) says: *We noticed you didn’t check your oil on
+multiple days this week. Please make sure you’re checking it, and tick the box when you do.*
+Then it shows the two steps: **1. Tap this box** with a copy of the glowing Oil check box and an
+arrow, and **2. Tick this and tap Save** with a copy of the *I checked the oil* tick. Only
+**I have read and understand** closes it.
+
+- Saved at `employees/<ek>/notices/oil` and `timeclock/notice_acks/<ek>/oil`, with the same
+  **Show again** and **Takes the place of** behaviour as the other reminders.
+- A driver ticked for more than one sees them in order: punch time, change vehicle, oil check.
+- The wording says "this week", so tick drivers soon after you notice the missed checks.
+- **No rules change.**
 ## Punch locations
 
 Each punch in, punch out and van swap saves where the phone was: latitude, longitude

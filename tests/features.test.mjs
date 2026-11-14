@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, farFromPlace, punchPlace, cleanSpots, shopShift, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, fixAskedFor, officeNote, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, P } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, fixAskedFor, officeNote, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, P } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -285,6 +285,15 @@ test('change vehicle reminder: its own switch and answer, separate from the punc
   assert.strictEqual(noticeDue(both, { vehicle: 1762333320000 }, PUNCH_NOTICE), true);
   assert.strictEqual(noticeDue(both, { vehicle: 1762333320000 }, VEHICLE_NOTICE), false);
   assert.strictEqual(noticeDue({ notices: { punch: true } }, {}, VEHICLE_NOTICE), false);
+});
+
+test('oil check reminder: its own switch and answer, separate from the other reminders', () => {
+  assert.strictEqual(OIL_NOTICE, 'oil');
+  const all = { notices: { punch: true, vehicle: true, oil: true } };
+  assert.strictEqual(noticeDue(all, { punch: 1762333320000, vehicle: 1762333320000 }, OIL_NOTICE), true);
+  assert.strictEqual(noticeDue(all, { oil: 1762333320000 }, OIL_NOTICE), false);
+  assert.strictEqual(noticeDue(all, { oil: 1762333320000 }, VEHICLE_NOTICE), true);
+  assert.strictEqual(noticeDue({ notices: { vehicle: true } }, {}, OIL_NOTICE), false);
 });
 
 test('office changes: the driver only sees ones they asked for', () => {
