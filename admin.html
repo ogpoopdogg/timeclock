@@ -2067,7 +2067,12 @@
                 if (before.swapHint && (r.out || vehicleId || shop)) put("swapHint", null); // no van swap needed any more
                 // r.oilNotDue: the vehicle came from another driver today, so its oil is theirs (vehicle swap rule) and
                 // this driver isn't asked about it. Same as a driver taking it themselves (remindOil(true) in index.html).
-                if (r.oilNotDue && !r.out && vanChanged && vehicleId && !oilSettled(before) && !(before.oil && typeof before.oil.done === "boolean"))
+                // Not while they still owe an answer for a vehicle they gave up (theirs before, or one taken from them,
+                // unless its oil wasn't due): their phone asks about that one (officeHandoff in tc-core.js), and that
+                // answer settles the shift's oil.
+                const gaveUp = !!before.vehicleId || !!before.swapHint;
+                if (r.oilNotDue && !r.out && vanChanged && vehicleId && !oilSettled(before) && !(before.oil && typeof before.oil.done === "boolean") &&
+                    (!gaveUp || (before.oil && before.oil.due === false)))
                     put("oil", { due: false, at: serverTimestamp() });
                 put("edited", edited);
                 data = Object.assign({}, before, { in: r.in, out: r.out || null }, vanChanged ? { vehicleId: vehicleId, vehicleName: vehicleName, shop: shop || null } : {});

@@ -181,6 +181,13 @@ open (or the next check) picks it up.
   - The admin live board shows **Needs van swap** until they pick a van or punch out.
   - The app can't tell which van a driver is sitting in. It only knows what drivers pick.
     That's why the bumped driver is asked rather than moved automatically.
+- **Choose driver.** On **Admin → Vehicles**, each vehicle card has **Choose driver**
+  (**Change driver** when someone has it). It lists who is punched in now (No vehicle yet,
+  In the shop, On another vehicle); tap one and confirm. It's saved like changing the
+  vehicle in Edit punch: the vehicle goes on their shift, the RouteWatcher nickname becomes
+  their first name, a vehicle they had is freed, and a driver who had this one is unassigned
+  and gets *Vehicle swap needed*. A vehicle taken from another driver is *Oil not due* for
+  the new driver (unless they still owe an oil answer for a vehicle they gave up).
 - **Van history.** Every van pick, swap, move to the shop and "taken by" is saved on the shift with its time
   (and location). The admin timesheet shows each one in its own yellow box between the
   punch in and punch out, in time order, and the CSV has a **Van changes** column.
@@ -286,6 +293,11 @@ punches. Only email and password sign-in is used, which doesn't need it.
   another driver had today (taken from them, or the one they left behind) gets no Vehicle
   Check and no oil question for it; their shift is saved as *Oil not due*. A vehicle
   nobody was driving (picked up from the lot, or after Shop) is a normal pick.
+- **The office moves a driver to another vehicle** (Edit punch, **Vehicles → Choose driver**,
+  or RouteWatcher's *Who's driving this?*): if the oil of the vehicle they gave up was due
+  and not ticked, their phone asks *Did you check the oil?* about that vehicle as soon as it
+  sees the change, the same as a swap they make themselves. A vehicle the office gives them
+  shows no Vehicle Check or oil pop-up (the driver who had it before likely did the checks).
 - **Last pay week:** the total, regular and overtime hours for the last full pay week.
 
 **Admin → Inbox** lists punch fixes and late punch ins (see *No signal*), with a count on the tab. **Fix it** opens the punch
