@@ -358,6 +358,20 @@ export function oilSettled(shift) {
 export function oilHandoffVehicle(shift) {
     return shift && shift.oil && shift.oil.how === "swap" && typeof shift.oil.vehicle === "string" ? shift.oil.vehicle : "";
 }
+// The office moved an on-the-clock driver from one vehicle to another (Edit punch, Vehicles → Choose driver or
+// RouteWatcher's "Who's driving this?"): the vehicle they gave up, which is theirs to answer for (vehicle swap rule),
+// as { entryId, vehicleName }. The gave-up vehicle is the one in the history entry just before the office's change, or
+// the one another driver took from them. Null when the latest change isn't the office giving them their vehicle now, or
+// the shift's oil is already answered. Whether that vehicle's oil was due is up to the caller.
+export function officeHandoff(shift) {
+    if (!shift || typeof shift.out === "number" || !shift.vehicleId) return null;
+    if (shift.oil && typeof shift.oil.done === "boolean") return null; // answered (or said no) already
+    const list = vanHistory(shift), last = list[list.length - 1], prev = list[list.length - 2];
+    if (!last || !prev || last.how !== "admin" || last.vehicleId !== shift.vehicleId) return null;
+    const name = prev.vehicleId ? (prev.vehicleId !== last.vehicleId ? prev.vehicleName || prev.vehicleId : "")
+        : prev.how === "taken" ? prev.takenName || prev.takenId || "" : "";
+    return name ? { entryId: last.id, vehicleName: String(name) } : null;
+}
 
 // ---------- Oil check schedule ----------
 // oil_plan = { def: plan, vehicles: { [vanKey]: plan }, ask: { [vanKey]: time } }: how often each vehicle's oil is

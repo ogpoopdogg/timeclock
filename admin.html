@@ -422,7 +422,20 @@
         .gps-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c, var(--yellow)); box-shadow: 0 0 10px var(--c, var(--yellow)); }
         .gps-card .gps-info { color: var(--muted); font-size: 0.9rem; margin-top: 8px; min-height: 2.9em; }
         .gps-card .gps-info strong { color: var(--text); }
-        .gps-card .gps-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
+        .gps-card .gps-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .gps-card .gps-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .as-item {
+            width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border: 0; border-radius: 12px; cursor: pointer;
+            font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 8px;
+            transition: box-shadow 0.2s;
+        }
+        .as-item:hover:not(:disabled), .as-item:focus-visible { box-shadow: inset 0 0 0 1px var(--yellow); outline: none; }
+        .as-item:disabled { cursor: default; opacity: 0.75; }
+        .as-item.now { box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.45); opacity: 1; }
+        .as-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .as-name { font-weight: 600; font-size: 1.05rem; }
+        .as-sub { color: var(--muted); font-size: 0.88rem; }
+        #asList .empty-state { padding: 18px 8px; }
 
         /* ---------- Settings ---------- */
         .settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
@@ -923,6 +936,20 @@
     </div>
 
     <!-- Export -->
+    <!-- Vehicles → Choose driver: who is driving this vehicle (drivers punched in now) -->
+    <div class="modal-backdrop" id="assignModal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="asTitle">
+            <h2 id="asTitle">Who's driving?</h2>
+            <p class="modal-sub" id="asSub">Drivers punched in right now. Tap the one driving this vehicle.</p>
+            <div id="asList"></div>
+            <p class="modal-msg" id="asMsg" role="alert"></p>
+            <div class="modal-foot">
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost" data-close>Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notifications: the one-time reminders, by category. Tap one to pick who sees it. -->
     <div class="modal-backdrop" id="notifyModal">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="nfTitle">
@@ -1054,7 +1081,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, punchMinute, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, fixAskedFor, overlapping,
+            oilState, oilSettled, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, fixAskedFor, overlapping,
             longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
@@ -1071,6 +1098,7 @@
 
         // ---------- State ----------
         let user = null, settings = settingsWithDefaults(null), serverOffset = 0;
+        let asGps = null, asBusy = false; // Vehicles → Choose driver: the vehicle it's open for, and while it saves
         let employees = {}, shiftsByEk = {}, claims = {}, nicknames = {}, gpsUnits = [], gpsLoaded = false, gpsRaw = null, vansRaw = {}, audit = [];
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
         let spots = {}, spotsLoaded = false;               // punch spots other than the shop (cleanSpots of timeclock/spots)
@@ -1303,6 +1331,7 @@
             else if (activeTab === "people") renderPeople();
             else if (activeTab === "vehicles") renderVehicles();
             else if (activeTab === "reports") renderReports();
+            renderAssign(); // Choose driver, while it's open
         }
 
         // ---------- Live ----------
@@ -2008,7 +2037,7 @@
             let takeClaim = false;
             if (!r.out && vehicleId) {
                 const c = claims[vehicleId];
-                if (c && c.shiftId !== id && !confirm("GPS " + vehicleName + " is in use by " + (c.nickname || c.name) + ". Move it to " + displayName(emp, emp.email) + "?")) return false;
+                if (c && c.shiftId !== id && !r.confirmed && !confirm("GPS " + vehicleName + " is in use by " + (c.nickname || c.name) + ". Move it to " + displayName(emp, emp.email) + "?")) return false;
                 takeClaim = true;
             }
 
@@ -2036,6 +2065,15 @@
                 // A new punch out time from the office replaces the phone's (a late punch out would otherwise still count from it)
                 else if (r.out && beforeOut !== null && beforeOut !== r.out && typeof before.outTap === "number") put("outTap", null);
                 if (before.swapHint && (r.out || vehicleId || shop)) put("swapHint", null); // no van swap needed any more
+                // r.oilNotDue: the vehicle came from another driver today, so its oil is theirs (vehicle swap rule) and
+                // this driver isn't asked about it. Same as a driver taking it themselves (remindOil(true) in index.html).
+                // Not while they still owe an answer for a vehicle they gave up (theirs before, or one taken from them,
+                // unless its oil wasn't due): their phone asks about that one (officeHandoff in tc-core.js), and that
+                // answer settles the shift's oil.
+                const gaveUp = !!before.vehicleId || !!before.swapHint;
+                if (r.oilNotDue && !r.out && vanChanged && vehicleId && !oilSettled(before) && !(before.oil && typeof before.oil.done === "boolean") &&
+                    (!gaveUp || (before.oil && before.oil.due === false)))
+                    put("oil", { due: false, at: serverTimestamp() });
                 put("edited", edited);
                 data = Object.assign({}, before, { in: r.in, out: r.out || null }, vanChanged ? { vehicleId: vehicleId, vehicleName: vehicleName, shop: shop || null } : {});
             }
@@ -2805,13 +2843,15 @@
             draw(grid, all.map((g, i) => {
                 const c = claims[g.id];
                 const nick = typeof nicknames[g.id] === "string" ? nicknames[g.id] : "";
+                // Choose driver: only for vehicles drivers can pick (not one that's gone from RouteWatcher)
+                const pick = gpsUnits.some(u => u.id === g.id) ? '<button type="button" class="btn sm primary" data-assign="' + esc(g.id) + '">' + (c ? "Change driver" : "Choose driver") + "</button>" : "";
                 return '<article class="gps-card' + (c ? " taken" : "") + '" style="--i:' + i + ";--c:" + esc(g.color) + '">' +
                     '<div class="gps-name"><span class="gps-dot"></span>' + esc(g.name) + "</div>" +
                     '<div class="gps-info">' + (c ? "In use by <strong>" + esc(c.name || c.nickname) + "</strong> since " + esc(fmtTime(c.at)) +
                         (dayKey(c.at) !== dayKey(now()) ? " (" + esc(fmtKey(dayKey(c.at))) + ")" : "") : "Available") +
                     (g.manual ? "<br>No GPS unit" : "<br>RouteWatcher nickname: " + (nick ? "<strong>" + esc(nick) + "</strong>" : "none")) + "</div>" +
-                    '<div class="gps-foot">' + (c ? '<span class="tag gps">Taken</span><button type="button" class="btn sm" data-release="' + esc(g.id) + '">Release</button>'
-                        : '<span class="tag live">Free</span>') + "</div></article>";
+                    '<div class="gps-foot">' + (c ? '<span class="tag gps">Taken</span><span class="gps-btns">' + pick + '<button type="button" class="btn sm" data-release="' + esc(g.id) + '">Release</button></span>'
+                        : '<span class="tag live">Free</span><span class="gps-btns">' + pick + "</span>") + "</div></article>";
             }).join(""));
         }
         $("gpsGrid").addEventListener("click", async e => {
@@ -2824,6 +2864,77 @@
                 await releaseVan(b.dataset.release, c);
                 toast((manual ? "Vehicle " : "GPS ") + c.vehicleName + " released.");
             } catch (err) { toast("Couldn't release: " + errText(err), true); }
+        });
+
+        // Choose driver: gives a vehicle to someone punched in now, from its card. Saved with saveShift, the same as
+        // changing the vehicle in Edit punch (and RouteWatcher's "Who's driving this?"): the vehicle goes on their open
+        // shift with a line in its vehicle history, the claim and RouteWatcher nickname move to them, and a vehicle they
+        // had is freed. If another driver has it, the server (timeclockVanTaken) unassigns them and their clock asks them
+        // to pick the vehicle they're in; the new driver isn't asked about its oil (vehicle swap rule: it's the other
+        // driver's).
+        function onTheClock() {
+            return empList().map(e => ({ ek: e.ek, name: displayName(e, e.email), shift: openShift(shiftsOf(e.ek)) })).filter(p => p.shift)
+                .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+        }
+        function renderAssign() {
+            if (!asGps || !$("assignModal").classList.contains("show")) return;
+            const g = gpsUnits.find(u => u.id === asGps);
+            if (!g) { closeModal("assignModal"); return; }
+            const c = claims[g.id];
+            const people = onTheClock();
+            const holder = people.find(p => p.shift.vehicleId === g.id) || null;
+            $("asTitle").textContent = "Who's driving " + g.name + "?";
+            const item = (p, sub, now) => '<button type="button" class="as-item' + (now ? " now" : "") + '"' + (now || asBusy ? " disabled" : "") + ' data-as="' + esc(p.ek) + '">' +
+                '<span class="as-text"><span class="as-name">' + esc(p.name) + '</span><span class="as-sub">' + esc(sub) + "</span></span></button>";
+            const others = people.filter(p => p !== holder);
+            const group = (label, list, sub) => list.length ? '<div class="nf-cat">' + esc(label) + "</div>" + list.map(p => item(p, sub(p))).join("") : "";
+            let html = holder ? '<div class="nf-cat">Driving it now</div>' + item(holder, "Punched in " + fmtTime(holder.shift.in), true) : "";
+            html += group("No vehicle yet", others.filter(p => !p.shift.vehicleId && !p.shift.shop), p => "Punched in " + fmtTime(p.shift.in));
+            html += group("In the shop", others.filter(p => !p.shift.vehicleId && p.shift.shop), () => "Shop");
+            html += group("On another vehicle", others.filter(p => p.shift.vehicleId), p => "Vehicle " + (p.shift.vehicleName || p.shift.vehicleId));
+            if (!others.length) html += '<div class="empty-state">' + (holder ? "Nobody else is punched in right now." : "Nobody is punched in right now.") + "</div>";
+            draw($("asList"), html);
+            $("asSub").textContent = !holder && c ? "Time Clock last had " + (c.name || c.nickname) + " on it. Tap who's driving it now." : "Drivers punched in right now. Tap the one driving this vehicle.";
+        }
+        $("gpsGrid").addEventListener("click", e => {
+            const b = e.target.closest("[data-assign]");
+            if (!b) return;
+            asGps = b.dataset.assign;
+            asBusy = false;
+            $("asMsg").textContent = "";
+            openModal("assignModal");
+            renderAssign();
+        });
+        $("asList").addEventListener("click", async e => {
+            const b = e.target.closest("[data-as]");
+            if (!b || b.disabled || asBusy) return;
+            const g = gpsUnits.find(u => u.id === asGps), k = b.dataset.as, emp = employees[k];
+            const s = openShift(shiftsOf(k));
+            if (!g || !emp) return;
+            if (!s) { $("asMsg").textContent = empName(k) + " isn't punched in any more."; renderAssign(); return; }
+            if (s.vehicleId === g.id) { closeModal("assignModal"); return; }
+            const name = displayName(emp, emp.email);
+            const c = claims[g.id];
+            const holder = c && c.ek !== k ? c : null; // another driver has it now (same test as a driver's own pick)
+            const holderName = holder ? holder.nickname || holder.name || "Another driver" : "";
+            let q = "Give vehicle " + g.name + " to " + name + "?";
+            if (holder) q += "\n\n" + holderName + " has it now. They will be unassigned and asked to pick the vehicle they're in.";
+            if (s.vehicleId) q += "\n\n" + name + " is on vehicle " + (s.vehicleName || s.vehicleId) + " now. That vehicle will be freed.";
+            if (!g.manual) q += "\n\nThe RouteWatcher nickname becomes \"" + nicknameFor(emp, emp.email) + "\".";
+            if (!confirm(q)) return;
+            asBusy = true;
+            $("asMsg").textContent = "";
+            renderAssign();
+            try {
+                await saveShift(k, s, { in: s.in, out: null, vehicleId: g.id, shop: false, confirmed: true, oilNotDue: !!holder }, "Vehicle set on the Vehicles page", "edit");
+                asBusy = false;
+                closeModal("assignModal");
+                toast(name + " is driving vehicle " + g.name + "." + (holder ? " " + holderName + " has been unassigned." : ""));
+            } catch (err) {
+                asBusy = false;
+                $("asMsg").textContent = "Couldn't save: " + errText(err);
+                renderAssign();
+            }
         });
 
         // Vans without GPS: add and remove (punches that used a removed van keep its name)

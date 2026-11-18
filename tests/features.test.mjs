@@ -11,9 +11,29 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, farFromPlace, punchPlace, cleanSpots, shopShift, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, punchForFix, fixAskedFor, officeNote, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, P } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, officeHandoff, punchForFix, fixAskedFor, officeNote, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, P } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
+
+test('office moves a driver to another vehicle: the vehicle they gave up is theirs to answer for', () => {
+  const pick = { at: t0 + M, how: 'pick', vehicleId: 'g7', vehicleName: '7' };
+  const office = { at: t0 + H, how: 'admin', by: 'justin@ec.com', vehicleId: 'g3', vehicleName: '3' };
+  const moved = { in: t0, vehicleId: 'g3', vehicleName: '3', vans: { a: pick, b: office } };
+  assert.deepStrictEqual(officeHandoff(moved), { entryId: 'b', vehicleName: '7' });
+  // a vehicle another driver took from them, then the office gave them one
+  const taken = { in: t0, vehicleId: 'g3', vehicleName: '3', vans: { a: pick, t: { at: t0 + 30 * M, how: 'taken', takenId: 'g7', takenName: '7' }, b: office } };
+  assert.deepStrictEqual(officeHandoff(taken), { entryId: 'b', vehicleName: '7' });
+  // nothing to answer for
+  assert.strictEqual(officeHandoff({ in: t0, vehicleId: 'g3', vehicleName: '3', vans: { b: office } }), null);           // had no vehicle before
+  assert.strictEqual(officeHandoff({ in: t0, vehicleId: 'g3', vehicleName: '3', vans: { a: { at: t0, how: 'shop' }, b: office } }), null); // from the shop
+  assert.strictEqual(officeHandoff(Object.assign({}, moved, { oil: { done: true, at: t0, how: 'box' } })), null);        // oil already ticked
+  assert.strictEqual(officeHandoff(Object.assign({}, moved, { oil: { done: false, at: t0, how: 'swap', vehicle: '9' } })), null);
+  assert.strictEqual(officeHandoff(Object.assign({}, moved, { out: t0 + 2 * H })), null);                               // punched out
+  assert.strictEqual(officeHandoff({ in: t0, vehicleId: 'g3', vehicleName: '3', vans: { a: pick, b: Object.assign({}, office, { at: t0 }), c: { at: t0 + 2 * H, how: 'swap', vehicleId: 'g3', vehicleName: '3' } } }), null); // they changed it themselves after
+  assert.strictEqual(officeHandoff({ in: t0, vehicleId: 'g7', vehicleName: '7', vans: { a: pick, b: Object.assign({}, office, { vehicleId: 'g7', vehicleName: '7' }) } }), null); // same vehicle
+  // an oil "not due" from earlier doesn't hide it (the caller checks if it was due)
+  assert.deepStrictEqual(officeHandoff(Object.assign({}, moved, { oil: { due: false, at: t0 } })), { entryId: 'b', vehicleName: '7' });
+});
 
 test('hours per van: picks and swaps split the shift', () => {
   const shift = { in: t0, out: t0 + 9 * H, vans: {

@@ -901,7 +901,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, punchForFix, officeNote, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, noticeDue,
+            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, officeHandoff, punchForFix, officeNote, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, noticeDue,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -1148,6 +1148,12 @@
                 if (lost && lost.vehicleName && needsHandoffOil(open) && !formOpen && !sheetOpen && handoffAsked !== open.id + "|" + lost.vehicleName) {
                     handoffAsked = open.id + "|" + lost.vehicleName;
                     askOilAtHandoff(open.id, lost.vehicleName, null);
+                }
+                // The office moved them to another vehicle: the one they gave up is theirs to answer for, if its oil was due
+                const moved = !lost && !formOpen && !sheetOpen ? officeHandoff(open) : null;
+                if (moved && handoffAsked !== open.id + "|" + moved.entryId && officeHandoffDue(open, moved.vehicleName)) {
+                    handoffAsked = open.id + "|" + moved.entryId;
+                    askOilAtHandoff(open.id, moved.vehicleName, null);
                 }
             }
             $("vanReportBtn").hidden = !(open && open.vehicleId && !lostVan(open));
@@ -2230,6 +2236,12 @@
         }
 
         function needsHandoffOil(open) { return !!open && oilWanted(open) && !oilSettled(open); }
+        // Whether the oil of a vehicle the office moved them off was due: what was saved when they got it, else the schedule
+        function officeHandoffDue(open, vehicleName) {
+            if (!open || oilSettled(open)) return false;
+            if (open.oil && typeof open.oil.due === "boolean") return open.oil.due;
+            return oilDueNow(vehicleName);
+        }
         function askOilAtHandoff(shiftId, vehicleName, then) {
             openForm({
                 title: "Did you check the oil?",
