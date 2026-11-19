@@ -612,6 +612,59 @@
             .emp-row .sched-chips { grid-column: 1 / -1; order: 5; }
             .emp-row .emp-status { display: none; }
         }
+        /* ---------- Oil checks this week (Timesheets, one driver picked) ---------- */
+        .oil-week { border-bottom: 1px solid var(--line); padding: 14px 18px 16px; background: rgba(255, 255, 255, 0.015); }
+        .ow-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin-bottom: 10px; }
+        .ow-title { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
+        .ow-title svg { width: 20px; height: 20px; color: var(--yellow); }
+        .ow-score { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+        .ow-score small { font-family: var(--font-body); font-weight: 500; font-size: 0.8rem; color: var(--muted); margin-left: 4px; }
+        .ow-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+        .ow-day { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .ow-dn { font-family: var(--font-display); font-weight: 700; font-size: 0.86rem; color: var(--muted); text-align: center; letter-spacing: 0.04em; }
+        .ow-day.today .ow-dn { color: var(--yellow); }
+        .ow-tile { flex: 1; min-height: 76px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+            padding: 8px 4px; text-align: center; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--muted); min-width: 0; }
+        .ow-tile.done { background: rgba(53, 208, 127, 0.16); border-color: rgba(53, 208, 127, 0.4); color: var(--green); }
+        .ow-tile.miss { background: rgba(255, 107, 94, 0.18); border-color: rgba(255, 107, 94, 0.45); color: var(--red); }
+        .ow-tile.wait { background: rgba(138, 180, 255, 0.12); border-color: rgba(138, 180, 255, 0.35); color: var(--blue); }
+        .ow-tile.shop { color: #9fb3c8; }
+        .ow-tile.off { background: var(--asphalt); color: var(--dim); font-size: 0.85rem; }
+        .ow-ic { font-size: 1.25rem; font-weight: 800; line-height: 1; }
+        .ow-n { font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; line-height: 1.1; color: var(--text); max-width: 100%; overflow-wrap: break-word; }
+        .ow-w { font-size: 0.72rem; font-weight: 600; }
+        /* The oil check reminder for this driver (the same one as Staff → Notifications): one small button by their name.
+           It glows red when they missed many oil checks this week: 3 soft pulses the first time, then still (an endless
+           pulse makes some Android phones flash). */
+        .ow-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+            background: transparent; color: var(--muted); font-weight: 600; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+        .ow-btn svg { width: 16px; height: 16px; flex: none; }
+        .ow-btn:hover { color: var(--text); border-color: var(--shoulder); }
+        .ow-btn:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+        .ow-btn b { font-weight: 800; }
+        .ow-btn .ow-short { display: none; }
+        .sheet-card-name.has-ow { display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap; }
+        .scn-text { min-width: 0; }
+        .ow-btn.on { color: var(--green); border-color: rgba(53, 208, 127, 0.45); background: rgba(53, 208, 127, 0.08); }
+        .ow-btn.warn { color: #fff; border-color: var(--red); background: rgba(255, 107, 94, 0.22);
+            box-shadow: 0 0 0 3px rgba(255, 107, 94, 0.18), 0 0 18px rgba(255, 107, 94, 0.45); }
+        .ow-btn.warn.pulse { animation: owGlow 1.2s ease-in-out 3; }
+        .ow-btn .ow-badge { background: var(--red); color: #1a0705; border-radius: 999px; padding: 1px 7px; font-size: 0.75rem; font-weight: 800; }
+        @keyframes owGlow { 50% { box-shadow: 0 0 0 6px rgba(255, 107, 94, 0.28), 0 0 28px rgba(255, 107, 94, 0.7); } }
+        .ow-nudge { margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px;
+            border: 1px solid rgba(255, 107, 94, 0.45); background: rgba(255, 107, 94, 0.1); font-size: 0.9rem; }
+        .ow-nudge span { flex: 1; min-width: 200px; }
+        .ow-nudge b { color: var(--red); }
+        .ow-box { width: min(440px, 100%); }
+        .ow-box .ow-state { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--asphalt); border: 1px solid var(--line); margin-bottom: 12px; font-weight: 600; }
+        .ow-box .ow-state.on { color: var(--green); border-color: rgba(53, 208, 127, 0.45); background: rgba(53, 208, 127, 0.07); }
+        .ow-box .ow-state svg { width: 22px; height: 22px; flex: none; }
+        .ow-box .ow-state small { display: block; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+        .ow-box .ow-warn { color: var(--red); font-weight: 600; margin-bottom: 12px; }
+        .ow-box .ow-pic { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+        .ow-box .ow-pic img { width: 74px; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); cursor: zoom-in; }
+        .ow-box .ow-pic span { color: var(--muted); font-size: 0.88rem; }
+
         @media (max-width: 720px) {
             .clock { display: none; }
             .tab .tab-text { display: none; }
@@ -624,6 +677,19 @@
             .shift-act { grid-column: 2; grid-row: 1; }
             .loc { max-width: none; }
             .day-cell { padding: 8px 2px; font-size: 0.82rem; }
+            .oil-week { padding: 12px 10px 14px; }
+            .ow-week { gap: 3px; }
+            .ow-tile { min-height: 64px; padding: 6px 1px; border-radius: 8px; }
+            .ow-n { font-size: 0.86rem; }
+            .ow-dn { font-size: 0.8rem; line-height: 1.15; }
+            .ow-dn span { display: block; }
+            .ow-w { font-size: 0.56rem; }
+            .ow-ic { font-size: 1rem; }
+            .ow-btn { height: 30px; padding: 0 9px; font-size: 0.8rem; }
+            .ow-btn .ow-word { display: none; }
+            .ow-btn .ow-short { display: inline; }
+            .sheet-card-name.has-ow { flex-direction: column; align-items: flex-start; }
+            .sheet-card-name.has-ow .person-email { display: none; }
             .modal-grid { grid-template-columns: 1fr; }
             .week-switch .week-label { min-width: 0; }
         }
@@ -984,6 +1050,21 @@
         </form>
     </div>
 
+    <!-- Timesheets → one driver → Oil reminder button -->
+    <div class="modal-backdrop" id="owModal">
+        <div class="modal ow-box" role="dialog" aria-modal="true" aria-labelledby="owTitle">
+            <h2 id="owTitle">Oil check reminder</h2>
+            <p class="modal-sub" id="owSub"></p>
+            <div id="owBody"></div>
+            <div class="modal-foot">
+                <button type="button" class="btn ghost" id="owOff" hidden>Turn off</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost" data-close>Close</button>
+                <button type="button" class="btn primary" id="owGo">Turn on</button>
+            </div>
+        </div>
+    </div>
+
     <!-- A reminder's picture, full size (over the reminder's list) -->
     <div class="modal-backdrop pv-box" id="pvModal">
         <img id="pvImg" alt="">
@@ -1081,7 +1162,7 @@
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, hhmmOf, fmtTime, fmtDate, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, shiftMs, punchMinute, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
-            oilState, oilSettled, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, fixAskedFor, overlapping,
+            oilState, oilSettled, oilPlanFor, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, fixAskedFor, overlapping,
             longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
@@ -1103,6 +1184,7 @@
         let settingsRaw = {};                              // timeclock/settings as saved (so saving one part keeps the rest)
         let spots = {}, spotsLoaded = false;               // punch spots other than the shop (cleanSpots of timeclock/spots)
         let noticeAcks = {};                               // when each driver agreed to the punch time reminder (timeclock/notice_acks)
+        let oilPlans = null;                               // timeclock/oil_plan: how often each vehicle's oil is checked (set in Garage)
         let requestsAll = {}; // the Inbox: punch fixes (vehicle problems and oil checks are in Garage)
         let auditLimit = 30, auditFilter = "all", auditUnsub = null, showRemoved = false;
         let viewWeek = null, rangeStart = null;
@@ -1207,6 +1289,7 @@
             sub(ref(db, P.noticeAcks), s => { noticeAcks = s.val() || {}; renderPeople(); if ($("noticeModal").classList.contains("show")) renderNoticeList(); if ($("notifyModal").classList.contains("show")) renderNotifyList(); });
             sub(ref(db, P.nicknames), s => { nicknames = s.val() || {}; if (activeTab === "vehicles") renderVehicles(); });
             sub(ref(db, P.vans), s => { vansRaw = s.val() || {}; gpsUnits = vehicleList(gpsRaw, vansRaw); if (activeTab === "vehicles") renderVehicles(); });
+            sub(ref(db, P.oilPlan), s => { oilPlans = s.val() || {}; if (activeTab === "sheets") renderSheets(); });
             sub(ref(db, P.requests), s => { requestsAll = s.val() || {}; renderInboxCount(); if (activeTab === "inbox") renderInbox(); });
             listenAudit();
             unsubs.push(() => { if (auditUnsub) { auditUnsub(); auditUnsub = null; } });
@@ -1483,13 +1566,16 @@
                         (ot > 0 ? '<div class="dot">' + esc(fmtHours(ot)) + " OT</div>" : "") + "</div>";
                 }).join("");
                 const rows = days.flatMap(k => byDay[k].shifts).map(s => shiftBlock(e.ek, s, byShift[s.id], t)).join("");
+                const oil = filter !== "all" ? oilWeekData(e.ek, days, today) : null;
                 return '<article class="sheet-card" style="--i:' + i + '">' +
-                    '<div class="sheet-card-head"><div class="avatar">' + esc(initials(name)) + '</div><div class="sheet-card-name">' +
+                    '<div class="sheet-card-head"><div class="avatar">' + esc(initials(name)) + '</div><div class="sheet-card-name' + (oil ? " has-ow" : "") + '"><div class="scn-text">' +
                     '<div class="person-name">' + esc(name) + (e.removed ? ' <span class="tag off">Removed</span>' : "") + '</div><div class="person-email">' + esc(e.email) + "</div></div>" +
+                    (oil ? oilBtn(e.ek, oil) : "") + "</div>" +
                     '<button type="button" class="btn sm ghost" data-add-for="' + esc(e.ek) + '">+ Punch</button>' +
                     '<div class="sheet-card-total">' + esc(fmtHours(total)) + "<small>hours · " + esc(fmtDur(total)) + "</small>" +
                     '<span class="split">Reg ' + esc(fmtHours(regular)) + ' · <b>OT ' + esc(fmtHours(overtime)) + "</b></span></div></div>" +
                     '<div class="day-strip">' + strip + "</div>" +
+                    (oil ? oilWeek(e.ek, oil) : "") +
                     (rows ? '<div class="shifts">' + rows + "</div>"
                         : '<p class="no-punches">No punches this week.</p>') + "</article>";
             }).join(""));
@@ -2187,6 +2273,158 @@
             if (typeof s.outTap !== "number" && !s.outLoc && (s.src === "admin" || s.edited)) return "Punched out by the office, so they weren't asked";
             return "Didn't answer at punch out";
         }
+        // ---------- Oil checks this week (Timesheets, one driver picked) ----------
+        // Each day of the week, each vehicle the driver had: checked, not checked, not due, or not theirs to answer.
+        // One oil answer is saved per shift (shifts/{ek}/{id}/oil); this works out which vehicle it was about.
+        // Hovering a tile shows why.
+        const OW = { done: ["✓", "Checked"], miss: ["✕", "Not checked"], wait: ["…", "Not yet"], notdue: ["–", "Not due"], notasked: ["↪", "Not asked"], shop: ["S", "Shop"] };
+        const owDay = at => DOW_SHORT[new Date(dayKey(at) + "T12:00:00Z").getUTCDay()] + " " + fmtTime(at);
+        // The vehicles a shift had, in order: [{ name, at, how }]
+        function shiftVehicles(s) {
+            const out = [];
+            for (const v of vanHistory(s)) {
+                const n = v.vehicleName || v.vehicleId;
+                if (n && (!out.length || out[out.length - 1].name !== n)) out.push({ name: String(n), at: v.at, how: v.how });
+            }
+            if (!out.length && (s.vehicleName || s.vehicleId)) out.push({ name: String(s.vehicleName || s.vehicleId), at: s.in, how: "pick" });
+            return out;
+        }
+        // The vehicle a shift's oil answer was about: the handed-off one, the one they had when they ticked the box, else the last one
+        function oilVehicleOf(s, list) {
+            if (!list.length) return "";
+            if (s.oil && s.oil.how === "swap" && s.oil.vehicle) return String(s.oil.vehicle);
+            if (s.oil && s.oil.how === "box" && typeof s.oil.at === "number") return (list.filter(v => v.at <= s.oil.at + 60000).pop() || list[0]).name;
+            return list[list.length - 1].name;
+        }
+        // Another driver who had this vehicle earlier the same day (they answer for its oil)
+        function hadBefore(k, name, at) {
+            const day = dayKey(at);
+            for (const [ok, list] of Object.entries(shiftsByEk)) {
+                if (ok === k) continue;
+                for (const o of list) if (dayKey(o.in) === day && o.in < at && shiftVehicles(o).some(v => v.name === name && v.at < at)) return empName(ok);
+            }
+            return "";
+        }
+        // The last time anyone said they checked this vehicle before `at`, in the punches loaded
+        function lastCheck(name, at) {
+            let best = null;
+            for (const [ok, list] of Object.entries(shiftsByEk)) for (const o of list) {
+                if (!o.oil || o.oil.done !== true || typeof o.oil.at !== "number" || o.oil.at >= at) continue;
+                if (oilVehicleOf(o, shiftVehicles(o)) === name && (!best || o.oil.at > best.at)) best = { at: o.oil.at, who: empName(ok) };
+            }
+            return best;
+        }
+        function planText(name) {
+            const p = oilPlanFor(oilPlans || {}, name);
+            if (p.mode === "never") return "no oil checks for this vehicle";
+            if (p.mode === "every") return p.every === 1 ? "once a day" : "every " + p.every + " days";
+            if (p.mode === "days") return DOW_KEYS.filter(d => p.days[d]).map(d => DOW_SHORT[DOW_KEYS.indexOf(d)]).join(", ");
+            return "every shift";
+        }
+        // The tiles for one shift: [{ kind, name, why }]
+        function oilRowsFor(k, s) {
+            const list = shiftVehicles(s);
+            if (!list.length) return [{ kind: "shop", name: s.shop ? "Shop" : "None", word: s.shop ? "Shop" : "Not driving", ic: s.shop ? "S" : "–", why: (s.shop ? "Shop shift" : "Not driving") + ": no vehicle, so no oil check" }];
+            const st = oilState(s), about = oilVehicleOf(s, list);
+            return list.map(v => {
+                const from = hadBefore(k, v.name, v.at);
+                if (v.name === about) {
+                    if (st === "checked") return { kind: "done", name: v.name, why: "Checked at " + fmtTime(s.oil.at) + ": " +
+                        (s.oil.how === "out" ? "said so at punch out" : s.oil.how === "swap" ? "said so when handing the vehicle to the next driver" : "ticked the Oil check box") };
+                    if (st === "missed") return { kind: "miss", name: v.name, why: "Not checked: " + oilMissWhy(s) + (s.oil && s.oil.done === false && s.oil.at ? " (" + fmtTime(s.oil.at) + ")" : "") };
+                    if (st === "waiting") return { kind: "wait", name: v.name, why: "Not ticked yet: still on the clock. They'll be asked at punch out" };
+                    if (from) return { kind: "notasked", name: v.name, why: "Took it over from " + from + " today, so " + from + " answers for its oil" };
+                    const last = lastCheck(v.name, s.in);
+                    return { kind: "notdue", name: v.name, why: "Not due. Schedule: " + planText(v.name) + (last ? ". Last checked " + owDay(last.at) + " by " + last.who : "") };
+                }
+                if (from) return { kind: "notasked", name: v.name, why: "Took it over from " + from + " at " + fmtTime(v.at) + ", so " + from + " answers for its oil" };
+                if (v.how === "admin") return { kind: "notasked", name: v.name, why: "Given by the office at " + fmtTime(v.at) + ". The driver before had the checks" };
+                return { kind: "notasked", name: v.name, why: oilSettled(s) ? "Only one oil check per shift, and it was for " + about : "Changed off it before the oil was answered" };
+            });
+        }
+        const OW_DROP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s-6 6.5-6 11a6 6 0 0 0 12 0c0-4.5-6-11-6-11z"/></svg>';
+        const OW_BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+        // This week's tiles and counts for one driver. warn: they missed at least 2 of the checks due, and at least 40% of them
+        function oilWeekData(k, days, today) {
+            const byDay = days.map(d => ({ d, rows: shiftsOf(k).filter(s => dayKey(s.in) === d).sort((a, b) => a.in - b.in).flatMap(s => oilRowsFor(k, s)) }));
+            const all = byDay.flatMap(x => x.rows), done = all.filter(r => r.kind === "done").length, miss = all.filter(r => r.kind === "miss").length;
+            return { byDay, today, done, miss, due: done + miss, warn: miss >= 2 && miss / (done + miss) >= 0.4 };
+        }
+        function oilWeek(k, w) {
+            const tiles = w.byDay.map(({ d, rows }) => '<div class="ow-day' + (d === w.today ? " today" : "") + '"><div class="ow-dn">' + "<span>" + esc(DOW_SHORT[new Date(d + "T12:00:00Z").getUTCDay()]) + "</span> <span>" + esc(d.slice(8)) + "</span></div>" +
+                (rows.length ? rows.map(r => '<div class="ow-tile ' + r.kind + '" title="' + esc(r.why) + '"><span class="ow-ic" aria-hidden="true">' + (r.ic || OW[r.kind][0]) + '</span><span class="ow-n">' + esc(r.name) +
+                    '</span><span class="ow-w">' + esc(r.word || OW[r.kind][1]) + "</span></div>").join("") : '<div class="ow-tile off">' + (d > w.today ? "" : "Off") + "</div>") + "</div>").join("");
+            const e = employees[k], first = e ? displayName(e, e.email).split(" ")[0] : "", warn = oilWarn(k, w);
+            const nudge = warn ? '<div class="ow-nudge"><span>' + esc(first) + " missed <b>" + w.miss + " of " + w.due + "</b> oil checks this week.</span>" +
+                '<button type="button" class="btn sm primary" data-ow-open="' + esc(k) + '">' + (noticeOn(e, OIL_NOTICE) ? "Show oil check reminder again" : "Turn on oil check reminder") + "</button></div>" : "";
+            return '<section class="oil-week" aria-label="Oil checks this week"><div class="ow-head"><div class="ow-title">' + OW_DROP + "Oil checks this week</div>" +
+                '<div class="ow-score">' + (w.due ? w.done + " of " + w.due + "<small>checks done</small>" : "<small>No oil checks due yet</small>") + "</div></div>" +
+                '<div class="ow-week">' + tiles + "</div>" + nudge + "</section>";
+        }
+        // Whether to point the office to the reminder: they missed many this week, and it's off, or they agreed to it
+        // before this week and still miss. Not while it's on and waiting for them to read it.
+        function oilWarn(k, w) {
+            const e = employees[k];
+            if (!w.warn || !e || e.removed) return false;
+            const at = noticeAt(k, OIL_NOTICE);
+            return !noticeOn(e, OIL_NOTICE) || (!!at && at < keyToEpoch(w.byDay[0].d));
+        }
+        const owPulsed = new Set();
+        // The one small oil check reminder button by the driver's name: Off, On, or glowing red when they missed many this week
+        function oilBtn(k, w) {
+            const e = employees[k];
+            if (!e || e.removed) return "";
+            const on = noticeOn(e, OIL_NOTICE), warn = oilWarn(k, w);
+            const label = warn ? (on ? "Show oil reminder again" : "Turn on oil reminder") : "Oil reminder: <b>" + (on ? "On" : "Off") + "</b>";
+            // the glow pulses 3 times the first time it shows for this driver on this page, then stays still
+            const pulse = warn && !owPulsed.has(k);
+            if (warn) owPulsed.add(k);
+            return '<button type="button" class="ow-btn' + (warn ? " warn" + (pulse ? " pulse" : "") : on ? " on" : "") + '" data-ow-open="' + esc(k) + '" title="Oil check reminder for ' + esc(displayName(e, e.email)) + '">' + OW_BELL +
+                '<span class="ow-word">' + label + '</span><span class="ow-short">' + (warn ? "Oil" : "Oil: <b>" + (on ? "On" : "Off") + "</b>") + "</span>" + (warn ? '<span class="ow-badge">' + w.miss + " missed</span>" : "") + "</button>";
+        }
+        // The small box the button opens: what the reminder is doing for this driver now, and one button to change it
+        let owK = null;
+        function openOilBox(k) {
+            owK = k;
+            const e = employees[k];
+            if (!e) return;
+            const name = displayName(e, e.email), first = name.split(" ")[0], on = noticeOn(e, OIL_NOTICE), at = noticeAt(k, OIL_NOTICE);
+            const days = weekDays(viewWeek), w = oilWeekData(k, days, dayKey(now()));
+            $("owTitle").textContent = "Oil check reminder";
+            $("owSub").textContent = name;
+            $("owBody").innerHTML = (w.miss ? '<div class="ow-warn">' + esc(first) + " missed " + w.miss + " of " + w.due + " oil checks this week.</div>" : "") +
+                '<div class="ow-state' + (on ? " on" : "") + '">' + OW_BELL + "<span>" + (on ? "On" : "Off") + "<small>" +
+                esc(!on ? first + " doesn't get it now." : at ? first + " read it and agreed on " + fmtDate(at) + " at " + fmtTime(at) + "." : first + " sees it before their next punch in.") + "</small></span></div>" +
+                '<div class="ow-pic"><img src="' + esc(NOTICES[OIL_NOTICE].pic) + '" alt="The oil check reminder, as drivers see it" data-ow-pic><span>' +
+                esc(on && at ? "Show it again and " + first + " sees it once more before their next punch in." : on ? "It closes only when they tap “I have read and understand”." : "Turn it on and " + first + " sees this once, before their next punch in.") + "</span></div>";
+            $("owGo").textContent = !on ? "Turn on" : at ? "Show it again" : "Turn off";
+            $("owGo").className = "btn " + (!on || at ? "primary" : "ghost");
+            $("owOff").hidden = !(on && at);
+            openModal("owModal");
+        }
+        // Same as ticking or unticking them in Staff → Notifications → Oil check reminder: turning it on again (or "Show
+        // it again") clears their earlier answer so they see it once more
+        async function setOilRemind(k, on) {
+            const e = employees[k];
+            if (!e) return;
+            const was = noticeOn(e, OIL_NOTICE), name = NOTICES[OIL_NOTICE].name, u = {};
+            u[P.employees + "/" + k + "/notices/" + OIL_NOTICE] = on ? true : null;
+            if (on && noticeAt(k, OIL_NOTICE)) u[P.noticeAcks + "/" + k + "/" + OIL_NOTICE] = null;
+            try {
+                await update(ref(db), u);
+                await logEmpAudit(k, "emp-edit", [name + (on ? (was ? ": shown again" : ": on") : ": off")], { name: displayName(e, e.email) });
+                closeModal("owModal");
+                toast(name + (on ? (was ? " will show again for " : " on for ") : " off for ") + displayName(e, e.email) + ".");
+            } catch (err) { toast("Couldn't save: " + errText(err), true); }
+        }
+        $("sheets").addEventListener("click", e => {
+            const b = e.target.closest("[data-ow-open]");
+            if (b) openOilBox(b.dataset.owOpen);
+        });
+        $("owGo").addEventListener("click", () => { const e = employees[owK], on = noticeOn(e, OIL_NOTICE), at = noticeAt(owK, OIL_NOTICE); setOilRemind(owK, !on || !!at); });
+        $("owOff").addEventListener("click", () => setOilRemind(owK, false));
+        $("owBody").addEventListener("click", e => { if (e.target.closest("[data-ow-pic]")) { $("pvImg").src = NOTICES[OIL_NOTICE].pic; $("pvImg").alt = NOTICES[OIL_NOTICE].name + ", as drivers see it"; openModal("pvModal"); } });
+
         function inboxData() {
             const fixes = [];
             for (const [k, list] of Object.entries(requestsAll)) for (const [id, r] of Object.entries(list || {})) if (r && r.kind) fixes.push(Object.assign({ ek: k, id: id }, r));
