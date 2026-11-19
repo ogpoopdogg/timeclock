@@ -100,6 +100,23 @@ the clock*. The day and its hours are on the left; overtime, oil, long shift, ed
 the admin's note are on the right. Pick one employee with the buttons above the
 timesheets, or **All employees**.
 
+### Oil checks this week (one employee picked)
+
+With one employee picked (not **All employees**), their timesheet shows **Oil checks this
+week** under the hours: one tile per day for each vehicle they drove, green *Checked*, red
+*Not checked*, blue *Not yet* (still on the clock), grey *Not due* or *Not asked* (a vehicle
+taken over from another driver, given by the office, or a second vehicle after the shift's
+one oil check), or *Shop*. Hold the mouse on a tile to see why. The top right says how many
+of the checks due were done.
+
+The **Oil reminder** button by their name shows whether the oil check reminder (the same
+one as **Staff → Notifications**) is On or Off; tap it to turn it on, off, or show it
+again. When they missed at least 2 of the checks due that week and at least 40% of them,
+the button glows red with *N missed* (3 soft pulses, then still) and a red line under the
+tiles offers **Turn on oil check reminder**, unless it's already on and they haven't read
+it yet. If they agreed to it before that week and still miss, it offers **Show oil check
+reminder again**.
+
 ## Installing the app, and how updates reach it
 
 Both pages install as apps: the time clock as **E&C Clock**, the admin panel as
