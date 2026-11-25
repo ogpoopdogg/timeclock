@@ -1163,7 +1163,7 @@
             fmtClockDur, fmtHours, shiftList, shiftMs, punchMinute, openShift, weekTotals, scheduleFor, vehicleList, manualVans, isManualVan, vanKey, gpsList, esc, errText,
             AUTH_MESSAGES, reportFailedSignIn, reportRefusedSignIn, reportSignedIn, DOW_KEYS, DOW_SHORT, DOW_LONG, vanHistory, hasCoords, LOCATION_ERRORS, mapsLink, addressJobs,
             oilState, oilSettled, oilPlanFor, sentLate, countedOut, farFromShop, farFromPlace, punchPlace, cleanSpots, SPOT_NAME_MAX, SPOT_RADIUS_MIN, SPOT_RADIUS_MAX, fmtDistance, rangeDays, vanTime, punchForFix, fixAskedFor, overlapping,
-            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE
+            longShift, LONG_SHIFT_MIN_HOURS, LONG_SHIFT_MAX_HOURS, PUNCH_NOTICE, PICK_NOTICE, VEHICLE_NOTICE, OIL_NOTICE
         } = core;
         const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js");
         const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } =
@@ -2825,12 +2825,14 @@
             if (old.spot && spots[old.spot]) fillSpotSelect(old.spot); // their punch spot comes along too
         });
 
-        // One-time reminders (see PUNCH_NOTICE, VEHICLE_NOTICE and OIL_NOTICE in tc-core.js): on for this employee, and when they agreed to it
+        // One-time reminders (see PUNCH_NOTICE, PICK_NOTICE, VEHICLE_NOTICE and OIL_NOTICE in tc-core.js): on for this employee, and when they agreed to it
         // Shown in Staff → Notifications under their category, in this order. pic: a picture of the pop-up drivers see,
         // taken from the driver app. Take it again when a reminder's wording or look changes.
         const NOTICES = {
             [PUNCH_NOTICE]: { name: "Punch time reminder", category: "Punching", pic: "reminders/punch.png", about: "Punch in when you arrive at work, and punch out when your work is done.",
                 icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
+            [PICK_NOTICE]: { name: "Vehicle pick reminder", category: "Vehicles", pic: "reminders/pick.png", about: "Pick your vehicle right after you punch in, and every time you change vehicles.",
+                icon: '<path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/>' },
             [VEHICLE_NOTICE]: { name: "Change vehicle reminder", category: "Vehicles", pic: "reminders/vehicle.png", about: "Tap Change vehicle every time you change vehicles, including swaps.",
                 icon: '<path d="M3 16V7a1 1 0 0 1 1-1h10v10"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>' },
             [OIL_NOTICE]: { name: "Oil check reminder", category: "Vehicles", pic: "reminders/oil.png", about: "We noticed you didn’t check your oil on multiple days this week. Please make sure you’re checking it, and tick the box when you do.",

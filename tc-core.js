@@ -88,10 +88,11 @@ export const P = {
 };
 
 // One-time reminders for the drivers an admin picks in Staff (employees/{ek}/notices/{id} = true):
-// the punch time reminder, the change vehicle reminder and the oil check reminder. The driver's tap on its button is saved at
+// the punch time reminder, the vehicle pick reminder, the change vehicle reminder and the oil check reminder. The driver's tap on its button is saved at
 // notice_acks/{ek}/{id} (server time) and it doesn't show again. Turning it off and on again in Staff clears that,
 // so it shows once more. The rules allow any id here, so a new reminder needs no rules change.
 export const PUNCH_NOTICE = "punch";
+export const PICK_NOTICE = "pick";
 export const VEHICLE_NOTICE = "vehicle";
 export const OIL_NOTICE = "oil";
 export function noticeDue(emp, acks, id) {

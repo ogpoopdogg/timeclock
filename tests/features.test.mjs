@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-')), 'core.mjs');
 fs.writeFileSync(tmp, 'const initializeApp=()=>({}),getAuth=()=>({}),initializeAuth=()=>({}),indexedDBLocalPersistence={},browserLocalPersistence={},browserSessionPersistence={},getDatabase=()=>({});const firebaseConfig={};\n' + src);
 const { vanTime, sentLate, farFromShop, farFromPlace, punchPlace, cleanSpots, shopShift, distanceM, oilState, hadVehicle, settingsWithDefaults, rangeDays, keyToEpoch, vehicleList, vanKey, isManualVan,
-  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, officeHandoff, punchForFix, fixAskedFor, officeNote, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, P } = await import(pathToFileURL(tmp).href);
+  cleanOilPlan, oilPlanFor, oilNextDue, oilDue, oilSettled, oilHandoffVehicle, officeHandoff, punchForFix, fixAskedFor, officeNote, overlapping, countedOut, shiftMs, weekTotals, weekDays, noticeDue, PUNCH_NOTICE, PICK_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, P } = await import(pathToFileURL(tmp).href);
 const H = 3600000, M = 60000;
 const t0 = keyToEpoch('2026-10-12', '08:00');
 
@@ -314,6 +314,15 @@ test('oil check reminder: its own switch and answer, separate from the other rem
   assert.strictEqual(noticeDue(all, { oil: 1762333320000 }, OIL_NOTICE), false);
   assert.strictEqual(noticeDue(all, { oil: 1762333320000 }, VEHICLE_NOTICE), true);
   assert.strictEqual(noticeDue({ notices: { vehicle: true } }, {}, OIL_NOTICE), false);
+});
+
+test('vehicle pick reminder: its own switch and answer, separate from the other reminders', () => {
+  assert.strictEqual(PICK_NOTICE, 'pick');
+  const all = { notices: { punch: true, pick: true, vehicle: true, oil: true } };
+  assert.strictEqual(noticeDue(all, { punch: 1762333320000, vehicle: 1762333320000, oil: 1762333320000 }, PICK_NOTICE), true);
+  assert.strictEqual(noticeDue(all, { pick: 1762333320000 }, PICK_NOTICE), false);
+  assert.strictEqual(noticeDue(all, { pick: 1762333320000 }, VEHICLE_NOTICE), true);
+  assert.strictEqual(noticeDue({ notices: { vehicle: true } }, {}, PICK_NOTICE), false);
 });
 
 test('office changes: the driver only sees ones they asked for', () => {

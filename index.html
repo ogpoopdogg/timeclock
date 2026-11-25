@@ -645,6 +645,7 @@
         .rm-ticks li { display: flex; gap: 12px; align-items: center; font-size: 1rem; }
         .rm-ticks .rm-ic { width: 32px; height: 32px; background: rgba(53, 208, 127, 0.12); color: var(--green); }
         .rm-ticks .rm-ic svg { width: 18px; height: 18px; }
+        .rm-ticks strong { font-weight: 700; }
         .rm-must { display: flex; gap: 12px; align-items: center; padding: 12px 14px; margin: 4px 0 10px; border-radius: 14px; background: rgba(255, 204, 0, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 204, 0, 0.3); }
         .rm-must p { color: var(--muted); font-size: 0.93rem; line-height: 1.4; }
         .rm-must strong { color: var(--text); }
@@ -901,7 +902,7 @@
             auth, db, P, TZ, settingsWithDefaults, emailKey, normEmail, displayName, firstName, nicknameFor,
             zoned, dayKey, addDaysKey, keyToEpoch, weekStartKey, weekDays, fmtTime, fmtKey, fmtHHMM, fmtDur,
             fmtClockDur, fmtHours, shiftList, openShift, weekTotals, countedOut, sentLate, scheduleFor, vehicleList, isManualVan, vanHistory, hadVehicle, esc, errText,
-            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, officeHandoff, punchForFix, officeNote, longShift, PUNCH_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, noticeDue,
+            vanKey, oilPlanFor, oilDue, oilSettled, oilHandoffVehicle, officeHandoff, punchForFix, officeNote, longShift, PUNCH_NOTICE, PICK_NOTICE, VEHICLE_NOTICE, OIL_NOTICE, noticeDue,
             AUTH_MESSAGES, DOW_SHORT, readLocation, hasCoords, reportFailedSignIn, reportRefusedSignIn, reportSignedIn
         } = core;
         const { onAuthStateChanged, signInWithEmailAndPassword, signOut } =
@@ -2131,13 +2132,14 @@
         // Vehicle swap: the driver handing off a vehicle (or whose vehicle another driver took) is asked about its oil
         // right then, if they haven't ticked it yet. Some drivers only tick it at punch out, and the driver taking the
         // vehicle isn't responsible for its oil. The answer settles the shift's oil (see oilSettled() in tc-core.js).
-        // ---------- One-time reminders (punch time, change vehicle, oil check) ----------
+        // ---------- One-time reminders (punch time, vehicle pick, change vehicle, oil check) ----------
         // Shown one time to the drivers an admin picked (Staff → Notifications), before
         // anything else on the clock screen, one after the other. Only the button closes each one. The tap is saved with
         // the server's time, and the admin sees it on Staff.
         function showNotices() {
             if (!acks || formOpen || sheetOpen || holding || busy || $("success").classList.contains("show")) return;
             if (noticeDue(emp, acks, PUNCH_NOTICE)) showPunchNotice();
+            else if (noticeDue(emp, acks, PICK_NOTICE)) showPickNotice();
             else if (noticeDue(emp, acks, VEHICLE_NOTICE)) showVehicleNotice();
             else if (noticeDue(emp, acks, OIL_NOTICE)) showOilNotice();
         }
@@ -2194,6 +2196,29 @@
                 onClose: showNotices
             });
         }
+        // Vehicle pick reminder: pick your vehicle right after punching in (Shop if in the shop, Not driving today if not in
+        // a vehicle), and every time you change vehicles. It's part of the job.
+        function showPickNotice() {
+            openForm({
+                kicker: "Important",
+                important: true,
+                title: "Vehicle pick is required",
+                sub: "Pick your vehicle right after you punch in, and every time you change vehicles.",
+                body: '<ul class="rm-ticks">' +
+                    "<li>" + RM_CHECK + "<span>In the shop? Tap <strong>Shop</strong></span></li>" +
+                    "<li>" + RM_CHECK + "<span>Not in a vehicle? Tap <strong>Not driving today</strong></span></li></ul>" +
+                    '<div class="rm-must">' + RM_CHECK + "<p><strong>This is part of your job.</strong> Thank you for helping keep things running smoothly.</p></div>" +
+                    '<div class="rm-call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>' +
+                    "<p>Questions or concerns? Please call or text.</p></div>",
+                submit: "I have read and understand",
+                noCancel: true,
+                mustAnswer: true,
+                offline: true,
+                onSubmit: () => saveNoticeAck(PICK_NOTICE),
+                onClose: showNotices
+            });
+        }
+
         // The arrow from "Tap this button" to the button in the copy of the vehicle bar (or from "Tap this box" to the
         // copy of the Oil check box, a bit right of its middle)
         function drawNoticeArrow() {
