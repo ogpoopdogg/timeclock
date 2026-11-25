@@ -366,14 +366,14 @@ ones. Hover over any cell or bar for the numbers.
 ## Notifications (one-time reminders)
 
 All the one-time reminders are in **Staff → Notifications**, grouped by category
-(**Punching**: Punch time reminder; **Vehicles**: Change vehicle reminder, Oil check reminder). Each one shows how
+(**Punching**: Punch time reminder; **Vehicles**: Vehicle pick reminder, Change vehicle reminder, Oil check reminder). Each one shows how
 many ticked drivers have agreed and how many are still waiting. Tap one to open its tick list
 (**‹ Notifications** goes back). The yellow number on the button is how many drivers still have
 a reminder to read. A new reminder goes in `NOTICES` in `admin.html` with its category.
 
 Each reminder's tick list starts with **What drivers see**: a picture of the pop-up as it looks on
 the driver's phone (tap it, or **See full size**, to see it full size). The pictures are in `reminders/`
-(`punch.png`, `vehicle.png`, `oil.png`), taken from the driver app at phone size. When a reminder's
+(`punch.png`, `pick.png`, `vehicle.png`, `oil.png`), taken from the driver app at phone size. When a reminder's
 wording or look changes, take its picture again, and give a new reminder a picture (`pic` in `NOTICES`).
 
 ## Punch time reminder
@@ -437,9 +437,25 @@ arrow, and **2. Tick this and tap Save** with a copy of the *I checked the oil* 
 
 - Saved at `employees/<ek>/notices/oil` and `timeclock/notice_acks/<ek>/oil`, with the same
   **Show again** and **Takes the place of** behaviour as the other reminders.
-- A driver ticked for more than one sees them in order: punch time, change vehicle, oil check.
+- A driver ticked for more than one sees them in order: punch time, vehicle pick, change vehicle, oil check.
 - The wording says "this week", so tick drivers soon after you notice the missed checks.
 - **No rules change.**
+
+## Vehicle pick reminder
+
+A fourth one-time message, set up the same way: **Staff → Notifications → Vehicle pick reminder**
+(under **Vehicles**), tick the drivers, save. It's for drivers who punch in without picking a
+vehicle. The pop-up (marked *Important* in red) is titled *Vehicle pick is required* and says:
+*Pick your vehicle right after you punch in, and every time you change vehicles.* Then: *In the
+shop? Tap **Shop***, *Not in a vehicle? Tap **Not driving today***, *This is part of your job.
+Thank you for helping keep things running smoothly.*, and *Questions or concerns? Please call or
+text.* Only **I have read and understand** closes it. It's only a reminder: drivers can still
+punch in without picking.
+
+- Saved at `employees/<ek>/notices/pick` and `timeclock/notice_acks/<ek>/pick`, with the same
+  **Show again** and **Takes the place of** behaviour as the other reminders.
+- **No rules change.**
+
 ## Punch locations
 
 Each punch in, punch out and van swap saves where the phone was: latitude, longitude
